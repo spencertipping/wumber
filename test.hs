@@ -1,27 +1,27 @@
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE FlexibleContexts, FlexibleInstances #-}
 
 module Main where
 
 import Numeric.Units.Dimensional as ND
 import Numeric.Units.Dimensional.SIUnits
 
-data Dim = MM | CM deriving Show
-data Len = L !Dim !Float deriving Show
+import Prelude hiding ((*))
 
-instance Num Len where
-  (L d x) + (L _ y) = L d (x Prelude.+ y)
-  (L d x) - (L _ y) = L d (x Prelude.- y)
-  (L d x) * (L _ y) = L d (x Prelude.* y)
+instance (Num a) => Num (Unit m t a -> Quantity t a) where
+  fromInteger i = \d -> fromIntegral i *~ d
 
-instance Num (Dim -> Len) where
-  fromInteger i = \d -> L d (fromIntegral i)
+instance (Fractional a) => Fractional (Unit m t a -> Quantity t a) where
+  fromRational r = \d -> fromRational r *~ d
 
-mm = MM
-cm = CM
+mm :: Unit 'NonMetric DLength Float
+mm = milli meter
+mm² = mm ND.* mm
 
+-- Hot damn, we might be onto something here
 main :: IO ()
 main = do
-  let l = 5mm :: Len
-  putStrLn $ show l
-  putStrLn $ show (meter)
+  putStrLn $ show (15mm  :: Quantity DLength Float)
+  putStrLn $ show (15mm² :: Quantity (DLength * DLength) Float)
+  putStrLn $ show (1 *~ (meter ND.* meter ND.* gram))
