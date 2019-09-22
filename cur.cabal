@@ -1,0 +1,24 @@
+cabal-version:       >=1.10
+name:                cur
+version:             0.1.0.0
+synopsis:            CAD for Haskell
+-- description:
+license:             GPL-3
+license-file:        LICENSE
+author:              Spencer Tipping
+maintainer:          spencer.tipping@gmail.com
+copyright:           Copyright (C) 2019, Spencer Tipping and Joyce Tipping
+category:            CAD
+build-type:          Simple
+extra-source-files:  CHANGELOG.md, README.md
+
+library
+  exposed-modules:     Cur
+  build-depends:       base >= 4.9
+                     , linear
+                     , hint
+                     , hmatrix
+                     , units
+                     , units-defs
+
+  default-language:    Haskell2010

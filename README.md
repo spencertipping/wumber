@@ -12,3 +12,13 @@ It's really tempting to use `dimensional` because it provides a great way to
 represent physical quantities -- and that's important for CAD -- but it also
 muddies up the syntax something fierce. If I get into FEA or anything I'll
 probably use it, but for now I'm going to stick with thinner types.
+
+
+## Linear algebra
+Two libraries for this:
+
+- `Linear`: high-level vectors (`Num a => V3 a`)
+- `HMatrix`: BLAS/LAPACK integration
+
+We define the translation layer between the two, as well as providing the
+notation.
