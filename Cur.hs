@@ -1,3 +1,6 @@
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE DataKinds #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE IncoherentInstances #-}
 {-# LANGUAGE FlexibleContexts, FlexibleInstances #-}
 
@@ -5,11 +8,11 @@ module Cur where
 
 import Data.Dimensions.SI
 import Data.Metrology
-import Data.Metrology.SI
 import Data.Units.SI
+import Data.Units.SI.Prefixes
 import Data.Units.US
 import Language.Haskell.Interpreter
-import Linear
+import Linear hiding (zero)
 import Numeric.LinearAlgebra
 
 
@@ -26,10 +29,10 @@ x = X
 y = Y
 z = Z
 
-vec :: Num a => a -> Coordinate -> V3 a
-vec n X = V3 n 0 0
-vec n Y = V3 0 n 0
-vec n Z = V3 0 0 n
+vec :: Num n => Qu d l n -> Coordinate -> V3 (Qu d l n)
+vec n X = V3 n zero zero
+vec n Y = V3 zero n zero
+vec n Z = V3 zero zero n
 
 
 plus'  x y u = x u + y u
@@ -42,46 +45,53 @@ abs'    x u = abs (x u)
 signum' x u = signum (x u)
 
 
+type Len = Qu '[ 'F Length One] 'DefaultLCSU Double
+
+km = Kilo :@ Meter
 m  = Meter
-cm = 0.01m
-mm = 0.001m :: Double
-μm = 0.001mm :: Double
+cm = Centi :@ Meter
+mm = Milli :@ Meter
+μm = Micro :@ Meter
+nm = Nano  :@ Meter
+
+kg = Kilo :@ Gram
+g  = Gram
+mg = Milli :@ Gram
+μg = Micro :@ Gram
 
 
 type P = V3 Double
 
-instance (Unit u, Fractional a) => Num (u -> a) where
-  fromInteger x u = fromInteger x
-  (+) = plus'
-  (-) = minus'
-  (*) = times'
-  abs = abs'
-  signum = signum'
 
-instance (Unit u, Fractional a) => Fractional (u -> a) where
-  fromRational x u = fromRational x
-  (/) = div'
+instance (
+  Subset (CanonicalUnitsOfFactors (UnitFactorsOf unit))
+         (CanonicalUnitsOfFactors (LookupList dim 'DefaultLCSU)),
+  Subset (CanonicalUnitsOfFactors (LookupList dim 'DefaultLCSU))
+         (CanonicalUnitsOfFactors (UnitFactorsOf unit)),
+  UnitFactor (LookupList dim 'DefaultLCSU),
+  Unit unit, dim ~ DimFactorsOf (DimOfUnit unit), Fractional n) =>
+  Num (unit -> Qu dim 'DefaultLCSU n) where
 
-instance Num a => Num (Coordinate -> V3 a) where
-  fromInteger x c = vec (fromInteger x) c
-  (+) = plus'
-  (-) = minus'
-  (*) = times'
-  abs = abs'
-  signum = signum'
+  fromInteger x u = fromInteger x % u
 
-instance Fractional a => Fractional (Coordinate -> V3 a) where
-  fromRational x c = vec (fromRational x) c
-  (/) = div'
+instance (
+  Subset (CanonicalUnitsOfFactors (UnitFactorsOf unit))
+         (CanonicalUnitsOfFactors (LookupList dim 'DefaultLCSU)),
+  Subset (CanonicalUnitsOfFactors (LookupList dim 'DefaultLCSU))
+         (CanonicalUnitsOfFactors (UnitFactorsOf unit)),
+  UnitFactor (LookupList dim 'DefaultLCSU),
+  Unit unit, dim ~ DimFactorsOf (DimOfUnit unit), Fractional n) =>
+  Fractional (unit -> Qu dim 'DefaultLCSU n) where
 
-instance Num a => Num (a -> a) where
-  fromInteger n = (*) (fromInteger n)
-  (+) = plus'
-  (-) = minus'
-  (*) = times'
-  abs = abs'
-  signum = signum'
+  fromRational x u = fromRational x % u
 
-instance Fractional a => Fractional (a -> a) where
-  fromRational n = (*) (fromRational n)
-  (/) = div'
+
+instance Num a => Num (Coordinate -> V3 (Qu d l a))
+
+instance Fractional a => Fractional (Coordinate -> V3 (Qu d l a))
+
+
+-- TODO: make this work
+-- Right now it fails because Qu ... isn't a function; I think we need a
+-- typeclass that's aware of vector-like things
+-- v = (10nm |+| 15nm) x :: V3 Len
