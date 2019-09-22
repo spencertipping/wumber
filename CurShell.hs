@@ -10,9 +10,11 @@ import Cur
 import qualified Data.ByteString as BS
 import qualified Data.ByteString.UTF8 as B8
 import Data.Maybe
+import GHC.Float
 import Graphics.Gloss
-import Graphics.Gloss.Interface.IO.Animate as A
+import Graphics.Gloss.Interface.IO.Display as D
 import Language.Haskell.Interpreter
+import System.Clock
 import System.Environment
 import System.INotify
 import System.IO.Unsafe
@@ -54,13 +56,20 @@ compiler pic f = do
   render pic f (Modified False Nothing)
 
 
+now :: IO Double
+now = do t <- fromIntegral <$> toNanoSecs <$> getTime Realtime
+         return $! t / 1000000000.0
+
+
 main :: IO ()
 main = do
   fname:_ <- getArgs
   pic     <- newMVar Nothing
+  t0      <- now
   forkIO $ compiler pic fname
-  animateIO (InWindow "Cur" (1920, 1080) (100, 100))
+  displayIO (InWindow "Cur" (1920, 1080) (100, 100))
             (makeColor 0.2 0.2 0.2 0)
-            (\t -> do f <- fromMaybe loading <$> readMVar pic
-                      return $ f t)
-            (\c -> return ())
+            (do t <- now
+                f <- fromMaybe loading <$> readMVar pic
+                return $ f (double2Float $ t - t0))
+            controllerSetRedraw

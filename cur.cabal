@@ -17,6 +17,7 @@ executable cur
   other-modules:       Cur
   build-depends:       base >= 4.9
                      , bytestring
+                     , clock
                      , gloss
                      , hinotify
                      , hint
