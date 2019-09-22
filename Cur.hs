@@ -3,16 +3,23 @@
 
 module Cur where
 
-{-
 import Data.Dimensions.SI
 import Data.Metrology
 import Data.Metrology.SI
 import Data.Units.SI
 import Data.Units.US
--}
+import Language.Haskell.Interpreter
 import Linear
 import Numeric.LinearAlgebra
 
+
+say :: String -> Interpreter ()
+say = liftIO . putStrLn
+
+doit :: Interpreter [Int]
+doit = do
+  setImportsQ [("Prelude", Nothing)]
+  interpret "5:[]" (as :: [Int])
 
 data Coordinate = X | Y | Z
 x = X
@@ -35,21 +42,25 @@ abs'    x u = abs (x u)
 signum' x u = signum (x u)
 
 
+m  = Meter
+cm = 0.01m
+mm = 0.001m :: Double
+μm = 0.001mm :: Double
+
+
 type P = V3 Double
 
-{-
-instance (UnitFactorsOf u, Fractional a) => Num (u -> a) where
-  fromInteger x u = fromInteger x * factor u
+instance (Unit u, Fractional a) => Num (u -> a) where
+  fromInteger x u = fromInteger x
   (+) = plus'
   (-) = minus'
   (*) = times'
   abs = abs'
   signum = signum'
 
-instance Fractional a => Fractional (Unit -> a) where
-  fromRational x u = fromRational x * factor u
+instance (Unit u, Fractional a) => Fractional (u -> a) where
+  fromRational x u = fromRational x
   (/) = div'
--}
 
 instance Num a => Num (Coordinate -> V3 a) where
   fromInteger x c = vec (fromInteger x) c
