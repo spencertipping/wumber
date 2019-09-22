@@ -2,18 +2,16 @@ module Test where
 import Graphics.Gloss
 import Cur
 
-pmap :: (a -> Picture) -> [a] -> Picture
-pmap f xs = pictures $ map f xs
 
-circles :: Float -> Picture
-circles t = pmap (\x -> Circle ((sin t * x) `max` 20)) [30, 40, 100, 400, 500]
+for = flip map
 
-rects :: Float -> Picture
-rects t = pmap (\x -> scale (cos t * x) (cos t * x)
-                     $ rotate (x * x * t / 4)
-                     $ rectangleWire x x) [1..30]
+
+loading :: Float -> Picture
+loading t = color (makeColor 0.8 0.8 0.9 0.8)
+  $ pictures
+  $ for (map (* 10) [30..60])
+  $ \i -> rotate (i * sin (t / 3) / 4) $ Circle i
+
 
 pic :: Float -> Picture
-pic t = color white
-  $ rotate (t * 10)
-  $ pictures [translate (-400) 0 (circles t), translate 400 0 (rects t)]
+pic = loading

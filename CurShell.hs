@@ -12,7 +12,7 @@ import qualified Data.ByteString.UTF8 as B8
 import Data.Maybe
 import GHC.Float
 import Graphics.Gloss
-import Graphics.Gloss.Interface.IO.Display as D
+import Graphics.Gloss.Interface.IO.Animate as A
 import Language.Haskell.Interpreter
 import System.Clock
 import System.Environment
@@ -27,7 +27,7 @@ type StoredPic = Maybe (Float -> Picture)
 loading :: Float -> Picture
 loading t = color (makeColor 0.8 0.8 0.9 0.8)
   $ pictures
-  $ map (\x -> rotate (sin t * x) (rectangleWire x x))
+  $ map (\x -> rotate (sin t * x) (Arc x (x*2) x))
   $ map (** 2) [1..20]
 
 
@@ -65,11 +65,9 @@ main :: IO ()
 main = do
   fname:_ <- getArgs
   pic     <- newMVar Nothing
-  t0      <- now
   forkIO $ compiler pic fname
-  displayIO (InWindow "Cur" (1920, 1080) (100, 100))
+  animateIO (InWindow "Cur" (1920, 1080) (100, 100))
             (makeColor 0.2 0.2 0.2 0)
-            (do t <- now
-                f <- fromMaybe loading <$> readMVar pic
-                return $ f (double2Float $ t - t0))
-            controllerSetRedraw
+            (\t -> do f <- fromMaybe loading <$> readMVar pic
+                      return $ f t)
+            (\c -> return ())
