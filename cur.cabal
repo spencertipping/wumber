@@ -23,6 +23,7 @@ executable cur
                      , hint
                      , hmatrix
                      , linear
+                     , mtl
                      , units
                      , units-defs
                      , utf8-string

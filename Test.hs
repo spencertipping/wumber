@@ -1,16 +1,16 @@
+{-# LANGUAGE BlockArguments #-}
+
 module Test where
+import Control.Monad
 import Graphics.Gloss
+
 import Cur
 
 
-for = flip map
+square s = do
+  replicateM 80 do
+    fd 500
+    rt 90.5
 
 
-loading :: Float -> Picture
-loading t = color (makeColor 0.8 0.8 0.9 0.8)
-  $ pictures
-  $ for (map (* 10) [30..60])
-  $ \i -> rotate (i * sin (t / 3) / 4) $ Circle i
-
-pic :: Float -> Picture
-pic = loading
+pic x = color (makeColor 0.8 0.8 0.9 0.8) $ runT (square 500)

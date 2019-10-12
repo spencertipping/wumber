@@ -21,8 +21,8 @@ loading t = color (makeColor 0.8 0.8 0.9 0.8)
   $ map (** 2) [1..20]
 
 
-render :: MVar (Maybe (Float -> Picture)) -> FilePath -> Event -> IO ()
-render pic f e = do
+render :: MVar (Maybe (Float -> Picture)) -> FilePath -> IO ()
+render pic f = do
   r <- runInterpreter do
     loadModules [f]
     setImportsQ [("Prelude", Nothing),
@@ -43,8 +43,8 @@ render pic f e = do
 compiler :: MVar (Maybe (Float -> Picture)) -> FilePath -> IO ()
 compiler pic f = do
   i <- initINotify
-  addWatch i [MoveIn, Modify] (B8.fromString f) (render pic f)
-  render pic f (Modified False Nothing)
+  addWatch i [MoveIn, Modify] (B8.fromString f) (const $ render pic f)
+  render pic f
 
 
 main :: IO ()
