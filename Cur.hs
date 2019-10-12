@@ -14,6 +14,7 @@ import Lens.Micro.TH
 import Linear.Matrix
 import Linear.V3
 import Linear.V4
+import Linear.Vector
 
 
 {-
@@ -53,6 +54,9 @@ makeLenses ''View
 makeLenses ''Cursor
 makeLenses ''BoundingBox
 
+runCur :: Cur a -> Picture
+runCur m = pictures $ snd $ execRWS m init_view init_cursor
+
 instance Bounded Double where
   minBound = -(1/0)
   maxBound = 1/0
@@ -81,26 +85,11 @@ bb_intersect (BB (V3 x1 y1 z1) (V3 x2 y2 z2)) (V3 x y z) =
   y1 <= y && y <= y2 &&
   z1 <= z && z <= z2
 
--- TODO: improve bounding box intersection logic by specializing it per output
--- picture
-{-# INLINE emit #-}
-emit :: Picture -> Cur ()
-emit p = do
-  bb <- asks _vbox
-  l  <- gets _cl
-  when (bb_intersect bb l) $ tell [p]
-
-to :: V3 Double -> Cur ()
-to v2 = do
-  v1       <- gets _cl
-  (x1, y1) <- pp v1
-  (x2, y2) <- pp v2
-  emit $ Line [(x1, y1), (x2, y2)]
-  modify $ cl .~ v2
-
+{-# INLINE jump #-}
 jump :: V3 Double -> Cur ()
 jump v = modify $ cl .~ v
 
+{-# INLINE transform #-}
 transform :: M33 Double -> Cur ()
 transform m = modify $ cm %~ (!*! m)
 
@@ -122,6 +111,22 @@ fork p m = do
   b  <- gets _cbind
   put $ c0 & cbind %~ M.union b
   return v
+
+fline :: (Cursor -> V3 Double) -> Cur ()
+fline f = do
+  v1 <- gets _cl >>= pp
+  v2 <- f <$> get
+  pp v2 >>= \v2' -> tell [Line [v1, v2']]
+  modify $ cl .~ v2
+
+lx d = fline \(C cl m _ _) -> cl ^+^ m^._x ^* d
+ly d = fline \(C cl m _ _) -> cl ^+^ m^._y ^* d
+lz d = fline \(C cl m _ _) -> cl ^+^ m^._z ^* d
+
+
+square sz = replicateM 50 do
+  ly sz
+  rz 90.5
 
 
 data TurtleState = TS { _ts_loc   :: !Point,
