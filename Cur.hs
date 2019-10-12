@@ -7,11 +7,12 @@ import Control.Monad.Identity
 import Control.Monad.RWS.Strict
 import Data.Map as M
 import Data.Text as T
+import Debug.Trace
 import GHC.Float
 import Graphics.Gloss
 import Lens.Micro
 import Lens.Micro.TH
-import Linear.Matrix
+import Linear.Matrix hiding (trace)
 import Linear.V3
 import Linear.V4
 import Linear.Vector
@@ -62,20 +63,20 @@ instance Bounded Double where
   maxBound = 1/0
 
 init_cursor :: Cursor
-init_cursor = C (V3 0 0 0) identity [] M.empty
+init_cursor = C (V3 0 0 1) identity [] M.empty
 
 init_view :: View
-init_view = V (V4 (V4 1 0 0 0)
-                  (V4 0 1 0 0)
+init_view = V (V4 (V4 1080 0 0 0)
+                  (V4 0 1080 0 0)
                   (V4 0 0 1 0)
                   (V4 0 0 1 0)) (BB minBound maxBound)
 
 
-pp :: V3 Double -> Cur Point
+pp :: V3 Double -> Cur (Point, Double)
 pp v = do
   vm <- asks _vm
-  let V4 x y z w = vm !* point v
-  return (double2Float (x/w), double2Float (y/w))
+  let V4 x y z w = point v *! vm
+  return $ ((double2Float (x/z), double2Float (y/z)), z)
 
 
 {-# INLINE bb_intersect #-}
@@ -114,19 +115,16 @@ fork p m = do
 
 fline :: (Cursor -> V3 Double) -> Cur ()
 fline f = do
-  v1 <- gets _cl >>= pp
+  (v1, z1) <- gets _cl >>= pp
   v2 <- f <$> get
-  pp v2 >>= \v2' -> tell [Line [v1, v2']]
+  when (z1 > 0) do
+    (v2', z2') <- pp v2
+    when (z2' > 0) $ tell [Line [v1, v2']]
   modify $ cl .~ v2
 
 lx d = fline \(C cl m _ _) -> cl ^+^ m^._x ^* d
 ly d = fline \(C cl m _ _) -> cl ^+^ m^._y ^* d
 lz d = fline \(C cl m _ _) -> cl ^+^ m^._z ^* d
-
-
-square sz = replicateM 50 do
-  ly sz
-  rz 90.5
 
 
 data TurtleState = TS { _ts_loc   :: !Point,
