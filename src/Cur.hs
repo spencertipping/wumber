@@ -9,7 +9,8 @@ import Data.Map as M
 import Data.Text as T
 import Debug.Trace
 import GHC.Float
-import Graphics.Gloss
+import Graphics.Gloss.Data.Color
+import Graphics.Gloss.Data.Picture
 import Lens.Micro
 import Lens.Micro.TH
 import Linear.Matrix hiding (trace)
@@ -18,60 +19,40 @@ import Linear.V4
 import Linear.Vector
 
 
-{-
-Let's design the state we want.
-
-First, this thing is for 3D CAD -- so we're going for an interactive and
-detailed view into a model, and we're likely to want measurements.
-
-Some things we need:
-
-1. Objects that occupy 3D space
-2. Points with scoped names
-3. Measurements between things
-4. Calculated bounding boxes
-5. Axis metadata
-6. Viewport slicing
-7. Perspective projection
-8. Annotations
-
-It would be _very_ cool if we could define data models and drop them into a
-typeclass, then use lenses to access their elements.
--}
-
 type Cur = RWST View [Picture] Cursor Identity
 
-data View = V { _vm   :: !(M44 Double),
-                _vbox :: !BoundingBox }
+data View = V { _vm     :: !(M44 Double),
+                _vbox   :: !BoundingBox,
+                _vmouse :: Maybe Point }
+  deriving (Show)
 
-data Cursor = C { _cl    :: (V3 Double),
-                  _cm    :: (M33 Double),
-                  _cpath :: [Text],
-                  _cbind :: (Map Text (V3 Double)) }
+data Cursor = C { _cl     :: (V3 Double),
+                  _cm     :: (M33 Double),
+                  _ccolor :: Color,
+                  _cpath  :: [Text],
+                  _cbind  :: (Map Text (V3 Double)) }
+  deriving (Show)
 
 data BoundingBox = BB !(V3 Double) !(V3 Double)
+  deriving (Show)
 
 makeLenses ''View
 makeLenses ''Cursor
 makeLenses ''BoundingBox
 
-runCur :: Cur a -> Picture
-runCur m = pictures $ snd $ execRWS m init_view init_cursor
+runCur :: View -> Cur a -> Picture
+runCur v m = pictures $ snd $ execRWS m v init_cursor
+
 
 instance Bounded Double where
   minBound = -(1/0)
   maxBound = 1/0
 
 init_cursor :: Cursor
-init_cursor = C (V3 0 0 1) identity [] M.empty
-
-init_view :: View
-init_view = V (V4 (V4 1080 0 0 0)
-                  (V4 0 1080 0 0)
-                  (V4 0 0 1 0)
-                  (V4 0 0 1 0)) (BB minBound maxBound)
+init_cursor = C (V3 0 0 1) identity (makeColor 0.8 0.8 0.9 0.8) [] M.empty
 
 
+{-# INLINE pp #-}
 pp :: V3 Double -> Cur (Point, Double)
 pp v = do
   vm <- asks _vm
@@ -119,33 +100,13 @@ fline f = do
   v2 <- f <$> get
   when (z1 > 0) do
     (v2', z2') <- pp v2
-    when (z2' > 0) $ tell [Line [v1, v2']]
+    col        <- gets _ccolor
+    when (z2' > 0) $ tell [color col $ Line [v1, v2']]
   modify $ cl .~ v2
 
-lx d = fline \(C cl m _ _) -> cl ^+^ m^._x ^* d
-ly d = fline \(C cl m _ _) -> cl ^+^ m^._y ^* d
-lz d = fline \(C cl m _ _) -> cl ^+^ m^._z ^* d
+lx d = fline \(C cl m _ _ _) -> cl ^+^ m^._x ^* d
+ly d = fline \(C cl m _ _ _) -> cl ^+^ m^._y ^* d
+lz d = fline \(C cl m _ _ _) -> cl ^+^ m^._z ^* d
 
-
-data TurtleState = TS { _ts_loc   :: !Point,
-                        _ts_theta :: !Float }
-makeLenses ''TurtleState
-
-type CurM = RWST () Path TurtleState Identity
-
-runT :: CurM a -> Picture
-runT m = Line $ snd $ execRWS (do tell [(0, 0)]; m) () (TS (0, 0) 0)
-
-fd :: Float -> CurM ()
-fd d = do
-  TS (x, y) t <- get
-  let x' = x + d * cos t
-      y' = y + d * sin t
-  tell [(x', y')]
-  modify $ ts_loc .~ (x', y')
-
-rt :: Float -> CurM ()
-rt d = modify $ ts_theta %~ (+ d * pi / 180)
-
-lt :: Float -> CurM ()
-lt = rt . negate
+fg :: Float -> Float -> Float -> Float -> Cur ()
+fg r g b a = modify $ ccolor .~ makeColor r g b a
