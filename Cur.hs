@@ -40,12 +40,12 @@ typeclass, then use lenses to access their elements.
 type Cur = RWST View [Picture] Cursor Identity
 
 data View = V { _vm   :: !(M44 Double),
-                _vbox :: BoundingBox }
+                _vbox :: !BoundingBox }
 
-data Cursor = C { _cl    :: !(V3 Double),
-                  _cm    :: !(M33 Double),
-                  _cpath :: ![Text],
-                  _cbind :: !(Map [Text] (V3 Double)) }
+data Cursor = C { _cl    :: (V3 Double),
+                  _cm    :: (M33 Double),
+                  _cpath :: [Text],
+                  _cbind :: (Map Text (V3 Double)) }
 
 data BoundingBox = BB !(V3 Double) !(V3 Double)
 
@@ -90,11 +90,38 @@ emit p = do
   l  <- gets _cl
   when (bb_intersect bb l) $ tell [p]
 
-emit_line :: V3 Double -> V3 Double -> Cur ()
-emit_line v1 v2 = do
-  return ()
+to :: V3 Double -> Cur ()
+to v2 = do
+  v1       <- gets _cl
+  (x1, y1) <- pp v1
+  (x2, y2) <- pp v2
+  emit $ Line [(x1, y1), (x2, y2)]
+  modify $ cl .~ v2
 
+jump :: V3 Double -> Cur ()
+jump v = modify $ cl .~ v
 
+transform :: M33 Double -> Cur ()
+transform m = modify $ cm %~ (!*! m)
+
+d2r θ = θ / 180 * pi
+cs θ = (cos r, sin r) where r = d2r θ
+
+rx θ = transform (V3 (V3 1 0 0) (V3 0 c (-s)) (V3 0 s c)) where (c, s) = cs θ
+ry θ = transform (V3 (V3 c 0 s) (V3 0 1 0) (V3 (-s) 0 c)) where (c, s) = cs θ
+rz θ = transform (V3 (V3 c (-s) 0) (V3 s c 0) (V3 0 0 1)) where (c, s) = cs θ
+
+bind :: Text -> Cur ()
+bind t = do l <- gets _cl; modify $ cbind %~ M.insert t l
+
+fork :: Text -> Cur a -> Cur a
+fork p m = do
+  c0 <- get
+  modify $ cpath %~ (p :)
+  v  <- m
+  b  <- gets _cbind
+  put $ c0 & cbind %~ M.union b
+  return v
 
 
 data TurtleState = TS { _ts_loc   :: !Point,
