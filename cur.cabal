@@ -18,6 +18,7 @@ executable cur
   build-depends:       base >= 4.9
                      , bytestring
                      , clock
+                     , containers >= 0.6.0.1
                      , gloss
                      , hinotify
                      , hint
@@ -26,6 +27,7 @@ executable cur
                      , microlens
                      , microlens-th
                      , mtl
+                     , text >= 1.2.3.1
                      , units
                      , units-defs
                      , utf8-string
