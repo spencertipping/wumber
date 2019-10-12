@@ -9,7 +9,7 @@ import Graphics.Gloss
 
 square sz = replicateM_ 500 do
   ly sz
-  rz 90
+  rz 90.5
   rx 0.5
 
-main = do square 10; return ()
+main = do square 1; return ()

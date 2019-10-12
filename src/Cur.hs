@@ -50,7 +50,7 @@ instance Bounded Double where
   maxBound = 1/0
 
 init_cursor :: Cursor
-init_cursor = C (V3 0 0 1) identity (makeColor 0.8 0.8 0.9 0.8) [] M.empty
+init_cursor = C (V3 0 0 0) identity (makeColor 0.8 0.8 0.9 0.8) [] M.empty
 
 
 {-# INLINE pp #-}

@@ -13,6 +13,7 @@ import Graphics.Gloss.Interface.IO.Interact as I
 import Language.Haskell.Interpreter
 import Lens.Micro
 import Linear.Matrix hiding (trace)
+import Linear.V3
 import Linear.V4
 import System.Environment
 import System.INotify hiding (Event)
@@ -43,44 +44,50 @@ compiler pic f = do
   render pic f
 
 
+xsz = 1080
+ysz = 1080
+xfd = float2Double . (/ xsz)
+yfd = float2Double . (/ ysz)
+
 init_view :: View
-init_view = V (V4 (V4 1080 0 0 0)
-                  (V4 0 1080 0 0)
-                  (V4 0 0 1080 0)
+init_view = V (V4 (V4 1 0 0 0)
+                  (V4 0 1 0 0)
+                  (V4 0 0 1 1)
                   (V4 0 0 1 0))
               (BB minBound maxBound)
               (Modifiers Up Up Up, Nothing)
 
 
-f2d = float2Double
-
 update_view :: Event -> View -> View
 
 update_view (EventKey (Char 'r') _ _ _) _ = init_view
+update_view (EventKey (Char 'x') _ _ _) v =
+  v & vm._m33 .~ V3 (V3 0 0 1) (V3 0 1 0) (V3 1 0 0)
+
+update_view (EventKey (Char 'y') _ _ _) v =
+  v & vm._m33 .~ V3 (V3 1 0 0) (V3 0 0 1) (V3 0 1 0)
+
+update_view (EventKey (Char 'z') _ _ _) v = v & vm._m33 .~ identity
 
 update_view (EventKey (MouseButton LeftButton) Down m p) v = v & vmouse .~ (m, Just p)
 update_view (EventKey (MouseButton LeftButton) Up   m p) v = v & vmouse .~ (m, Nothing)
 update_view (EventMotion (x, y)) v =
   case _vmouse v of
     (Modifiers Up Up Up, Just (x0, y0)) ->
-      v & vm %~ (!+! V4 0 0 0 (V4 (f2d $ x - x0) (f2d $ y - y0) 0 0))
+      v & vm %~ (!+! V4 0 0 0 (V4 (xfd $ x - x0) (yfd $ y - y0) 0 0))
         & vmouse._2 .~ Just (x, y)
 
     (Modifiers Down Up Up, Just (x0, y0)) ->
-      v & vm %~ (V4 (V4   cx  0 sx 0)
-                    (V4    0  1  0 0)
-                    (V4 (-sx) 0 cx 0)
-                    (V4    0  0  0 1) !*!)
-
-        & vm %~ (V4 (V4 1  0    0  0)
-                    (V4 0 cy (-sy) 0)
-                    (V4 0 sy   cy  0)
-                    (V4 0  0    0  1) !*!)
-
+      v & vm._m33 %~ (!*! V3 (V3   cx  0 sx)
+                             (V3    0  1  0)
+                             (V3 (-sx) 0 cx))
+        & vm._m33 %~ (!*! V3 (V3 1  0    0)
+                             (V3 0 cy (-sy))
+                             (V3 0 sy   cy))
         & vmouse._2 .~ Just (x, y)
 
-        where (cx, sx) = cs $ f2d (x - x0)
-              (cy, sy) = cs $ f2d (y - y0)
+        where (cx, sx) = cs $ xfd (x - x0) * 360
+              (cy, sy) = cs $ yfd (y0 - y) * 360
 
     _ -> v
 
@@ -97,7 +104,7 @@ main = do
     (InWindow ("Cur " ++ fname) (1920, 1080) (100, 100))
     (makeColor 0.2 0.2 0.2 0)
     init_view
-    (\v -> runCur v <$> fromMaybe (return ()) <$> readMVar pic)
+    (\v -> scale xsz ysz <$> runCur v <$> fromMaybe (return ()) <$> readMVar pic)
     (\e v -> do Just c <- readIORef controller
                 controllerSetRedraw c
                 return $ update_view e v)
