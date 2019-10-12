@@ -76,7 +76,7 @@ jump v = modify $ cl .~ v
 
 {-# INLINE transform #-}
 transform :: M33 Double -> Cur ()
-transform m = modify $ cm %~ (!*! m)
+transform m = modify $ cm %~ (m !*!)
 
 d2r θ = θ / 180 * pi
 cs θ = (cos r, sin r) where r = d2r θ
