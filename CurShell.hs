@@ -46,10 +46,10 @@ compiler pic f = do
 init_view :: View
 init_view = V (V4 (V4 1080 0 0 0)
                   (V4 0 1080 0 0)
-                  (V4 0 0 1 0)
+                  (V4 0 0 1080 0)
                   (V4 0 0 1 0))
               (BB minBound maxBound)
-              Nothing
+              (Modifiers Up Up Up, Nothing)
 
 
 f2d = float2Double
@@ -58,14 +58,31 @@ update_view :: Event -> View -> View
 
 update_view (EventKey (Char 'r') _ _ _) _ = init_view
 
-update_view (EventKey (MouseButton LeftButton) Down _ p) v = v & vmouse .~ Just p
-update_view (EventKey (MouseButton LeftButton) Up   _ p) v = v & vmouse .~ Nothing
+update_view (EventKey (MouseButton LeftButton) Down m p) v = v & vmouse .~ (m, Just p)
+update_view (EventKey (MouseButton LeftButton) Up   m p) v = v & vmouse .~ (m, Nothing)
 update_view (EventMotion (x, y)) v =
   case _vmouse v of
-    Just (x0, y0) ->
+    (Modifiers Up Up Up, Just (x0, y0)) ->
       v & vm %~ (!+! V4 0 0 0 (V4 (f2d $ x - x0) (f2d $ y - y0) 0 0))
-        & vmouse .~ Just (x, y)
-    Nothing -> v
+        & vmouse._2 .~ Just (x, y)
+
+    (Modifiers Down Up Up, Just (x0, y0)) ->
+      v & vm %~ (V4 (V4   cx  0 sx 0)
+                    (V4    0  1  0 0)
+                    (V4 (-sx) 0 cx 0)
+                    (V4    0  0  0 1) !*!)
+
+        & vm %~ (V4 (V4 1  0    0  0)
+                    (V4 0 cy (-sy) 0)
+                    (V4 0 sy   cy  0)
+                    (V4 0  0    0  1) !*!)
+
+        & vmouse._2 .~ Just (x, y)
+
+        where (cx, sx) = cs $ f2d (x - x0)
+              (cy, sy) = cs $ f2d (y - y0)
+
+    _ -> v
 
 update_view _ v = v
 

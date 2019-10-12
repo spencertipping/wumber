@@ -11,6 +11,7 @@ import Debug.Trace
 import GHC.Float
 import Graphics.Gloss.Data.Color
 import Graphics.Gloss.Data.Picture
+import Graphics.Gloss.Interface.IO.Interact
 import Lens.Micro
 import Lens.Micro.TH
 import Linear.Matrix hiding (trace)
@@ -23,7 +24,7 @@ type Cur = RWST View [Picture] Cursor Identity
 
 data View = V { _vm     :: !(M44 Double),
                 _vbox   :: !BoundingBox,
-                _vmouse :: Maybe Point }
+                _vmouse :: (Modifiers, Maybe Point) }
   deriving (Show)
 
 data Cursor = C { _cl     :: (V3 Double),
