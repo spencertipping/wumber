@@ -74,7 +74,9 @@ update_view (EventKey (MouseButton LeftButton) Up   m p) v = v & vmouse .~ (m, N
 update_view (EventMotion (x, y)) v =
   case _vmouse v of
     (Modifiers Up Up Up, Just (x0, y0)) ->
-      v & vm %~ (!+! V4 0 0 0 (V4 (xfd $ x - x0) (yfd $ y - y0) 0 0))
+      v & vm %~ (!+! V4 (V4 0 0 0 (xfd $ x - x0))
+                        (V4 0 0 0 (yfd $ y - y0))
+                        0 0)
         & vmouse._2 .~ Just (x, y)
 
     (Modifiers Down Up Up, Just (x0, y0)) ->
