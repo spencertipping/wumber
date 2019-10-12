@@ -11,9 +11,9 @@ import Lens.Micro.TH
 
 data TurtleState = TS { _ts_loc   :: !Point,
                         _ts_theta :: !Float }
-type CurM = RWST () Path TurtleState Identity
-
 makeLenses ''TurtleState
+
+type CurM = RWST () Path TurtleState Identity
 
 runT :: CurM a -> Picture
 runT m = Line $ snd $ execRWS (do tell [(0, 0)]; m) () (TS (0, 0) 0)

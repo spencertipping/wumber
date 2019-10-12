@@ -13,6 +13,13 @@ import System.Environment
 import System.INotify
 import Text.Printf
 
+-- Cur imports, duplicated here to force them to load
+import Control.Monad.Identity
+import Control.Monad.RWS.Strict
+import Graphics.Gloss
+import Lens.Micro
+import Lens.Micro.TH
+
 
 loading :: Float -> Picture
 loading t = color (makeColor 0.8 0.8 0.9 0.8)
