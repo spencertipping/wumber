@@ -21,7 +21,13 @@ Some things we need:
 2. Points with scoped names
 3. Measurements between things
 4. Calculated bounding boxes
-TODO
+5. Axis metadata
+6. Viewport slicing
+7. Perspective projection
+8. Annotations
+
+It would be _very_ cool if we could define data models and drop them into a
+typeclass, then use lenses to access their elements.
 -}
 
 data TurtleState = TS { _ts_loc   :: !Point,
