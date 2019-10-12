@@ -23,6 +23,8 @@ executable cur
                      , hint
                      , hmatrix
                      , linear
+                     , microlens
+                     , microlens-th
                      , mtl
                      , units
                      , units-defs
