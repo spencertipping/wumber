@@ -14,6 +14,14 @@ Let's design the state we want.
 
 First, this thing is for 3D CAD -- so we're going for an interactive and
 detailed view into a model, and we're likely to want measurements.
+
+Some things we need:
+
+1. Objects that occupy 3D space
+2. Points with scoped names
+3. Measurements between things
+4. Calculated bounding boxes
+TODO
 -}
 
 data TurtleState = TS { _ts_loc   :: !Point,
