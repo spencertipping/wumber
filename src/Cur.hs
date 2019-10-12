@@ -119,3 +119,13 @@ jz d = do v <- gets _cl; m <- gets _cm; modify $ cl %~ (^+^ m^._z ^* d)
 
 fg :: Float -> Float -> Float -> Float -> Cur ()
 fg r g b a = modify $ ccolor .~ makeColor r g b a
+
+box x y z = do
+  lz z; jz (-z); lx x
+  lz z; jz (-z); ly y
+  lz z; jz (-z); lx (-x)
+  lz z; jz (-z); ly (-y)
+  jz z; lx x; ly y; lx (-x); ly (-y); jz (-z)
+
+screw n θ m = do replicateM_ n do fork "" m; rz θ
+                 rz (- (θ * fromIntegral n))
