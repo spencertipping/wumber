@@ -9,6 +9,13 @@ import Lens.Micro
 import Lens.Micro.TH
 
 
+{-
+Let's design the state we want.
+
+First, this thing is for 3D CAD -- so we're going for an interactive and
+detailed view into a model, and we're likely to want measurements.
+-}
+
 data TurtleState = TS { _ts_loc   :: !Point,
                         _ts_theta :: !Float }
 makeLenses ''TurtleState

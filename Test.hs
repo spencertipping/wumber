@@ -13,4 +13,5 @@ square s = do
     rt 90.5
 
 
-pic x = color (makeColor 0.8 0.8 0.9 0.8) $ runT (square 500)
+pic x = color (makeColor 0.8 0.8 0.9 0.8)
+  $ pictures [runT (square 500), Text "10.8mm"]

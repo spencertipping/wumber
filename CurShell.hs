@@ -3,10 +3,12 @@ module Main where
 
 import Control.Concurrent
 import Control.Concurrent.MVar
+import Cur
 import qualified Data.ByteString.UTF8 as B8
 import Data.Maybe
 import Graphics.Gloss
 import Graphics.Gloss.Interface.IO.Animate as A
+import Graphics.Gloss.Interface.IO.Interact as I
 import Language.Haskell.Interpreter
 import System.Environment
 import System.INotify
