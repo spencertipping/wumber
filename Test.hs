@@ -2,6 +2,7 @@
 {-# LANGUAGE BlockArguments #-}
 
 module Test where
+
 import Control.Monad
 import Control.Monad.Identity
 import Control.Monad.RWS.Strict
@@ -23,11 +24,12 @@ profile = do
   lx (-1)
   ly (-1)
 
-container = screw 30 12 profile
+container = screw 300 1.2 profile
 
 main = do
   zoom 0.01
   container
+  fork "" do { rx 90; jz 10; container }
   jx 32
   replicateM_ 4 do
     wall 5

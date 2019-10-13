@@ -17,6 +17,7 @@ import Graphics.Gloss.Interface.IO.Interact
 import Lens.Micro
 import Lens.Micro.TH
 import Linear.Matrix hiding (trace)
+import Linear.Projection
 import Linear.V3
 import Linear.V4
 import Linear.Vector
@@ -24,7 +25,11 @@ import Linear.Vector
 
 type Cur = RWST View [Picture] Cursor Identity
 
-data View = V { _vm     :: !(M44 Double),
+data View = V { _vt     :: !(V3 Double),
+                _vry    :: !Double,
+                _vrx    :: !Double,
+                _vz     :: !Double,
+                _vm     :: !(M44 Double),
                 _vbox   :: !BoundingBox,
                 _vmouse :: (Modifiers, Maybe Point) }
   deriving (Show)
@@ -44,7 +49,37 @@ makeLenses ''Cursor
 makeLenses ''BoundingBox
 
 runCur :: View -> Cur a -> Picture
-runCur v m = pictures $ snd $ execRWS m v init_cursor
+runCur v m = pictures $ snd $ execRWS m v' init_cursor
+  where v' = v & vm .~ view_matrix v
+
+
+rs_matrix :: View -> M33 Double
+rs_matrix v = V3 (V3 1    0   0)
+                 (V3 0   cx  sx)
+                 (V3 0 (-sx) cx)
+          !*! V3 (V3   cy  0 sy)
+                 (V3    0  1  0)
+                 (V3 (-sy) 0 cy)
+          !*! identity !!* _vz v
+  where (cy, sy) = cs (_vry v)
+        (cx, sx) = cs (_vrx v)
+
+
+view_matrix :: View -> M44 Double
+view_matrix v = V4 (V4 1 0 0 0)
+                   (V4 0 1 0 0)
+                   (V4 0 0 1 0)
+                   (V4 0 0 1 0)
+            !*! V4 (V4 1 0 0 0)
+                   (V4 0 1 0 0)
+                   (V4 0 0 1 1)
+                   (V4 0 0 0 1)
+            !*! (identity & _m33 .~ rs_matrix v)
+            !*! V4 (V4 1 0 0 (vt^._x))
+                   (V4 0 1 0 (vt^._y))
+                   (V4 0 0 1 (vt^._z))
+                   (V4 0 0 0 1)
+  where vt = _vt v
 
 
 instance Bounded Double where
@@ -60,7 +95,7 @@ pp :: V3 Double -> Cur (Point, Double)
 pp v = do
   vm <- asks _vm
   let V4 x y z w = vm !* point v
-  return $ ((double2Float (x/z), double2Float (y/z)), z)
+  return $ ((double2Float (x/w), double2Float (y/w)), z)
 
 
 {-# INLINE bb_intersect #-}

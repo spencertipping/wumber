@@ -15,6 +15,7 @@ import Lens.Micro
 import Linear.Matrix hiding (trace)
 import Linear.V3
 import Linear.V4
+import Linear.Vector
 import System.Environment
 import System.INotify hiding (Event)
 import Text.Printf
@@ -50,46 +51,41 @@ xfd = float2Double . (/ xsz)
 yfd = float2Double . (/ ysz)
 
 init_view :: View
-init_view = V (V4 (V4 1 0 0 0)
-                  (V4 0 1 0 0)
-                  (V4 0 0 1 1)
-                  (V4 0 0 1 0))
+init_view = V 0 0 0 1
+              identity
               (BB minBound maxBound)
               (Modifiers Up Up Up, Nothing)
 
 
 update_view :: Event -> View -> View
 
-update_view (EventKey (Char 'r') _ _ _) _ = init_view
-update_view (EventKey (Char 'x') _ _ _) v =
-  v & vm._m33 .~ V3 (V3 0 0 1) (V3 0 1 0) (V3 1 0 0)
+update_view (EventKey (Char 'r') Down _ _) _ = init_view
 
-update_view (EventKey (Char 'y') _ _ _) v =
-  v & vm._m33 .~ V3 (V3 1 0 0) (V3 0 0 1) (V3 0 1 0)
+update_view (EventKey (Char 'x') Down _ _) v = v & vry .~ 90 & vrx .~ 0
+update_view (EventKey (Char 'y') Down _ _) v = v & vry .~ 0  & vrx .~ 90
+update_view (EventKey (Char 'z') Down _ _) v = v & vry .~ 0  & vrx .~ 0
 
-update_view (EventKey (Char 'z') _ _ _) v = v & vm._m33 .~ identity
+update_view (EventKey (Char 'h') Down _ _) v = v & vt._x %~ (+ (-0.1) / _vz v)
+update_view (EventKey (Char 'l') Down _ _) v = v & vt._x %~ (+   0.1  / _vz v)
+update_view (EventKey (Char 'j') Down _ _) v = v & vt._y %~ (+ (-0.1) / _vz v)
+update_view (EventKey (Char 'k') Down _ _) v = v & vt._y %~ (+   0.1  / _vz v)
 
 update_view (EventKey (MouseButton LeftButton) Down m p) v = v & vmouse .~ (m, Just p)
 update_view (EventKey (MouseButton LeftButton) Up   m p) v = v & vmouse .~ (m, Nothing)
+
+update_view (EventKey (MouseButton WheelUp)   Down m p) v = v & vz %~ (* 1.1)
+update_view (EventKey (MouseButton WheelDown) Down m p) v = v & vz %~ (/ 1.1)
+
 update_view (EventMotion (x, y)) v =
   case _vmouse v of
     (Modifiers Up Up Up, Just (x0, y0)) ->
-      v & vm %~ (!+! V4 (V4 0 0 0 (xfd $ x - x0))
-                        (V4 0 0 0 (yfd $ y - y0))
-                        0 0)
+      v & vt %~ (^+^ inv33 (rs_matrix v) !* V3 (xfd $ x - x0) (yfd $ y - y0) 0)
         & vmouse._2 .~ Just (x, y)
 
     (Modifiers Down Up Up, Just (x0, y0)) ->
-      v & vm._m33 %~ (!*! V3 (V3   cx  0 sx)
-                             (V3    0  1  0)
-                             (V3 (-sx) 0 cx))
-        & vm._m33 %~ (!*! V3 (V3 1  0    0)
-                             (V3 0 cy (-sy))
-                             (V3 0 sy   cy))
+      v & vry %~ (+ xfd (x0 - x) * 360)
+        & vrx %~ (+ yfd (y0 - y) * 360)
         & vmouse._2 .~ Just (x, y)
-
-        where (cx, sx) = cs $ xfd (x - x0) * 360
-              (cy, sy) = cs $ yfd (y0 - y) * 360
 
     _ -> v
 
