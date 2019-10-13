@@ -32,8 +32,7 @@ data View = V { _vt     :: !(V3 Double),
                 _vp     :: !Bool,
                 _vrs    :: !(M33 Double),
                 _vm     :: !(M44 Double),
-                _vminz  :: !Double,
-                _vmaxz  :: !Double,
+                _vclipz :: !Double,
                 _vclipc :: !Color,
                 _vmouse :: (Modifiers, Maybe Point) }
   deriving (Show)
@@ -66,7 +65,6 @@ init_view :: View
 init_view = V 0 0 0 1 True
               identity
               identity
-              0
               maxBound
               (makeColor 0.8 0.8 0.9 0.05)
               (Modifiers Up Up Up, Nothing)
@@ -131,10 +129,9 @@ zoom x = transform (identity !!* x)
 bind :: Text -> Cur ()
 bind t = do l <- gets _cl; modify $ cbind %~ M.insert t l
 
-fork :: Text -> Cur a -> Cur a
-fork p m = do
+fork :: Cur a -> Cur a
+fork m = do
   c0 <- get
-  modify $ cpath %~ (++ T.splitOn "/" p)
   v  <- m
   b  <- gets _cbind
   put $ c0 & cbind %~ M.union b
@@ -142,14 +139,13 @@ fork p m = do
 
 fline :: (Cursor -> V3 Double) -> Cur ()
 fline f = do
-  minz      <- asks _vminz
-  maxz      <- asks _vmaxz
+  clipz     <- asks _vclipz
   v1        <- gets _cl
   v2        <- f <$> get
   (xy1, z1) <- pp v1
   when (z1 > 0) do
     (xy2, z2) <- pp v2
-    col       <- if z1 >= minz && z2 >= minz && z1 <= maxz && z2 <= maxz
+    col       <- if abs (z1-1) <= clipz && abs (z2-1) <= clipz
       then gets _ccolor
       else asks _vclipc
     when (z2 > 0) $ tell [color col $ Line [xy1, xy2]]
@@ -159,12 +155,21 @@ lx d = fline \(C cl m _ _ _) -> cl ^+^ m^._x ^* d
 ly d = fline \(C cl m _ _ _) -> cl ^+^ m^._y ^* d
 lz d = fline \(C cl m _ _ _) -> cl ^+^ m^._z ^* d
 
+lxy dx dy = fline \(C cl m _ _ _) -> cl ^+^ m^._x ^* dx ^+^ m^._y ^* dy
+lyz dy dz = fline \(C cl m _ _ _) -> cl ^+^ m^._y ^* dy ^+^ m^._z ^* dz
+lxz dx dz = fline \(C cl m _ _ _) -> cl ^+^ m^._x ^* dx ^+^ m^._z ^* dz
+
 jx d = do v <- gets _cl; m <- gets _cm; modify $ cl %~ (^+^ m^._x ^* d)
 jy d = do v <- gets _cl; m <- gets _cm; modify $ cl %~ (^+^ m^._y ^* d)
 jz d = do v <- gets _cl; m <- gets _cm; modify $ cl %~ (^+^ m^._z ^* d)
 
-fg :: Float -> Float -> Float -> Float -> Cur ()
-fg r g b a = modify $ ccolor .~ makeColor r g b a
+zx m = fork do { ry 90; m }
+zy m = fork do { rx 90; m }
+
+fg :: Float -> Float -> Float -> Float -> Cur () -> Cur ()
+fg r g b a m = fork do
+  modify $ ccolor .~ makeColor r g b a
+  m
 
 box x y z = do
   lz z; jz (-z); lx x
@@ -173,5 +178,10 @@ box x y z = do
   lz z; jz (-z); ly (-y)
   jz z; lx x; ly y; lx (-x); ly (-y); jz (-z)
 
-screw n θ m = do replicateM_ n do fork "" m; rz θ
+screw n θ m = do replicateM_ n do fork m; rz θ
                  rz (- (θ * fromIntegral n))
+
+ind :: Cur ()
+ind = do fg 0 0.5 0.8 0.8 $ lx 1
+         fg 0.5 0 0.8 0.8 $ ly 1
+         fg 0.8 0.5 0 0.8 $ lz 1

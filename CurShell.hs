@@ -60,8 +60,8 @@ update_view :: Event -> View -> View
 
 update_view (EventKey (Char c) Down _ _) = case c of
   'r' -> const init_view
-  'b' -> (vmaxz .~ 2)        . (vminz .~ 1)
-  'B' -> (vmaxz .~ maxBound) . (vminz .~ 0)
+  'b' -> vclipz .~ 0.5
+  'B' -> vclipz .~ maxBound
   'x' -> (vry .~ (-90)) . (vrx .~ 0)
   'y' -> (vry .~ 0)     . (vrx .~ 90)
   'z' -> (vry .~ 0)     . (vrx .~ 0)
@@ -81,8 +81,8 @@ update_view (EventKey (MouseButton b) Down (Modifiers s Up Up) _)
   | b == WheelDown && s == Down = translate_rel $ V3 0 0 (-0.01)
 
 update_view (EventKey (MouseButton b) Down (Modifiers Up Down Up) _)
-  | b == WheelUp   = vmaxz %~ (* 1.01)
-  | b == WheelDown = vmaxz %~ (/ 1.01)
+  | b == WheelUp   = vclipz %~ (* 1.1)
+  | b == WheelDown = vclipz %~ (/ 1.1)
 
 update_view (EventMotion (x, y)) = \v ->
   case _vmouse v of

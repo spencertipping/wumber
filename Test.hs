@@ -12,24 +12,24 @@ import Graphics.Gloss
 square sz = replicateM_ 4 do ly sz; rz 90
 
 beam l = box 1.5 3.5 l
-wall n = replicateM_ n do; fork "" do { rx 90; beam 96 }; jx 16
+wall n = replicateM_ n do zy (beam 96); jx 16
 
-profile = do
+profile = zy do
   zoom 10
-  rx 90
-  jx 1
-  ly (-1)
-  lx 1
+  jx 0.1
+  lxy 1 (-1)
   ly (-1)
   lx (-1)
   ly (-1)
 
-container = screw 300 1.2 profile
+container = screw 30 12 profile
+
 
 main = do
   zoom 0.01
+  ind
   container
-  fork "" do { rx 90; jz 10; container }
+  zy do jz 10; container
   jx 32
   replicateM_ 4 do
     wall 5
