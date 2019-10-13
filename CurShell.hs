@@ -22,7 +22,7 @@ import Text.Printf
 
 
 render :: MVar (Maybe (Cur ())) -> FilePath -> IO ()
-render pic f = do
+render model f = do
   r <- runInterpreter do
     loadModules [f]
     setImports ["Prelude", "Graphics.Gloss.Data.Picture", "Cur"]
@@ -30,19 +30,19 @@ render pic f = do
     interpret "main" (as :: Cur ())
   case r of
     Left (WontCompile xs) -> do
-      swapMVar pic Nothing
+      swapMVar model Nothing
       printf "\027[2J\027[1;1H%s error\n" f
       mapM_ (\case GhcError {errMsg} -> printf "%s\n" errMsg) xs
     Right p -> do
-      swapMVar pic $ Just p
+      swapMVar model $ Just p
       printf "\027[2J\027[1;1H%s OK\n" f
 
 
 compiler :: MVar (Maybe (Cur ())) -> FilePath -> IO ()
-compiler pic f = do
+compiler model f = do
   i <- initINotify
-  addWatch i [MoveIn, Modify] (B8.fromString f) (const $ render pic f)
-  render pic f
+  addWatch i [MoveIn, Modify] (B8.fromString f) (const $ render model f)
+  render model f
 
 
 xsz = 1080
@@ -50,36 +50,44 @@ ysz = 1080
 xfd = float2Double . (/ xsz)
 yfd = float2Double . (/ ysz)
 
-init_view :: View
-init_view = V 0 0 0 1
-              identity
-              (BB minBound maxBound)
-              (Modifiers Up Up Up, Nothing)
+screenify :: Picture -> Picture
+screenify = scale xsz ysz
 
+translate_rel :: V3 Double -> View -> View
+translate_rel d v = v & vt %~ (^+^ inv33 (rs_matrix v) !* d)
 
 update_view :: Event -> View -> View
 
-update_view (EventKey (Char 'r') Down _ _) _ = init_view
+update_view (EventKey (Char c) Down _ _) = case c of
+  'r' -> const init_view
+  'b' -> (vmaxz .~ 2)        . (vminz .~ 1)
+  'B' -> (vmaxz .~ maxBound) . (vminz .~ 0)
+  'x' -> (vry .~ (-90)) . (vrx .~ 0)
+  'y' -> (vry .~ 0)     . (vrx .~ 90)
+  'z' -> (vry .~ 0)     . (vrx .~ 0)
+  'X' -> (vry .~ 90)    . (vrx .~ 0)
+  'Y' -> (vry .~ 0)     . (vrx .~ (-90))
+  'Z' -> (vry .~ 180)   . (vrx .~ 0)
+  'p' -> vp %~ not
+  _   -> id
 
-update_view (EventKey (Char 'x') Down _ _) v = v & vry .~ 90 & vrx .~ 0
-update_view (EventKey (Char 'y') Down _ _) v = v & vry .~ 0  & vrx .~ 90
-update_view (EventKey (Char 'z') Down _ _) v = v & vry .~ 0  & vrx .~ 0
+update_view (EventKey (MouseButton LeftButton) Down m p) = vmouse .~ (m, Just p)
+update_view (EventKey (MouseButton LeftButton) Up   m p) = vmouse .~ (m, Nothing)
 
-update_view (EventKey (Char 'h') Down _ _) v = v & vt._x %~ (+ (-0.1) / _vz v)
-update_view (EventKey (Char 'l') Down _ _) v = v & vt._x %~ (+   0.1  / _vz v)
-update_view (EventKey (Char 'j') Down _ _) v = v & vt._y %~ (+ (-0.1) / _vz v)
-update_view (EventKey (Char 'k') Down _ _) v = v & vt._y %~ (+   0.1  / _vz v)
+update_view (EventKey (MouseButton b) Down (Modifiers s Up Up) _)
+  | b == WheelUp   && s == Up   = vz %~ (* 1.1)
+  | b == WheelDown && s == Up   = vz %~ (/ 1.1)
+  | b == WheelUp   && s == Down = translate_rel $ V3 0 0   0.01
+  | b == WheelDown && s == Down = translate_rel $ V3 0 0 (-0.01)
 
-update_view (EventKey (MouseButton LeftButton) Down m p) v = v & vmouse .~ (m, Just p)
-update_view (EventKey (MouseButton LeftButton) Up   m p) v = v & vmouse .~ (m, Nothing)
+update_view (EventKey (MouseButton b) Down (Modifiers Up Down Up) _)
+  | b == WheelUp   = vmaxz %~ (* 1.01)
+  | b == WheelDown = vmaxz %~ (/ 1.01)
 
-update_view (EventKey (MouseButton WheelUp)   Down m p) v = v & vz %~ (* 1.1)
-update_view (EventKey (MouseButton WheelDown) Down m p) v = v & vz %~ (/ 1.1)
-
-update_view (EventMotion (x, y)) v =
+update_view (EventMotion (x, y)) = \v ->
   case _vmouse v of
     (Modifiers Up Up Up, Just (x0, y0)) ->
-      v & vt %~ (^+^ inv33 (rs_matrix v) !* V3 (xfd $ x - x0) (yfd $ y - y0) 0)
+      translate_rel (V3 (xfd $ x - x0) (yfd $ y - y0) 0) v
         & vmouse._2 .~ Just (x, y)
 
     (Modifiers Down Up Up, Just (x0, y0)) ->
@@ -89,20 +97,21 @@ update_view (EventMotion (x, y)) v =
 
     _ -> v
 
-update_view _ v = v
+update_view _ = id
 
 
 main :: IO ()
 main = do
   fname:_    <- getArgs
-  pic        <- newMVar Nothing
+  model      <- newMVar Nothing
   controller <- newIORef Nothing
-  forkIO $ compiler pic fname
+
+  forkIO $ compiler model fname
   interactIO
     (InWindow ("Cur " ++ fname) (1920, 1080) (100, 100))
     (makeColor 0.2 0.2 0.2 0)
     init_view
-    (\v -> scale xsz ysz <$> runCur v <$> fromMaybe (return ()) <$> readMVar pic)
+    (\v -> screenify <$> runCur v <$> fromMaybe (return ()) <$> readMVar model)
     (\e v -> do Just c <- readIORef controller
                 controllerSetRedraw c
                 return $ update_view e v)

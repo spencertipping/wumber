@@ -8,7 +8,7 @@ module Cur where
 import Control.Monad.Identity
 import Control.Monad.RWS.Strict
 import Data.Map as M
-import Data.Text as T
+import Data.Text as T hiding (transpose)
 import Debug.Trace
 import GHC.Float
 import Graphics.Gloss.Data.Color
@@ -29,8 +29,12 @@ data View = V { _vt     :: !(V3 Double),
                 _vry    :: !Double,
                 _vrx    :: !Double,
                 _vz     :: !Double,
+                _vp     :: !Bool,
+                _vrs    :: !(M33 Double),
                 _vm     :: !(M44 Double),
-                _vbox   :: !BoundingBox,
+                _vminz  :: !Double,
+                _vmaxz  :: !Double,
+                _vclipc :: !Color,
                 _vmouse :: (Modifiers, Maybe Point) }
   deriving (Show)
 
@@ -41,7 +45,8 @@ data Cursor = C { _cl     :: (V3 Double),
                   _cbind  :: (Map Text (V3 Double)) }
   deriving (Show)
 
-data BoundingBox = BB !(V3 Double) !(V3 Double)
+data BoundingBox = BB { _bmin :: !(V3 Double),
+                        _bmax :: !(V3 Double) }
   deriving (Show)
 
 makeLenses ''View
@@ -50,7 +55,21 @@ makeLenses ''BoundingBox
 
 runCur :: View -> Cur a -> Picture
 runCur v m = pictures $ snd $ execRWS m v' init_cursor
-  where v' = v & vm .~ view_matrix v
+  where v' = v & vm  .~ view_matrix v
+               & vrs .~ rs_matrix v
+
+
+init_cursor :: Cursor
+init_cursor = C (V3 0 0 0) identity (makeColor 0.8 0.8 0.9 0.8) [] M.empty
+
+init_view :: View
+init_view = V 0 0 0 1 True
+              identity
+              identity
+              0
+              maxBound
+              (makeColor 0.8 0.8 0.9 0.05)
+              (Modifiers Up Up Up, Nothing)
 
 
 rs_matrix :: View -> M33 Double
@@ -66,28 +85,15 @@ rs_matrix v = V3 (V3 1    0   0)
 
 
 view_matrix :: View -> M44 Double
-view_matrix v = V4 (V4 1 0 0 0)
-                   (V4 0 1 0 0)
-                   (V4 0 0 1 0)
-                   (V4 0 0 1 0)
-            !*! V4 (V4 1 0 0 0)
-                   (V4 0 1 0 0)
-                   (V4 0 0 1 1)
-                   (V4 0 0 0 1)
+view_matrix v = (identity & _w .~ (if _vp v then V4 0 0 1 0 else V4 0 0 0 1))
+            !*! (identity & _z._w .~ 1)
             !*! (identity & _m33 .~ rs_matrix v)
-            !*! V4 (V4 1 0 0 (vt^._x))
-                   (V4 0 1 0 (vt^._y))
-                   (V4 0 0 1 (vt^._z))
-                   (V4 0 0 0 1)
-  where vt = _vt v
+            !*! transpose (identity & _w._xyz .~ _vt v)
 
 
 instance Bounded Double where
   minBound = -(1/0)
-  maxBound = 1/0
-
-init_cursor :: Cursor
-init_cursor = C (V3 0 0 0) identity (makeColor 0.8 0.8 0.9 0.8) [] M.empty
+  maxBound =   1/0
 
 
 {-# INLINE pp #-}
@@ -136,12 +142,17 @@ fork p m = do
 
 fline :: (Cursor -> V3 Double) -> Cur ()
 fline f = do
-  (v1, z1) <- gets _cl >>= pp
-  v2 <- f <$> get
+  minz      <- asks _vminz
+  maxz      <- asks _vmaxz
+  v1        <- gets _cl
+  v2        <- f <$> get
+  (xy1, z1) <- pp v1
   when (z1 > 0) do
-    (v2', z2') <- pp v2
-    col        <- gets _ccolor
-    when (z2' > 0) $ tell [color col $ Line [v1, v2']]
+    (xy2, z2) <- pp v2
+    col       <- if z1 >= minz && z2 >= minz && z1 <= maxz && z2 <= maxz
+      then gets _ccolor
+      else asks _vclipc
+    when (z2 > 0) $ tell [color col $ Line [xy1, xy2]]
   modify $ cl .~ v2
 
 lx d = fline \(C cl m _ _ _) -> cl ^+^ m^._x ^* d
