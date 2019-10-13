@@ -23,18 +23,9 @@ import Linear.V4
 import Linear.Vector
 
 
-type Cur = RWST View [Picture] Cursor Identity
+type Cur = RWST () [Element] Cursor Identity
 
-data View = V { _vt     :: !(V3 Double),
-                _vry    :: !Double,
-                _vrx    :: !Double,
-                _vz     :: !Double,
-                _vp     :: !Bool,
-                _vrs    :: !(M33 Double),
-                _vm     :: !(M44 Double),
-                _vclipz :: !Double,
-                _vclipc :: !Color,
-                _vmouse :: (Modifiers, Maybe Point) }
+data Element = L3D !Color !(V3 Double) !(V3 Double)
   deriving (Show)
 
 data Cursor = C { _cl     :: (V3 Double),
@@ -48,58 +39,19 @@ data BoundingBox = BB { _bmin :: !(V3 Double),
                         _bmax :: !(V3 Double) }
   deriving (Show)
 
-makeLenses ''View
 makeLenses ''Cursor
 makeLenses ''BoundingBox
 
-runCur :: View -> Cur a -> Picture
-runCur v m = pictures $ snd $ execRWS m v' init_cursor
-  where v' = v & vm  .~ view_matrix v
-               & vrs .~ rs_matrix v
-
+runCur :: Cur a -> [Element]
+runCur m = snd $ execRWS m () init_cursor
 
 init_cursor :: Cursor
 init_cursor = C (V3 0 0 0) identity (makeColor 0.8 0.8 0.9 0.8) [] M.empty
-
-init_view :: View
-init_view = V 0 0 0 1 True
-              identity
-              identity
-              maxBound
-              (makeColor 0.8 0.8 0.9 0.05)
-              (Modifiers Up Up Up, Nothing)
-
-
-rs_matrix :: View -> M33 Double
-rs_matrix v = V3 (V3 1    0   0)
-                 (V3 0   cx  sx)
-                 (V3 0 (-sx) cx)
-          !*! V3 (V3   cy  0 sy)
-                 (V3    0  1  0)
-                 (V3 (-sy) 0 cy)
-          !*! identity !!* _vz v
-  where (cy, sy) = cs (_vry v)
-        (cx, sx) = cs (_vrx v)
-
-
-view_matrix :: View -> M44 Double
-view_matrix v = (identity & _w .~ (if _vp v then V4 0 0 1 0 else V4 0 0 0 1))
-            !*! (identity & _z._w .~ 1)
-            !*! (identity & _m33 .~ rs_matrix v)
-            !*! transpose (identity & _w._xyz .~ _vt v)
 
 
 instance Bounded Double where
   minBound = -(1/0)
   maxBound =   1/0
-
-
-{-# INLINE pp #-}
-pp :: V3 Double -> Cur (Point, Double)
-pp v = do
-  vm <- asks _vm
-  let V4 x y z w = vm !* point v
-  return $ ((double2Float (x/w), double2Float (y/w)), z)
 
 
 {-# INLINE bb_intersect #-}
@@ -139,16 +91,10 @@ fork m = do
 
 fline :: (Cursor -> V3 Double) -> Cur ()
 fline f = do
-  clipz     <- asks _vclipz
-  v1        <- gets _cl
-  v2        <- f <$> get
-  (xy1, z1) <- pp v1
-  when (z1 > 0) do
-    (xy2, z2) <- pp v2
-    col       <- if abs (z1-1) <= clipz && abs (z2-1) <= clipz
-      then gets _ccolor
-      else asks _vclipc
-    when (z2 > 0) $ tell [color col $ Line [xy1, xy2]]
+  v1 <- gets _cl
+  v2 <- f <$> get
+  c  <- gets _ccolor
+  tell [L3D c v1 v2]
   modify $ cl .~ v2
 
 lx d = fline \(C cl m _ _ _) -> cl ^+^ m^._x ^* d
@@ -178,8 +124,7 @@ box x y z = do
   lz z; jz (-z); ly (-y)
   jz z; lx x; ly y; lx (-x); ly (-y); jz (-z)
 
-screw n θ m = do replicateM_ n do fork m; rz θ
-                 rz (- (θ * fromIntegral n))
+screw n θ dz m = fork $ replicateM_ n do fork m; rz θ; jz dz
 
 ind :: Cur ()
 ind = do fg 0 0.5 0.8 0.8 $ lx 1

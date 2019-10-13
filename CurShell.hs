@@ -1,4 +1,4 @@
-{-# LANGUAGE NamedFieldPuns, LambdaCase, BlockArguments #-}
+{-# LANGUAGE NamedFieldPuns, LambdaCase, BlockArguments, TemplateHaskell #-}
 module Main where
 
 import Control.Concurrent
@@ -12,6 +12,7 @@ import Graphics.Gloss
 import Graphics.Gloss.Interface.IO.Interact as I
 import Language.Haskell.Interpreter
 import Lens.Micro
+import Lens.Micro.TH
 import Linear.Matrix hiding (trace)
 import Linear.V3
 import Linear.V4
@@ -19,6 +20,47 @@ import Linear.Vector
 import System.Environment
 import System.INotify hiding (Event)
 import Text.Printf
+
+
+data View = V { _vt     :: !(V3 Double),
+                _vry    :: !Double,
+                _vrx    :: !Double,
+                _vz     :: !Double,
+                _vp     :: !Bool,
+                _vrs    :: !(M33 Double),
+                _vm     :: !(M44 Double),
+                _vclipz :: !Double,
+                _vclipc :: !Color,
+                _vmouse :: (Modifiers, Maybe Point) }
+  deriving (Show)
+
+makeLenses ''View
+
+init_view :: View
+init_view = V 0 0 0 1 True
+              identity
+              identity
+              maxBound
+              (makeColor 0.8 0.8 0.9 0.05)
+              (Modifiers Up Up Up, Nothing)
+
+rs_matrix :: View -> M33 Double
+rs_matrix v = V3 (V3 1    0   0)
+                 (V3 0   cx  sx)
+                 (V3 0 (-sx) cx)
+          !*! V3 (V3   cy  0 sy)
+                 (V3    0  1  0)
+                 (V3 (-sy) 0 cy)
+          !*! identity !!* _vz v
+  where (cy, sy) = cs (_vry v)
+        (cx, sx) = cs (_vrx v)
+
+
+view_matrix :: View -> M44 Double
+view_matrix v = (identity & _w .~ (if _vp v then V4 0 0 1 0 else V4 0 0 0 1))
+            !*! (identity & _z._w .~ 1)
+            !*! (identity & _m33 .~ rs_matrix v)
+            !*! transpose (identity & _w._xyz .~ _vt v)
 
 
 render :: MVar (Maybe (Cur ())) -> FilePath -> IO ()
@@ -50,8 +92,10 @@ ysz = 1080
 xfd = float2Double . (/ xsz)
 yfd = float2Double . (/ ysz)
 
-screenify :: Picture -> Picture
-screenify = scale xsz ysz
+screenify :: View -> [Element] -> Picture
+screenify v = scale xsz ysz . pictures . map (project v')
+  where v' = v & vm  .~ view_matrix v
+               & vrs .~ rs_matrix v
 
 translate_rel :: V3 Double -> View -> View
 translate_rel d v = v & vt %~ (^+^ inv33 (rs_matrix v) !* d)
@@ -100,6 +144,23 @@ update_view (EventMotion (x, y)) = \v ->
 update_view _ = id
 
 
+pp :: View -> V3 Double -> (Point, Double)
+pp v p = ((double2Float (x/w), double2Float (y/w)), z)
+  where V4 x y z w = _vm v !* point p
+
+project :: View -> Element -> Picture
+project v (L3D c v1 v2) =
+  if z1 > 0 && z2 > 0
+  then color c' $ Line [xy1, xy2]
+  else Blank
+  where (xy1, z1) = pp v v1
+        (xy2, z2) = pp v v2
+        clipz     = _vclipz v
+        c'        = if abs (z1-1) <= clipz && abs (z2-1) <= clipz
+                    then c
+                    else _vclipc v
+
+
 main :: IO ()
 main = do
   fname:_    <- getArgs
@@ -111,7 +172,7 @@ main = do
     (InWindow ("Cur " ++ fname) (1920, 1080) (100, 100))
     (makeColor 0.2 0.2 0.2 0)
     init_view
-    (\v -> screenify <$> runCur v <$> fromMaybe (return ()) <$> readMVar model)
+    (\v -> screenify v <$> runCur <$> fromMaybe (return ()) <$> readMVar model)
     (\e v -> do Just c <- readIORef controller
                 controllerSetRedraw c
                 return $ update_view e v)
