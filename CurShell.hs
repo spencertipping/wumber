@@ -14,6 +14,7 @@ import Language.Haskell.Interpreter
 import Lens.Micro
 import Lens.Micro.TH
 import Linear.Matrix hiding (trace)
+import Linear.Metric (distance)
 import Linear.V3
 import Linear.V4
 import Linear.Vector
@@ -31,6 +32,7 @@ data View = V { _vt     :: !(V3 Double),
                 _vm     :: !(M44 Double),
                 _vclipz :: !Double,
                 _vclipc :: !Color,
+                _vclipa :: !Float,
                 _vmouse :: (Modifiers, Maybe Point) }
   deriving (Show)
 
@@ -41,7 +43,8 @@ init_view = V 0 0 0 1 True
               identity
               identity
               maxBound
-              (makeColor 0.8 0.8 0.9 0.05)
+              (makeColor 0.8 0.8 0.9 1)
+              0.05
               (Modifiers Up Up Up, Nothing)
 
 rs_matrix :: View -> M33 Double
@@ -94,8 +97,9 @@ yfd = float2Double . (/ ysz)
 
 screenify :: View -> [Element] -> Picture
 screenify v = scale xsz ysz . pictures . map (project v')
-  where v' = v & vm  .~ view_matrix v
-               & vrs .~ rs_matrix v
+  where v' = v & vm     .~ view_matrix v
+               & vrs    .~ rs_matrix v
+               & vclipc .~ withAlpha (_vclipa v) (_vclipc v)
 
 translate_rel :: V3 Double -> View -> View
 translate_rel d v = v & vt %~ (^+^ inv33 (rs_matrix v) !* d)
@@ -118,15 +122,25 @@ update_view (EventKey (Char c) Down _ _) = case c of
 update_view (EventKey (MouseButton LeftButton) Down m p) = vmouse .~ (m, Just p)
 update_view (EventKey (MouseButton LeftButton) Up   m p) = vmouse .~ (m, Nothing)
 
-update_view (EventKey (MouseButton b) Down (Modifiers s Up Up) _)
-  | b == WheelUp   && s == Up   = vz %~ (* 1.1)
-  | b == WheelDown && s == Up   = vz %~ (/ 1.1)
-  | b == WheelUp   && s == Down = translate_rel $ V3 0 0   0.01
-  | b == WheelDown && s == Down = translate_rel $ V3 0 0 (-0.01)
+update_view (EventKey (MouseButton b) Down (Modifiers s c Up) _)
+  | c == Up
+    = case (s, b) of
+        (Up,   WheelUp)   -> vz %~ (* 1.1)
+        (Up,   WheelDown) -> vz %~ (/ 1.1)
+        (Down, WheelUp)   -> translate_rel $ V3 0 0   0.01
+        (Down, WheelDown) -> translate_rel $ V3 0 0 (-0.01)
+        _                 -> id
 
-update_view (EventKey (MouseButton b) Down (Modifiers Up Down Up) _)
-  | b == WheelUp   = vclipz %~ (* 1.1)
-  | b == WheelDown = vclipz %~ (/ 1.1)
+  | c == Down
+    = case (s, b) of
+        (Up,   WheelUp)   -> vclipz %~ (* 1.1)
+        (Up,   WheelDown) -> vclipz %~ (/ 1.1)
+        (Down, WheelUp)   -> vclipa %~ (* 1.1)
+        (Down, WheelDown) -> vclipa %~ (/ 1.1)
+        _                 -> id
+
+  | otherwise = id
+
 
 update_view (EventMotion (x, y)) = \v ->
   case _vmouse v of
@@ -149,13 +163,13 @@ pp v p = ((double2Float (x/w), double2Float (y/w)), z)
   where V4 x y z w = _vm v !* point p
 
 project :: View -> Element -> Picture
-project v (L3D c v1 v2) =
-  if z1 > 0 && z2 > 0
-  then color c' $ Line [xy1, xy2]
-  else Blank
+project v (L3D c v1 v2)
+  | z1 <= 0 || z2 <= 0 = Blank
+  | otherwise          = color c' $ Line [xy1, xy2]
+
   where (xy1, z1) = pp v v1
         (xy2, z2) = pp v v2
-        clipz     = _vclipz v
+        clipz     = _vclipz v * _vz v
         c'        = if abs (z1-1) <= clipz && abs (z2-1) <= clipz
                     then c
                     else _vclipc v

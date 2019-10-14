@@ -9,7 +9,6 @@ import Control.Monad.RWS.Strict
 import Cur
 import Graphics.Gloss
 
-{-
 beam l = box 1.5 3.5 l
 wall n = replicateM_ n do zy (beam 96); jx 16
 
@@ -23,7 +22,6 @@ profile = zy do
 
 container = screw 120 6 1 profile
 
-
 main = do
   zoom 0.01
   ind
@@ -33,10 +31,11 @@ main = do
   replicateM_ 4 do
     wall 5
     ry 90
--}
 
+{-
 main = do
   replicateM_ 3000 do
     ly 1
     rz 121
     ry 1
+-}
