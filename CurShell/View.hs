@@ -30,7 +30,7 @@ data View = V { _vt     :: !(V3 Double),
                 _vclipz :: !Double,
                 _vclipc :: !Color,
                 _vclipa :: !Float,
-                _vhovd  :: !Float,
+                _vhovd  :: !Double,
                 _vhovc  :: !Color,
                 _vmouse :: (Modifiers, Maybe MouseButton, Point) }
   deriving (Show)

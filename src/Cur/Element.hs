@@ -15,6 +15,7 @@ import Linear.Vector
 
 
 data Element = L3D !Color !(V3 Double) !(V3 Double)
+             | Multi !BoundingBox [Element]
   deriving (Show)
 
 
@@ -28,6 +29,14 @@ instance Bounded Double where
   maxBound =   1/0
 
 makeLenses ''BoundingBox
+
+
+bb_of :: Element -> BoundingBox
+bb_of (L3D _ (V3 x1 y1 z1) (V3 x2 y2 z2)) =
+  BB (V3 (min x1 x2) (min y1 y2) (min z1 z2))
+     (V3 (max x1 x2) (max y1 y2) (max z1 z2))
+
+bb_of (Multi bb _) = bb
 
 
 {-# INLINE bb_inside #-}

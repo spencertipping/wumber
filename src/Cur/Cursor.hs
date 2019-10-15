@@ -74,6 +74,9 @@ amod :: AutoFork r => (Cursor -> Cursor) -> r
 amod = autofork . cmod
 
 
+-- Movement/rotation macros
+-- Low-level transformation stuff used to move the cursor around. None of this
+-- deals with Element; it's all modifying _cm and _cl.
 jump :: AutoFork r => V3 Double -> r
 jump v = amod $ cl .~ v
 
@@ -89,24 +92,6 @@ rz θ = transform (V3 (V3 c (-s) 0) (V3 s c 0) (V3 0 0 1)) where (c, s) = cs θ
 
 zoom x = transform (identity !!* x)
 
-fline f = autofork do
-  v1 <- gets _cl
-  v2 <- f <$> get
-  c  <- gets _ccolor
-  tell [L3D c v1 v2]
-  amod $ cl .~ v2
-
-lx d = fline \(C cl m _) -> cl ^+^ m^._x ^* d
-ly d = fline \(C cl m _) -> cl ^+^ m^._y ^* d
-lz d = fline \(C cl m _) -> cl ^+^ m^._z ^* d
-
-lxy dx dy = fline \(C cl m _) -> cl ^+^ m^._x ^* dx ^+^ m^._y ^* dy
-lyz dy dz = fline \(C cl m _) -> cl ^+^ m^._y ^* dy ^+^ m^._z ^* dz
-lxz dx dz = fline \(C cl m _) -> cl ^+^ m^._x ^* dx ^+^ m^._z ^* dz
-
-lxyz dx dy dz = fline \(C cl m _) ->
-  cl ^+^ m^._x ^* dx ^+^ m^._y ^* dy ^+^ m^._z ^* dz
-
 jx d = autofork do m <- gets _cm; cmod $ cl %~ (^+^ m^._x ^* d)
 jy d = autofork do m <- gets _cm; cmod $ cl %~ (^+^ m^._y ^* d)
 jz d = autofork do m <- gets _cm; cmod $ cl %~ (^+^ m^._z ^* d)
@@ -115,18 +100,3 @@ zx = ry 90
 zy = rx 90
 
 fg r g b a = amod $ ccolor .~ makeColor r g b a
-
-
-box x y z = do
-  lz z; jz (-z); lx x
-  lz z; jz (-z); ly y
-  lz z; jz (-z); lx (-x)
-  lz z; jz (-z); ly (-y)
-  jz z; lx x; ly y; lx (-x); ly (-y); jz (-z)
-
-screw n θ dz m = fork $ replicateM_ n do fork m; rz θ; jz dz
-
-ind :: Cur ()
-ind = do fg 0 0.5 0.8 0.8 $ lx 1
-         fg 0.5 0 0.8 0.8 $ ly 1
-         fg 0.8 0.5 0 0.8 $ lz 1

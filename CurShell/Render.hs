@@ -28,26 +28,41 @@ screenify v = scale sz sz . pictures . map (render v')
                & vclipc .~ withAlpha (_vclipa v) (_vclipc v)
 
 
+screen_size :: View -> BoundingBox -> Double
+screen_size v (BB vmin vmax) = foldl1 max [LM.distance v0 v1,
+                                           LM.distance v0 v2,
+                                           LM.distance v0 v3]
+  where (v0, _) = p32 v vmin
+        (v1, _) = p32 v $ vmin & _x .~ vmax^._x
+        (v2, _) = p32 v $ vmin & _y .~ vmax^._y
+        (v3, _) = p32 v $ vmin & _z .~ vmax^._z
+
+
 render :: View -> Element -> Picture
-render v (L3D c v1 v2)
+render v e | screen_size v (bb_of e) > 0.01 = render' v e
+           | otherwise                      = Blank
+
+render' :: View -> Element -> Picture
+render' v (Multi bb es) = pictures $ map (render v) es
+render' v (L3D c v1 v2)
   | z1 <= 0 || z2 <= 0 = Blank
-  | otherwise          = color c' $ Line [xy1, xy2]
+  | otherwise          = color c' $ Line [vp v1', vp v2']
 
-  where (xy1, z1) = p32 v v1
-        (xy2, z2) = p32 v v2
-        (_, _, m) = _vmouse v
+  where (v1', z1)        = p32 v v1
+        (v2', z2)        = p32 v v2
+        (_, _, (mx, my)) = _vmouse v
 
-        pv (x, y) = V2 x y
-        d         = ldist (pv xy1) (pv xy2) (pv m ^/ d2f (_vsz v))
-        clipz     = _vclipz v * _vz v
-        c'        = if | abs (z1-1) > clipz || abs (z2-1) >= clipz -> _vclipc v
-                       | d < _vhovd v                              -> _vhovc v
-                       | otherwise                                 -> c
+        vp (V2 x y) = (d2f x, d2f y)
+        d           = ldist v1' v2' (V2 (f2d mx) (f2d my) ^/ _vsz v)
+        clipz       = _vclipz v * _vz v
+        c'          = if | abs (z1-1) > clipz || abs (z2-1) >= clipz -> _vclipc v
+                         | d < _vhovd v                              -> _vhovc v
+                         | otherwise                                 -> c
 
 
 {-# INLINE p32 #-}
-p32 :: View -> V3 Double -> (Point, Double)
-p32 v p = ((d2f (x/w), d2f (y/w)), z) where V4 x y z w = _vm v !* point p
+p32 :: View -> V3 Double -> (V2 Double, Double)
+p32 v p = (V2 (x/w) (y/w), z) where V4 x y z w = _vm v !* point p
 
 
 {-# INLINE ldist #-}
