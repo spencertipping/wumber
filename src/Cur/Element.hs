@@ -39,6 +39,12 @@ data Element = L3D !Color !(V3 Double) !(V3 Double)
 -- There are some other use cases like exploded views that are also worth
 -- considering: maybe we have an "exploded axis" pseudo-component that shows the
 -- travel path of each linear element.
+--
+-- The other big thing is that I think cursors should have a way to emit
+-- view-planes that show detail for different parts. I'm not sure how this
+-- should work. Are these view-planes also interactive? Do we show
+-- rulers/grids/etc? Do we decompose things into subassemblies with different
+-- manufacturing instructions, break stuff down into steps?
 
 
 data BoundingBox = BB { _bmin :: !(V3 Double),
