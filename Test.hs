@@ -1,5 +1,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 
 module Test where
 
@@ -27,8 +29,7 @@ main = do
   ind
   container
   zy do jz 10; container
-  jx 32
-  replicateM_ 4 do
+  jx 32 $ replicateM_ 4 do
     wall 5
     ry 90
 

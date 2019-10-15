@@ -52,4 +52,6 @@ library
                      , mtl
                      , text
   exposed-modules:     Cur
+                     , Cur.Cursor
+                     , Cur.Element
   default-language:    Haskell2010

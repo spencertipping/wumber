@@ -5,12 +5,13 @@ module CurShell.Compiler where
 
 import Control.Concurrent
 import Control.Concurrent.MVar
-import Cur
 import qualified Data.ByteString.UTF8 as B8
 import Data.Maybe
 import Language.Haskell.Interpreter
 import System.INotify hiding (Event)
 import Text.Printf
+
+import Cur
 
 
 compiler_loop :: MVar (Maybe (Cur ())) -> FilePath -> IO ()
@@ -22,16 +23,39 @@ compiler_loop model f = do
 
 compile :: MVar (Maybe (Cur ())) -> FilePath -> IO ()
 compile model f = do
+  printf "\027[2J\027[1;1Hcompiling...\n"
+
   r <- runInterpreter do
+    -- TODO
+    -- For whatever reason, I can't seem to get this to work outside a stack
+    -- build environment. It's possible it never will, but I'd like to figure
+    -- out why hint doesn't load the modules built into our executable.
+    --
+    -- It fails on the loadModules step, before any of our imports/etc. I
+    -- suspect I'm misusing hint by calling loadModules and then trying to mess
+    -- with imports.
+
     loadModules [f]
-    setImports ["Prelude"]
     setTopLevelModules [take (length f - 3) f]
+    setImports ["Prelude",
+                "Control.Monad",
+                "Control.Monad.Identity",
+                "Control.Monad.RWS.Strict",
+                "Graphics.Gloss",
+                "Cur"]
     interpret "main" (as :: Cur ())
+
   case r of
     Left (WontCompile xs) -> do
       swapMVar model Nothing
       printf "\027[2J\027[1;1H%s error\n" f
       mapM_ (\case GhcError {errMsg} -> printf "%s\n" errMsg) xs
+
+    Left e -> do
+      swapMVar model Nothing
+      printf "\027[2J\027[1;1H%s API error\n" f
+      printf "%s\n" (show e)
+
     Right p -> do
       swapMVar model $ Just p
       printf "\027[2J\027[1;1H%s OK\n" f
