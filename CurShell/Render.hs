@@ -29,9 +29,9 @@ screenify v = scale sz sz . pictures . map (render v')
 
 
 screen_size :: View -> BoundingBox -> Double
-screen_size v (BB vmin vmax) = foldl1 max [LM.distance v0 v1,
-                                           LM.distance v0 v2,
-                                           LM.distance v0 v3]
+screen_size v (BB vmin vmax) = foldl1 max [ LM.distance v0 v1,
+                                            LM.distance v0 v2,
+                                            LM.distance v0 v3 ]
   where (v0, _) = p32 v vmin
         (v1, _) = p32 v $ vmin & _x .~ vmax^._x
         (v2, _) = p32 v $ vmin & _y .~ vmax^._y
