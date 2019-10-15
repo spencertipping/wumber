@@ -5,6 +5,7 @@
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BlockArguments, TemplateHaskell #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE GADTs #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
@@ -12,13 +13,8 @@ module Cur.Cursor where
 
 import Control.Monad.Identity
 import Control.Monad.RWS.Strict
-import Data.Map as M
-import Data.Text as T hiding (transpose)
-import Debug.Trace
 import GHC.Float
 import Graphics.Gloss.Data.Color
-import Graphics.Gloss.Data.Picture
-import Graphics.Gloss.Interface.IO.Interact
 import Lens.Micro
 import Lens.Micro.TH
 import Linear.Matrix hiding (trace)
@@ -49,16 +45,17 @@ init_cursor c = C (V3 0 0 0) identity c
 
 fork :: Cur a -> Cur a
 fork m = do
-  c0 <- get
-  v  <- m
-  put c0
+  c <- get
+  v <- m
+  put c
   return v
 
 
 -- | This is some magic that lets us infer a fork for do-blocks appended to
 --   various commands. It works just like printf: we specify autofork behavior
 --   for a type in terms of flattening it down to a Cur monad instance.
-class AutoFork r where autofork :: Cur () -> r
+class AutoFork r where
+  autofork :: Cur () -> r
 
 instance (a ~ ()) => AutoFork (Cur a) where
   autofork m = m
@@ -92,8 +89,7 @@ rz θ = transform (V3 (V3 c (-s) 0) (V3 s c 0) (V3 0 0 1)) where (c, s) = cs θ
 
 zoom x = transform (identity !!* x)
 
-fline :: (Cursor -> V3 Double) -> Cur ()
-fline f = do
+fline f = autofork do
   v1 <- gets _cl
   v2 <- f <$> get
   c  <- gets _ccolor
@@ -118,11 +114,8 @@ jz d = autofork do m <- gets _cm; cmod $ cl %~ (^+^ m^._z ^* d)
 zx = ry 90
 zy = rx 90
 
+fg r g b a = amod $ ccolor .~ makeColor r g b a
 
-fg :: Float -> Float -> Float -> Float -> Cur () -> Cur ()
-fg r g b a m = fork do
-  modify $ ccolor .~ makeColor r g b a
-  m
 
 box x y z = do
   lz z; jz (-z); lx x
