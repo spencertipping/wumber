@@ -23,6 +23,22 @@ data Element = L3D !Color !(V3 Double) !(V3 Double)
 -- What kind of interfacing do we want to be able to interact with elements?
 -- Should elements be able to observe things like the mouse position, or should
 -- we reduce the interface to "you're focused" etc?
+--
+-- Let's figure out what we want to be able to do.
+--
+-- Ultimately, it's about a couple of things. First, we want to be able to view
+-- things from different perspectives, enable measurements, that type of thing.
+-- CAD-focused features for people to build stuff.
+--
+-- Second, and more interestingly, we want aspects of the model to interact with
+-- degrees of freedom (likely via lenses). So we might have a pre-made component
+-- like a hinge that provides actuation based on user interaction. Or maybe we
+-- have a slide, etc. Then the user can manipulate the state of the model while
+-- they're looking at it.
+--
+-- There are some other use cases like exploded views that are also worth
+-- considering: maybe we have an "exploded axis" pseudo-component that shows the
+-- travel path of each linear element.
 
 
 data BoundingBox = BB { _bmin :: !(V3 Double),
