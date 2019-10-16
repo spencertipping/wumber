@@ -1,12 +1,12 @@
+{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE BlockArguments, TemplateHaskell #-}
+{-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
-{-# LANGUAGE GADTs #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 module Cur.Sketch where
@@ -17,8 +17,9 @@ import GHC.Float
 import Graphics.Gloss.Data.Color
 import Lens.Micro
 import Lens.Micro.TH
-import Linear.Matrix hiding (trace)
+import Linear.Matrix hiding (trace, translation)
 import Linear.Projection
+import Linear.V2
 import Linear.V3
 import Linear.V4
 import Linear.Vector
@@ -27,29 +28,45 @@ import Cur.Cursor
 import Cur.Element
 
 
-fline f = autofork do
-  v1 <- gets _cl
-  v2 <- f <$> get
-  -- tell [L3D c v1 v2]
-  amod $ cl .~ v2
-
-lx d = fline \(C cl m) -> cl ^+^ m^._x ^* d
-ly d = fline \(C cl m) -> cl ^+^ m^._y ^* d
-lz d = fline \(C cl m) -> cl ^+^ m^._z ^* d
-
-lxy dx dy = fline \(C cl m) -> cl ^+^ m^._x ^* dx ^+^ m^._y ^* dy
-lyz dy dz = fline \(C cl m) -> cl ^+^ m^._y ^* dy ^+^ m^._z ^* dz
-lxz dx dz = fline \(C cl m) -> cl ^+^ m^._x ^* dx ^+^ m^._z ^* dz
-
-lxyz dx dy dz = fline \(C cl m) ->
-  cl ^+^ m^._x ^* dx ^+^ m^._y ^* dy ^+^ m^._z ^* dz
+sub :: Cur a -> Cur (a, Cursor)
+sub m = do
+  r <- ask
+  c <- get
+  let (v, c', w) = runRWS m r c
+  tell [multi_of w]
+  return (v, c')
 
 
-box x y z = do
-  lz z; jz (-z); lx x
-  lz z; jz (-z); ly y
-  lz z; jz (-z); lx (-x)
-  lz z; jz (-z); ly (-y)
-  jz z; lx x; ly y; lx (-x); ly (-y); jz (-z)
+type ShapeGen = RWS (M44 Double) [V3 Double] Cursor
 
-screw n θ dz m = fork $ replicateM_ n do fork m; rz θ; jz dz
+shape :: ShapeGen a -> Cur Element
+shape m = do
+  c <- get
+  let (_, vs) = evalRWS m c init_cursor
+  return $ shape_of c vs
+
+
+rect :: Double -> Double -> ShapeGen ()
+rect x y = replicateM_ 2 do lx x; ly y; rz 180
+
+
+l3 :: Double -> Double -> Double -> ShapeGen ()
+l3 x y z = do
+  modify (!*! translation (point $ V3 x y z))
+  v <- gets $ (^. column _w)
+  tell [v^._xyz]
+
+lx x = l3 x 0 0
+ly y = l3 0 y 0
+lz z = l3 0 0 z
+
+lxy x y = l3 x y 0
+lxz x z = l3 x 0 z
+lyz y z = l3 0 y z
+
+
+-- Second-order shapes
+screw_z :: Int -> Double -> Double -> Element -> Element
+screw_z n θ d e = replicate_of n (rotate_z_m θ & _z._w .~ d) e
+
+extrude_z n d e = screw_z n 0 d e

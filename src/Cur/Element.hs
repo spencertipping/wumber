@@ -15,10 +15,9 @@ import Linear.V3
 import Linear.V4
 
 
-data Element = Multi   !BoundingBox [Element]
-             | Plane   !BoundingBox !(M44 Double) [V2 Double]
-             | Shape   !BoundingBox [V3 Double]
-             | Replica !BoundingBox !Int !(M44 Double) Element
+data Element = Multi     !BoundingBox [Element]
+             | Shape     !BoundingBox !(M44 Double) [V3 Double]
+             | Replicate !BoundingBox !Int !(M44 Double) Element
   deriving (Show)
 
 
@@ -30,17 +29,29 @@ data BoundingBox = BB { _bmin :: !(V3 Double),
 makeLenses ''BoundingBox
 
 
-point2 :: V2 Double -> V4 Double
-point2 (V2 x y) = V4 x y 0 1
+multi_of :: [Element] -> Element
+multi_of xs = Multi (foldl1 bb_union $ map bb_of xs) xs
+
+shape_of :: M44 Double -> [V3 Double] -> Element
+shape_of m vs = Shape (bb_of_points $ map (inflate m) vs) m vs
+
+replicate_of :: Int -> M44 Double -> Element -> Element
+replicate_of n m e = Replicate (bb_of_points vs) n m e
+  where vs = vertices $ Replicate (BB 0 0) n m e
+
+
+{-# INLINE inflate#-}
+inflate :: M44 Double -> V3 Double -> V3 Double
+inflate m v = (m !* point v) ^._xyz
 
 
 -- | Returns an ordered list of vertices for the given element. This is used
---   during rendering to draw connecting lines between iterations of 'Replica's.
+--   during rendering to draw connecting lines between iterations of
+--   'Replicate's.
 vertices :: Element -> [V3 Double]
-vertices (Multi _ es)      = concatMap vertices es
-vertices (Plane _ pc vs)   = map ((^._xyz) . (*! pc) . point2) vs
-vertices (Shape _ vs)      = vs
-vertices (Replica _ n t e) = concatMap each ts
+vertices (Multi _ es)        = concatMap vertices es
+vertices (Shape _ m vs)      = map (inflate m) vs
+vertices (Replicate _ n t e) = concatMap each ts
   where each m = map ((^._xyz) . (*! m) . point) vs
         vs     = vertices e
         ts     = scanr (!*!) identity $ replicate n t
@@ -81,10 +92,13 @@ instance Bounded Double where
 
 {-# INLINE bb_of #-}
 bb_of :: Element -> BoundingBox
-bb_of (Multi bb _)       = bb
-bb_of (Plane bb _ _)     = bb
-bb_of (Shape bb _)       = bb
-bb_of (Replica bb _ _ _) = bb
+bb_of (Multi bb _)         = bb
+bb_of (Shape bb _ _)       = bb
+bb_of (Replicate bb _ _ _) = bb
+
+
+bb_of_points :: [V3 Double] -> BoundingBox
+bb_of_points vs = foldl1 bb_union $ map (\v -> BB v v) vs
 
 
 {-# INLINE bb_inside #-}
