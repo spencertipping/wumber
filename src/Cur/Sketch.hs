@@ -30,19 +30,18 @@ import Cur.Element
 fline f = autofork do
   v1 <- gets _cl
   v2 <- f <$> get
-  c  <- gets _ccolor
-  tell [L3D c v1 v2]
+  -- tell [L3D c v1 v2]
   amod $ cl .~ v2
 
-lx d = fline \(C cl m _) -> cl ^+^ m^._x ^* d
-ly d = fline \(C cl m _) -> cl ^+^ m^._y ^* d
-lz d = fline \(C cl m _) -> cl ^+^ m^._z ^* d
+lx d = fline \(C cl m) -> cl ^+^ m^._x ^* d
+ly d = fline \(C cl m) -> cl ^+^ m^._y ^* d
+lz d = fline \(C cl m) -> cl ^+^ m^._z ^* d
 
-lxy dx dy = fline \(C cl m _) -> cl ^+^ m^._x ^* dx ^+^ m^._y ^* dy
-lyz dy dz = fline \(C cl m _) -> cl ^+^ m^._y ^* dy ^+^ m^._z ^* dz
-lxz dx dz = fline \(C cl m _) -> cl ^+^ m^._x ^* dx ^+^ m^._z ^* dz
+lxy dx dy = fline \(C cl m) -> cl ^+^ m^._x ^* dx ^+^ m^._y ^* dy
+lyz dy dz = fline \(C cl m) -> cl ^+^ m^._y ^* dy ^+^ m^._z ^* dz
+lxz dx dz = fline \(C cl m) -> cl ^+^ m^._x ^* dx ^+^ m^._z ^* dz
 
-lxyz dx dy dz = fline \(C cl m _) ->
+lxyz dx dy dz = fline \(C cl m) ->
   cl ^+^ m^._x ^* dx ^+^ m^._y ^* dy ^+^ m^._z ^* dz
 
 
@@ -54,8 +53,3 @@ box x y z = do
   jz z; lx x; ly y; lx (-x); ly (-y); jz (-z)
 
 screw n θ dz m = fork $ replicateM_ n do fork m; rz θ; jz dz
-
-ind :: Cur ()
-ind = do fg 0 0.5 0.8 0.8 $ lx 1
-         fg 0.5 0 0.8 0.8 $ ly 1
-         fg 0.8 0.5 0 0.8 $ lz 1

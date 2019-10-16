@@ -17,8 +17,9 @@ import GHC.Float
 import Graphics.Gloss.Data.Color
 import Lens.Micro
 import Lens.Micro.TH
-import Linear.Matrix hiding (trace)
+import Linear.Matrix hiding (trace, translation)
 import Linear.Projection
+import Linear.V2
 import Linear.V3
 import Linear.V4
 import Linear.Vector
@@ -26,21 +27,14 @@ import Linear.Vector
 import Cur.Element
 
 
-type Cur = RWST () [Element] Cursor Identity
-
 -- TODO
--- Parameterize stuff like _ccolor; I don't think we want this module to depend
--- on Graphics.Gloss at all.
-data Cursor = C { _cl     :: (V3 Double),
-                  _cm     :: (M33 Double),
-                  _ccolor :: Color }
-  deriving (Show)
+-- We sometimes want to calculate the cursor-delta for a given operation. Can we
+-- do this easily?
 
-makeLenses ''Cursor
+type Cur    = RWST () [Element] Cursor Identity
+type Cursor = M44 Double
 
-
-init_cursor :: Color -> Cursor
-init_cursor c = C (V3 0 0 0) identity c
+init_cursor = identity
 
 
 fork :: Cur a -> Cur a
@@ -66,32 +60,38 @@ instance (m ~ Cur (), AutoFork (Cur a)) => AutoFork (m -> Cur a) where
   autofork m x = autofork $ fork do m; x
 
 
--- NOTE: we need this definition to disambiguate types for autofork.
-cmod :: (Cursor -> Cursor) -> Cur ()
-cmod = modify
-
 amod :: AutoFork r => (Cursor -> Cursor) -> r
-amod = autofork . cmod
+amod = autofork . modify
 
 
--- Movement/rotation macros
--- Low-level transformation stuff used to move the cursor around. None of this
--- deals with Element; it's all modifying _cm and _cl.
-jump :: AutoFork r => V3 Double -> r
-jump v = amod $ cl .~ v
+translation v = identity & column _w .~ point v
+local_translate  c v = amod $ (!*! translation v)
+global_translate c v = amod $ (translation v !*!)
+
 
 transform :: AutoFork r => M33 Double -> r
-transform m = amod $ cm %~ (m !*!)
+transform m = amod $ _m33 %~ (m !*!)
 
 d2r θ = θ / 180 * pi
 cs θ = (cos r, sin r) where r = d2r θ
 
+swap_xz_m = identity & _x .~ V4 0 0 1 0 & _z .~ V4 1 0 0 0
+swap_yz_m = identity & _y .~ V4 0 0 1 0 & _z .~ V4 0 1 0 0
+swap_xy_m = identity & _x .~ V4 0 1 0 0 & _y .~ V4 1 0 0 0
+
+rotate_z θ = identity & _m22 .~ V2 (V2 c (-s)) (V2 s c) where (c, s) = cs θ
+rotate_y θ = swap_yz_m !*! rotate_z θ !*! swap_yz_m
+rotate_x θ = swap_xz_m !*! rotate_z θ !*! swap_xz_m
+
+
+{-
 rx θ = transform (V3 (V3 1 0 0) (V3 0 c (-s)) (V3 0 s c)) where (c, s) = cs θ
 ry θ = transform (V3 (V3 c 0 s) (V3 0 1 0) (V3 (-s) 0 c)) where (c, s) = cs θ
 rz θ = transform (V3 (V3 c (-s) 0) (V3 s c 0) (V3 0 0 1)) where (c, s) = cs θ
 
 zoom x = transform (identity !!* x)
 
+-- FIXME
 jx d = autofork do m <- gets _cm; cmod $ cl %~ (^+^ m^._x ^* d)
 jy d = autofork do m <- gets _cm; cmod $ cl %~ (^+^ m^._y ^* d)
 jz d = autofork do m <- gets _cm; cmod $ cl %~ (^+^ m^._z ^* d)
@@ -99,4 +99,4 @@ jz d = autofork do m <- gets _cm; cmod $ cl %~ (^+^ m^._z ^* d)
 zx = ry 90
 zy = rx 90
 
-fg r g b a = amod $ ccolor .~ makeColor r g b a
+-}

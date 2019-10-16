@@ -18,6 +18,7 @@ import CurShell.View
 
 update_view :: Event -> View -> View
 
+
 update_view (EventKey (Char c) Down _ _) = case c of
   'r' -> const $ init_view 1080
   'b' -> vclipz .~ 0.5
@@ -31,26 +32,36 @@ update_view (EventKey (Char c) Down _ _) = case c of
   'p' -> vp %~ not
   _   -> id
 
+
 update_view (EventKey (MouseButton b) d m@(Modifiers s c a) p)
-  | b == LeftButton || b == MiddleButton || b == RightButton
+  | elem b [LeftButton, MiddleButton, RightButton]
     = if d == Down then vmouse .~ (m, Just b, p)
                    else vmouse .~ (m, Nothing, p)
 
-  | c == Up = case (s, b) of
-                (Up,   WheelUp)   -> vz %~ (* 1.1)
-                (Up,   WheelDown) -> vz %~ (/ 1.1)
-                (Down, WheelUp)   -> translate_rel $ V3 0 0   0.01
-                (Down, WheelDown) -> translate_rel $ V3 0 0 (-0.01)
-                _                 -> id
+  | (c, a) == (Up, Down) =                  -- LOD settings
+      case (s, b) of
+        (Up, WheelUp)   -> vlod %~ (* 1.1)
+        (Up, WheelDown) -> vlod %~ (/ 1.1)
+        _               -> id
 
-  | c == Down = case (s, b) of
-                  (Up,   WheelUp)   -> vclipz %~ (* 1.1)
-                  (Up,   WheelDown) -> vclipz %~ (/ 1.1)
-                  (Down, WheelUp)   -> vclipa %~ (* 1.1)
-                  (Down, WheelDown) -> vclipa %~ (/ 1.1)
-                  _                 -> id
+  | (c, a) == (Up, Up) =                    -- zoom and Z travel
+      case (s, b) of
+        (Up,   WheelUp)   -> vz %~ (* 1.1)
+        (Up,   WheelDown) -> vz %~ (/ 1.1)
+        (Down, WheelUp)   -> translate_rel $ V3 0 0   0.01
+        (Down, WheelDown) -> translate_rel $ V3 0 0 (-0.01)
+        _                 -> id
+
+  | (c, a) == (Down, Up) =                  -- clip plane settings
+      case (s, b) of
+        (Up,   WheelUp)   -> vclipz %~ (* 1.1)
+        (Up,   WheelDown) -> vclipz %~ (/ 1.1)
+        (Down, WheelUp)   -> vclipa %~ (* 1.1)
+        (Down, WheelDown) -> vclipa %~ (/ 1.1)
+        _                 -> id
 
   | otherwise = id
+
 
 update_view (EventMotion p@(x, y)) = \v ->
   case _vmouse v of
@@ -64,5 +75,6 @@ update_view (EventMotion p@(x, y)) = \v ->
         & vmouse._3 .~ p
 
     _ -> v & vmouse._3 .~ p
+
 
 update_view _ = id

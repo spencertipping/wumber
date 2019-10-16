@@ -23,11 +23,15 @@ import CurShell.View
 screenify :: View -> [Element] -> Picture
 screenify v = scale sz sz . pictures . map (render v')
   where sz = d2f (_vsz v)
-        v' = v & vm     .~ view_matrix v
-               & vrs    .~ rs_matrix v
-               & vclipc .~ withAlpha (_vclipa v) (_vclipc v)
+        v' = update_cached_fields v
 
 
+-- FIXME
+-- This is a hamfisted and inefficient way to calculate the screen area of a
+-- bounding box. We can do better with vector geometry.
+--
+-- We should also take clipping into account so we don't render offscreen
+-- things.
 screen_size :: View -> BoundingBox -> Double
 screen_size v (BB vmin vmax) = foldl1 max [ LM.distance v0 v1,
                                             LM.distance v0 v2,
@@ -39,8 +43,8 @@ screen_size v (BB vmin vmax) = foldl1 max [ LM.distance v0 v1,
 
 
 render :: View -> Element -> Picture
-render v e | screen_size v (bb_of e) > 0.01 = render' v e
-           | otherwise                      = Blank
+render v e | screen_size v (bb_of e) > _vlod v = render' v e
+           | otherwise                         = Blank
 
 render' :: View -> Element -> Picture
 render' v (Multi bb es) = pictures $ map (render v) es
