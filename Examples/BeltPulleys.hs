@@ -53,9 +53,6 @@ axle :: Double -> Double -> Wumber ()
 axle od l = wheel (od/2) $ do lz l
 
 
-mm :: Double -> Double
-mm = (/ 25.4)
-
 bearing :: Double -> Double -> Double -> Wumber ()
 bearing id od t = spin_z 60 6 $ shape do
   jx (id/2)
