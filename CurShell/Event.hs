@@ -47,8 +47,8 @@ update_view (EventKey (MouseButton b) d m@(Modifiers s c a) p)
 
   | (c, a) == (Up, Up) =                    -- zoom and Z travel
       case (s, b) of
-        (Up,   WheelUp)   -> vz %~ (* 1.1)
-        (Up,   WheelDown) -> vz %~ (/ 1.1)
+        (Up,   WheelUp)   -> vz %~ (* 1.03)
+        (Up,   WheelDown) -> vz %~ (/ 1.03)
         (Down, WheelUp)   -> translate_rel $ V3 0 0   0.01
         (Down, WheelDown) -> translate_rel $ V3 0 0 (-0.01)
         _                 -> id

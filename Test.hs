@@ -67,21 +67,23 @@ bearing_608zz    = bearing (mm 8) (mm 22) (mm 7)
 bearing_6203_2rs = bearing (mm 17) (mm 40) (mm 12)
 
 
+j_teeth     = 8
 belt_gap    = 0.100
-wheel_depth = j_profile_depth 6 + belt_gap * 2
-wheel_gap   = 0.050
+wheel_depth = j_profile_depth (fromIntegral j_teeth - 1) + belt_gap * 2
+wheel_gap   = 0.400
 axle_od     = mm 17
-axle_gap    = 0.150
-axle_len    = (wheel_depth + axle_gap + mm 12) * 2 - wheel_gap
+axle_gap    = 0.250
+axle_len    = (wheel_depth + axle_gap + mm 12) * 2 + wheel_gap
 
 reducer_pulley :: Cur ()
 reducer_pulley = f do
-  reducer 3.0 1.5 (wheel_depth + wheel_gap) (gapped belt_gap $ j_profile 6)
+  f $ reducer 3.0 1.1 (wheel_depth + wheel_gap)
+                      (gapped belt_gap $ j_profile (j_teeth - 1))
   f do
-    jz (-wheel_depth - axle_gap - mm 12)
+    jz (-axle_gap - mm 12)
     axle axle_od axle_len
   f do
-    jz (-wheel_depth - axle_gap)
+    jz (-axle_gap)
     bearing_6203_2rs
     jz (axle_len - mm 12)
     bearing_6203_2rs
@@ -90,6 +92,10 @@ reducer_pulley = f do
 stack_n       = 3
 stack_spacing = 5.5
 
+
+-- TODO
+-- We'll want two parallel drives for the final pulley. Otherwise we'll have a
+-- bunch of shear force on the frame.
 pulley_stack :: Int -> Cur ()
 pulley_stack n = replicateM_ n do
   reducer_pulley
@@ -104,10 +110,11 @@ frame_plate :: Cur ()
 frame_plate = do
   jx (-frame_clearance)
   jy (-frame_clearance)
-  jz (-belt_gap)
+  jz (-axle_gap)
   extrude_z 15 (-0.050) $ shape do
     start
-    rect ((fromIntegral stack_n - 1) * stack_spacing + 2 * frame_clearance) (2 * frame_clearance)
+    rect ((fromIntegral stack_n - 1) * stack_spacing + 2 * frame_clearance)
+         (2 * frame_clearance)
 
 
 main :: Cur ()

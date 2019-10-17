@@ -98,8 +98,7 @@ render' v (Shape bb m vs) = line_from $ map (p32 v . inflate m) vs
 
 render' v (Replicate bb n mb m e)
   | n == 0    = Blank
-  | otherwise = pictures [pictures layers,
-                          color (makeColor 0.6 0.6 0.7 0.8) $ pictures connect]
+  | otherwise = pictures $ layers ++ connect
 
   where m0      = _vm v !*! mb
         vs      = vertices e
