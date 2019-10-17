@@ -3,7 +3,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 
-module Test where
+module Examples.BeltPulleys where
 
 import Control.Monad
 import Control.Monad.Identity

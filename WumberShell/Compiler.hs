@@ -21,6 +21,12 @@ compiler_loop model f = do
   compile model f
 
 
+module_name :: FilePath -> String
+module_name p = map dotify $ take (length p - 3) p
+  where dotify '/' = '.'
+        dotify  c  =  c
+
+
 compile :: MVar (Maybe (Cur ())) -> FilePath -> IO ()
 compile model f = do
   printf "\027[2J\027[1;1Hcompiling...\n"
@@ -36,13 +42,13 @@ compile model f = do
     -- with imports.
 
     loadModules [f]
-    setTopLevelModules [take (length f - 3) f]
+    setTopLevelModules [module_name f]
     setImports ["Prelude",
                 "Control.Monad",
                 "Control.Monad.Identity",
                 "Control.Monad.RWS.Strict",
                 "Graphics.Gloss",
-                "Cur"]
+                "Wumber"]
     interpret "main" (as :: Cur ())
 
   case r of
@@ -53,7 +59,7 @@ compile model f = do
 
     Left e -> do
       swapMVar model Nothing
-      printf "\027[2J\027[1;1H%s API error\n" f
+      printf "\027[2J\027[1;1H%s compiler error\n" f
       printf "%s\n" (show e)
 
     Right p -> do
