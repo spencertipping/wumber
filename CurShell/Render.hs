@@ -21,14 +21,15 @@ import CurShell.View
 
 
 screenify :: View -> [Element] -> Picture
-screenify v = color (makeColor 0.8 0.8 0.9 0.8) . scale sz sz . pictures . map (render v')
-  where sz = d2f (_vsz v)
-        v' = update_cached_fields v
+screenify v = color init_color . scale sz sz . pictures . map (render v')
+  where sz         = d2f (_vsz v)
+        v'         = update_cached_fields v
+        init_color = makeColor 0.8 0.8 0.9 0.8
 
 
 -- NOTE
 -- This is a hamfisted and inefficient way to calculate the screen area of a
--- bounding box. We can do better with vector geometry.
+-- bounding box. We can do better with Math (TM).
 --
 -- We should also take clipping into account so we don't render offscreen
 -- things.
@@ -53,27 +54,30 @@ render v e | screen_size v (bb_of e) > _vlod v = render' v e
 render' :: View -> Element -> Picture
 render' v (Multi bb es) = pictures $ map (render v) es
 
-render' v (Shape bb m vs)
-  | any ((<= 0) . snd) vs' = Blank
-  | otherwise              = Line $ map (\(V2 x y, _) -> (d2f x, d2f y)) vs'
-  where vs' = map (p32 v . inflate m) vs
+render' v (Shape bb m vs) = line_from $ map (p32 v . inflate m) vs
 
 render' v (Replicate bb n m e)
   | n == 0    = Blank
   | otherwise = pictures $ render v e : layers ++ connect
+
   where m0      = _vm v
         vs      = vertices e
         vms     = map (m0 !*!) $ scanl1 (!*!) $ replicate (n-1) m
         layers  = map (\m' -> render (v {_vm = m'}) e) vms
         vmpairs = tail $ scanl (\(_, x) y -> (x, y)) (m0, m0) vms
 
-        bothzok ((_, z1), (_, z2)) = z1 > 0 && z2 > 0
-        zipped (m, n) = filter bothzok $ map (p32 $ v {_vm = m}) vs `zip`
-                                         map (p32 $ v {_vm = n}) vs
-
-        cline ((V2 x1 y1, _), (V2 x2 y2, _)) = Line [(d2f x1, d2f y1),
-                                                     (d2f x2, d2f y2)]
+        cline (a, b)  = line_from [a, b]
+        zipped (m, n) = map (p32 $ v {_vm = m}) vs `zip`
+                        map (p32 $ v {_vm = n}) vs
         connect = concatMap (map cline . zipped) vmpairs
+
+
+{-# INLINE line_from #-}
+line_from :: [(V2 Double, Double)] -> Picture
+line_from vs =
+  if any ((<= 0) . snd) vs
+  then Blank
+  else Line $ map (\(V2 x y, _) -> (d2f x, d2f y)) vs
 
 
 {-# INLINE p32 #-}
