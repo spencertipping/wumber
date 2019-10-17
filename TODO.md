@@ -12,6 +12,15 @@
 + Rulers/guides for display
 
 
+## Library
++ Machine bolt profiles, threading macros
+
+
+## CSG
++ Tool path profiles
++ Turning/milling operations with drive code?
+
+
 ## Rendering
 + Focus on specific elements
 + Focal plane
