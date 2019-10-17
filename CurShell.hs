@@ -27,14 +27,14 @@ main = do
   model      <- newMVar Nothing
   controller <- newIORef Nothing
 
-  let ic = init_cursor (makeColor 0.8 0.8 0.9 0.8)
-
   forkIO $ compiler_loop model fname
   interactIO
     (InWindow ("Cur " ++ fname) (1920, 1080) (100, 100))
     (makeColor 0.2 0.2 0.2 0)
     (init_view 1080)
-    (\v -> screenify v <$> runCur ic <$> fromMaybe (return ()) <$> readMVar model)
+    (\v -> do m <- fromMaybe (return ()) <$> readMVar model
+              let m' = runCur init_cursor m
+              return $ screenify v m')
     (\e v -> do Just c <- readIORef controller
                 controllerSetRedraw c
                 return $ update_view e v)

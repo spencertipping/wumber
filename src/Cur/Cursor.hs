@@ -1,8 +1,13 @@
+{-# LANGUAGE IncoherentInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
+{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 module Cur.Cursor where
@@ -33,18 +38,14 @@ init_cursor = identity
 --   various commands. It works just like printf: we specify autofork behavior
 --   for a type in terms of flattening it down to a Cur monad instance.
 
-class AutoFork x r where
-  autofork :: x -> r
+class AutoFork m r | r -> m where
+  autofork :: m () -> r
 
--- NOTE
--- We need n ~ m a here instead of repeating (m a) in the AutoFork instance.
--- Otherwise GHC will complain about (not-really-existent) ambiguity in
--- Cur.Sketch.
-instance (n ~ m a, MonadState c m) => AutoFork (m a) n where
+instance AutoFork m (m ()) where
   autofork = id
 
-instance (MonadState c m, AutoFork (m a) r) => AutoFork (m a) (m a -> r) where
-  autofork m x = autofork $ fork do m; x
+instance MonadState c m => AutoFork m (m () -> m ()) where
+  autofork m x = fork do m; x
 
 
 fork :: MonadState c m => m a -> m a
@@ -54,14 +55,18 @@ fork m = do
   put c
   return v
 
-amod   = autofork . modify
-amul m = amod (!*! m)
+{-
+amod :: (AutoFork m r, MonadState Cursor m) => (Cursor -> Cursor) -> r
+amod f = autofork $ modify f
 
+amul :: (AutoFork m r, MonadState Cursor m) => M44 Double -> r
+amul m = amod (!*! m)
+-}
 
 -- Translate
 translation      v = identity & column _w .~ v
-local_translate  v = amod $ (!*! translation (point v))
-global_translate v = amod $ (translation (point v) !*!)
+local_translate  v = autofork $ modify (!*! translation (point v))
+global_translate v = autofork $ modify (translation (point v) !*!)
 
 jx d = local_translate (V3 d 0 0)
 jy d = local_translate (V3 0 d 0)
@@ -73,21 +78,23 @@ jZ d = global_translate (V3 0 0 d)
 
 
 -- Rotate/scale
-transform33 m = amod $ _m33 %~ (m !*!)
+transform33 m = autofork $ modify $ _m33 %~ (m !*!)
 
 zoom x = transform33 (identity !!* x)
 
-swap_xz_m = identity & _x .~ V4 0 0 1 0 & _z .~ V4 1 0 0 0
-swap_yz_m = identity & _y .~ V4 0 0 1 0 & _z .~ V4 0 1 0 0
-swap_xy_m = identity & _x .~ V4 0 1 0 0 & _y .~ V4 1 0 0 0
+swap_xz_m = identity & _x .~ V4 0 0 1 0 & _z .~ V4 1 0 0 0 :: M44 Double
+swap_yz_m = identity & _y .~ V4 0 0 1 0 & _z .~ V4 0 1 0 0 :: M44 Double
+swap_xy_m = identity & _x .~ V4 0 1 0 0 & _y .~ V4 1 0 0 0 :: M44 Double
 
-rx θ = amul $ swap_xz_m !*! rotate_z_m θ !*! swap_xz_m
-ry θ = amul $ swap_yz_m !*! rotate_z_m θ !*! swap_yz_m
-rz θ = amul $               rotate_z_m θ
+rx :: (MonadState Cursor m, AutoFork m r) => Double -> r
+ry :: (MonadState Cursor m, AutoFork m r) => Double -> r
+rz :: (MonadState Cursor m, AutoFork m r) => Double -> r
+rx θ = autofork $ modify (!*! rotate_x_m θ)
+ry θ = autofork $ modify (!*! rotate_y_m θ)
+rz θ = autofork $ modify (!*! rotate_z_m θ)
 
+rotate_x_m θ = swap_xz_m !*! rotate_z_m θ !*! swap_xz_m
+rotate_y_m θ = swap_yz_m !*! rotate_z_m θ !*! swap_yz_m
 rotate_z_m θ = identity & _m22 .~ V2 (V2 c (-s)) (V2 s c)
   where (c, s) = (cos r, sin r)
         r      = θ / 180 * pi
-
-zx = ry 90
-zy = rx 90

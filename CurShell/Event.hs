@@ -13,6 +13,7 @@ import Linear.V3
 import Linear.V4
 import Linear.Vector
 
+import Cur
 import CurShell.View
 
 
@@ -70,7 +71,7 @@ update_view (EventMotion p@(x, y)) = \v ->
         & vmouse._3 .~ p
 
     (Modifiers Down Up Up, Just LeftButton, (x0, y0)) ->
-      v & vry %~ (+ f2d (x0 - x) * 360 / _vsz v)
+      v & vry %~ (+ f2d (x - x0) * 360 / _vsz v)
         & vrx %~ (+ f2d (y0 - y) * 360 / _vsz v)
         & vmouse._3 .~ p
 

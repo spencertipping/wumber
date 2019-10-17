@@ -21,7 +21,7 @@ import CurShell.View
 
 
 screenify :: View -> [Element] -> Picture
-screenify v = scale sz sz . pictures . map (render v')
+screenify v = color (makeColor 0.8 0.8 0.9 0.8) . scale sz sz . pictures . map (render v')
   where sz = d2f (_vsz v)
         v' = update_cached_fields v
 
@@ -48,20 +48,17 @@ render v e | screen_size v (bb_of e) > _vlod v = render' v e
 
 render' :: View -> Element -> Picture
 render' v (Multi bb es) = pictures $ map (render v) es
-render' v (L3D c v1 v2)
-  | z1 <= 0 || z2 <= 0 = Blank
-  | otherwise          = color c' $ Line [vp v1', vp v2']
 
-  where (v1', z1)        = p32 v v1
-        (v2', z2)        = p32 v v2
-        (_, _, (mx, my)) = _vmouse v
+render' v (Shape bb m vs)
+  | any ((<= 0) . snd) vs' = Blank
+  | otherwise              = Line $ map (\(V2 x y, _) -> (d2f x, d2f y)) vs'
+  where vs' = map (p32 v . inflate m) vs
 
-        vp (V2 x y) = (d2f x, d2f y)
-        d           = ldist v1' v2' (V2 (f2d mx) (f2d my) ^/ _vsz v)
-        clipz       = _vclipz v * _vz v
-        c'          = if | abs (z1-1) > clipz || abs (z2-1) >= clipz -> _vclipc v
-                         | d < _vhovd v                              -> _vhovc v
-                         | otherwise                                 -> c
+render' v (Replicate bb n m e)
+  | n == 0    = Blank
+  | otherwise = pictures $ map (\m' -> render (v {_vm = m0 !*! m'}) e) vms
+  where m0  = _vm v
+        vms = scanl1 (!*!) $ replicate (n-1) m
 
 
 {-# INLINE p32 #-}

@@ -71,15 +71,9 @@ init_view sz = V 0 0 0 1 True
 -- | Rotation and scale matrix, separate from projection and translation. We use
 --   this to back-transform drag operations into spatial vectors.
 rs_matrix :: View -> M33 Double
-rs_matrix v = V3 (V3 1    0   0)
-                 (V3 0   cx  sx)
-                 (V3 0 (-sx) cx)
-          !*! V3 (V3   cy  0 sy)
-                 (V3    0  1  0)
-                 (V3 (-sy) 0 cy)
-          !*! identity !!* _vz v
-  where (cy, sy) = cs (_vry v)
-        (cx, sx) = cs (_vrx v)
+rs_matrix v = (rotate_x_m (_vrx v)
+           !*! rotate_y_m (_vry v)
+           !*! identity !!* _vz v) ^._m33
 
 
 -- | The full view matrix used for rendering.
@@ -88,10 +82,6 @@ view_matrix v = (identity & _w .~ (if _vp v then V4 0 0 1 0 else V4 0 0 0 1))
             !*! (identity & _z._w .~ 1)
             !*! (identity & _m33 .~ rs_matrix v)
             !*! transpose (identity & _w._xyz .~ _vt v)
-
-
-f2d = float2Double
-d2f = double2Float
 
 
 translate_rel :: V3 Double -> View -> View

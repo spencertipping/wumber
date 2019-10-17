@@ -1,12 +1,4 @@
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BlockArguments #-}
-{-# LANGUAGE NoMonomorphismRestriction #-}
-{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 module Cur.Sketch where
@@ -39,11 +31,19 @@ sub m = do
 
 type ShapeGen = RWS (M44 Double) [V3 Double] Cursor
 
-shape :: ShapeGen a -> Cur Element
+shape :: ShapeGen a -> Cur a
 shape m = do
   c <- get
-  let (_, vs) = evalRWS m c init_cursor
-  return $ shape_of c vs
+  let (v, vs) = evalRWS m c init_cursor
+  tell [shape_of c (0:vs)]
+  return v
+
+capture :: Cur a -> Cur Element
+capture m = do
+  c <- get
+  r <- ask
+  let (_, [v]) = evalRWS m r c
+  return v
 
 
 rect :: Double -> Double -> ShapeGen ()
@@ -66,7 +66,9 @@ lyz y z = l3 0 y z
 
 
 -- Second-order shapes
-screw_z :: Int -> Double -> Double -> Element -> Element
-screw_z n θ d e = replicate_of n (rotate_z_m θ & _z._w .~ d) e
+screw_z :: Int -> Double -> Double -> Cur a -> Cur ()
+screw_z n θ d m = do
+  e <- capture m
+  tell [replicate_of n (rotate_z_m θ & _z._w .~ d) e]
 
 extrude_z n d e = screw_z n 0 d e
