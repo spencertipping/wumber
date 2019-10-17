@@ -19,11 +19,12 @@ import Text.Printf
 import Cur
 
 
--- | NOTE
---   Not all fields here are canonical; '_vm', '_vrs', and the alpha component
+-- NOTE
+-- | Not all fields here are canonical; '_vm', '_vrs', and the alpha component
 --   of '_vclipc' are all calculated from other values. Call
 --   'update_cached_fields' to get a 'View' with correctly computed values (e.g.
 --   before you use it to render anything).
+
 data View = V { _vt     :: !(V3 Double),    -- view settings
                 _vry    :: !Double,
                 _vrx    :: !Double,
@@ -84,5 +85,7 @@ view_matrix v = (identity & _w .~ (if _vp v then V4 0 0 1 0 else V4 0 0 0 1))
             !*! transpose (identity & _w._xyz .~ _vt v)
 
 
+-- | Apply a translation relative to the current rotation/scale. The input V3
+--   double is in screen coordinates; Z would move you in or out of the screen.
 translate_rel :: V3 Double -> View -> View
 translate_rel d v = v & vt %~ (^+^ inv33 (rs_matrix v) !* (d & _xy %~ (^/ _vsz v)))

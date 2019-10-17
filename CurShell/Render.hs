@@ -47,6 +47,46 @@ screen_size v (BB vmin vmax) = foldl1 max [ LM.distance v0 v1,
 -- We should render to something intermediate instead of Picture; Picture loses
 -- Z info and doesn't provide any association, which means we can't handle mouse
 -- interaction.
+
+
+-- TODO
+-- Should we have a render monad? There are some reasons we might want this; for
+-- example, we could drop Blank elements. We could also provide a more
+-- structured approach to 3D-transform stuff before putting it onscreen; this
+-- would help our Replicate logic out a bit.
+--
+-- Finally, I think we want a deeper context for things like "which element is
+-- in focus". I can see a world where we have CLI-driven search and model
+-- manipulation.
+
+
+-- TODO
+-- What kind of interfacing do we want to be able to interact with elements?
+-- Should elements be able to observe things like the mouse position, or should
+-- we reduce the interface to "you're focused" etc?
+--
+-- Let's figure out what we want to be able to do.
+--
+-- Ultimately, it's about a couple of things. First, we want to be able to view
+-- things from different perspectives, enable measurements, that type of thing.
+-- CAD-focused features for people to build stuff.
+--
+-- Second, and more interestingly, we want aspects of the model to interact with
+-- degrees of freedom (likely via lenses). So we might have a pre-made component
+-- like a hinge that provides actuation based on user interaction. Or maybe we
+-- have a slide, etc. Then the user can manipulate the state of the model while
+-- they're looking at it.
+--
+-- There are some other use cases like exploded views that are also worth
+-- considering: maybe we have an "exploded axis" pseudo-component that shows the
+-- travel path of each linear element.
+--
+-- The other big thing is that I think cursors should have a way to emit
+-- view-planes that show detail for different parts. I'm not sure how this
+-- should work. Are these view-planes also interactive? Do we show
+-- rulers/grids/etc? Do we decompose things into subassemblies with different
+-- manufacturing instructions, break stuff down into steps?
+
 render :: View -> Element -> Picture
 render v e | screen_size v (bb_of e) > _vlod v = render' v e
            | otherwise                         = Blank
@@ -74,10 +114,9 @@ render' v (Replicate bb n m e)
 
 {-# INLINE line_from #-}
 line_from :: [(V2 Double, Double)] -> Picture
-line_from vs =
-  if any ((<= 0) . snd) vs
-  then Blank
-  else Line $ map (\(V2 x y, _) -> (d2f x, d2f y)) vs
+line_from vs
+  | any ((<= 0) . snd) vs = Blank
+  | otherwise             = Line $ map (\(V2 x y, _) -> (d2f x, d2f y)) vs
 
 
 {-# INLINE p32 #-}
