@@ -31,6 +31,7 @@ sub m = do
 
 type ShapeGen = RWS (M44 Double) [V3 Double] Cursor
 
+
 shape :: ShapeGen a -> Cur a
 shape m = do
   c <- get

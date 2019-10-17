@@ -12,8 +12,9 @@ import Cur
 import Graphics.Gloss
 import Linear.V4
 
+
 main :: Cur ()
-main = ry 90 do
-  screw_z 100 1 0.01 do
-    ry 90
-    shape $ rect 1 1
+main = f do
+  ry 90
+  screw_z 720 1 0.001 do
+    shape $ replicateM_ 3 do lx 0.2; rz 120
