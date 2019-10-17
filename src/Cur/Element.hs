@@ -24,7 +24,7 @@ import Linear.V4
 
 data Element = Multi     !BoundingBox [Element]
              | Shape     !BoundingBox !(M44 Double) [V3 Double]
-             | Replicate !BoundingBox !Int !(M44 Double) Element
+             | Replicate !BoundingBox !Int !(M44 Double) !(M44 Double) Element
   deriving (Show)
 
 
@@ -42,9 +42,9 @@ multi_of xs = Multi (bb_of_elements xs) xs
 shape_of :: M44 Double -> [V3 Double] -> Element
 shape_of m vs = Shape (bb_of_points $ map (inflate m) vs) m vs
 
-replicate_of :: Int -> M44 Double -> Element -> Element
-replicate_of n m e = Replicate (bb_of_points vs) n m e
-  where vs = vertices $ Replicate (BB 0 0) n m e
+replicate_of :: Int -> M44 Double -> M44 Double -> Element -> Element
+replicate_of n m0 m e = Replicate (bb_of_points vs) n m0 m e
+  where vs = vertices $ Replicate (BB 0 0) n m0 m e
 
 
 {-# INLINE inflate#-}
@@ -56,12 +56,12 @@ inflate m v = (m !* point v) ^._xyz
 --   during rendering to draw connecting lines between iterations of
 --   'Replicate's.
 vertices :: Element -> [V3 Double]
-vertices (Multi _ es)        = concatMap vertices es
-vertices (Shape _ m vs)      = map (inflate m) vs
-vertices (Replicate _ n t e) = concatMap each ts
+vertices (Multi _ es)          = concatMap vertices es
+vertices (Shape _ m vs)        = map (inflate m) vs
+vertices (Replicate _ n m t e) = concatMap each ts
   where each m = map ((^._xyz) . (*! m) . point) vs
         vs     = vertices e
-        ts     = scanr (!*!) identity $ replicate n t
+        ts     = scanr (!*!) m $ replicate n t
 
 
 instance Bounded Double where
@@ -71,9 +71,9 @@ instance Bounded Double where
 
 {-# INLINE bb_of #-}
 bb_of :: Element -> BoundingBox
-bb_of (Multi bb _)         = bb
-bb_of (Shape bb _ _)       = bb
-bb_of (Replicate bb _ _ _) = bb
+bb_of (Multi bb _)           = bb
+bb_of (Shape bb _ _)         = bb
+bb_of (Replicate bb _ _ _ _) = bb
 
 
 bb_of_points :: [V3 Double] -> BoundingBox

@@ -96,13 +96,14 @@ render' v (Multi bb es) = pictures $ map (render v) es
 
 render' v (Shape bb m vs) = line_from $ map (p32 v . inflate m) vs
 
-render' v (Replicate bb n m e)
+render' v (Replicate bb n mb m e)
   | n == 0    = Blank
-  | otherwise = pictures $ render v e : layers ++ connect
+  | otherwise = pictures [pictures layers,
+                          color (makeColor 0.6 0.6 0.7 0.8) $ pictures connect]
 
-  where m0      = _vm v
+  where m0      = _vm v !*! mb
         vs      = vertices e
-        vms     = map (m0 !*!) $ scanl1 (!*!) $ replicate (n-1) m
+        vms     = scanl (!*!) m0 $ replicate (n-1) m
         layers  = map (\m' -> render (v {_vm = m'}) e) vms
         vmpairs = tail $ scanl (\(_, x) y -> (x, y)) (m0, m0) vms
 

@@ -36,20 +36,22 @@ shape :: ShapeGen a -> Cur a
 shape m = do
   c <- get
   let (v, vs) = evalRWS m c init_cursor
-  tell [shape_of c (0:vs)]
+  tell [shape_of c vs]
   return v
 
-capture :: Cur a -> Cur Element
-capture m = do
-  c <- get
+capture :: Cursor -> Cur a -> Cur Element
+capture c m = do
   r <- ask
   let (_, [v]) = evalRWS m r c
   return v
 
 
 rect :: Double -> Double -> ShapeGen ()
-rect x y = replicateM_ 2 do lx x; ly y; rz 180
+rect x y = do lx x; ly y; lx (-x); ly (-y)
 
+
+start :: ShapeGen ()
+start = l3 0 0 0
 
 l3 :: Double -> Double -> Double -> ShapeGen ()
 l3 x y z = do
@@ -69,8 +71,9 @@ lyz y z = l3 0 y z
 -- Second-order shapes
 screw_z :: Int -> Double -> Double -> Cur a -> Cur ()
 screw_z n θ d m = do
-  e <- capture m
-  tell [replicate_of n (rotate_z_m θ & _z._w .~ d) e]
+  c <- get
+  e <- capture init_cursor m
+  tell [replicate_of n c (rotate_z_m θ & _z._w .~ d) e]
 
 extrude_z n d e = screw_z n 0 d e
 spin_z    n θ e = screw_z n θ 0 e

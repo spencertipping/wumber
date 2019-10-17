@@ -3,7 +3,8 @@ module Cur (
   module Cur.Element,
   module Cur.Sketch,
   runCur,
-  f2d, d2f
+  f2d, d2f,
+  tau, sincos
 ) where
 
 import Control.Monad.RWS.Strict
@@ -16,6 +17,10 @@ import Cur.Sketch
 
 f2d = float2Double
 d2f = double2Float
+
+
+tau      = 2 * pi
+sincos θ = (sin r, cos r) where r = θ / 360 * tau
 
 
 runCur :: Cursor -> Cur () -> [Element]
