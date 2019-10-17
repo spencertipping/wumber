@@ -8,7 +8,7 @@ module Test where
 import Control.Monad
 import Control.Monad.Identity
 import Control.Monad.RWS.Strict
-import Cur
+import Wumber
 import Debug.Trace
 import Graphics.Gloss
 import Linear.V4
@@ -63,7 +63,7 @@ bearing id od t = spin_z 60 6 $ shape do
   start
   rect (od/2 - id/2) t
 
-bearing_608zz    = bearing (mm 8) (mm 22) (mm 7)
+bearing_608zz    = bearing (mm 8)  (mm 22) (mm 7)
 bearing_6203_2rs = bearing (mm 17) (mm 40) (mm 12)
 
 

@@ -1,7 +1,7 @@
-module Cur (
-  module Cur.Cursor,
-  module Cur.Element,
-  module Cur.Sketch,
+module Wumber (
+  module Wumber.Cursor,
+  module Wumber.Element,
+  module Wumber.Sketch,
   runCur,
   f2d, d2f,
   tau, sincos
@@ -10,9 +10,9 @@ module Cur (
 import Control.Monad.RWS.Strict
 import GHC.Float
 
-import Cur.Cursor
-import Cur.Element
-import Cur.Sketch
+import Wumber.Cursor
+import Wumber.Element
+import Wumber.Sketch
 
 
 f2d = float2Double

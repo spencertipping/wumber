@@ -1,7 +1,7 @@
 {-# LANGUAGE NamedFieldPuns, LambdaCase, BlockArguments, TemplateHaskell #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
-module CurShell.Event where
+module WumberShell.Event where
 
 import GHC.Float
 import Graphics.Gloss
@@ -13,8 +13,8 @@ import Linear.V3
 import Linear.V4
 import Linear.Vector
 
-import Cur
-import CurShell.View
+import Wumber
+import WumberShell.View
 
 
 update_view :: Event -> View -> View

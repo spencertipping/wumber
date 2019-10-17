@@ -1,7 +1,7 @@
 {-# LANGUAGE BlockArguments #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
-module Cur.Sketch where
+module Wumber.Sketch where
 
 import Control.Monad.Identity
 import Control.Monad.RWS.Strict
@@ -16,8 +16,8 @@ import Linear.V3
 import Linear.V4
 import Linear.Vector
 
-import Cur.Cursor
-import Cur.Element
+import Wumber.Cursor
+import Wumber.Element
 
 
 sub :: Cur a -> Cur (a, Cursor)

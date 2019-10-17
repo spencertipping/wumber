@@ -1,7 +1,7 @@
 {-# LANGUAGE NamedFieldPuns, LambdaCase, BlockArguments, TemplateHaskell #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
-module CurShell.Compiler where
+module WumberShell.Compiler where
 
 import Control.Concurrent
 import Control.Concurrent.MVar
@@ -11,7 +11,7 @@ import Language.Haskell.Interpreter
 import System.INotify hiding (Event)
 import Text.Printf
 
-import Cur
+import Wumber
 
 
 compiler_loop :: MVar (Maybe (Cur ())) -> FilePath -> IO ()

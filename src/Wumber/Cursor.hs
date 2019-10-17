@@ -10,7 +10,7 @@
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
-module Cur.Cursor where
+module Wumber.Cursor where
 
 import Control.Monad.Identity
 import Control.Monad.RWS.Strict
@@ -24,7 +24,7 @@ import Linear.V3
 import Linear.V4
 import Linear.Vector
 
-import Cur.Element
+import Wumber.Element
 
 
 type Cur    = RWS () [Element] Cursor

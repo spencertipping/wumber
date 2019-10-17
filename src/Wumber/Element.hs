@@ -3,7 +3,7 @@
 {-# LANGUAGE BlockArguments, TemplateHaskell #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
-module Cur.Element where
+module Wumber.Element where
 
 import Control.Applicative
 import Graphics.Gloss

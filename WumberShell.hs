@@ -13,12 +13,12 @@ import Graphics.Gloss.Interface.IO.Interact as I
 import System.Environment
 import Text.Printf
 
-import Cur
+import Wumber
 
-import CurShell.Compiler
-import CurShell.Event
-import CurShell.Render
-import CurShell.View
+import WumberShell.Compiler
+import WumberShell.Event
+import WumberShell.Render
+import WumberShell.View
 
 
 main :: IO ()

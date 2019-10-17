@@ -1,7 +1,7 @@
 {-# LANGUAGE NamedFieldPuns, LambdaCase, BlockArguments, MultiWayIf #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
-module CurShell.Render where
+module WumberShell.Render where
 
 import GHC.Float
 import Graphics.Gloss
@@ -15,9 +15,9 @@ import Linear.V4
 import Linear.Vector
 import Text.Printf
 
-import Cur
+import Wumber
 
-import CurShell.View
+import WumberShell.View
 
 
 screenify :: View -> [Element] -> Picture
