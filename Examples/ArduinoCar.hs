@@ -70,19 +70,19 @@ nema_17 = f do body; shaft; screw_holes; faceplate; cables
 -- Referenced from USB-plug corner, plane along XY
 arduino_uno :: Wumber ()
 arduino_uno = f do
-  f do jx 0.60; jy (-0.10); axle (mm 3.2) (-0.2)
-  f do jx 0.55; jy (-2.00); axle (mm 3.2) (-0.2)
-  f do jx 2.60; jy (-0.70); axle (mm 3.2) (-0.2)
-  f do jx 2.60; jy (-1.80); axle (mm 3.2) (-0.2)
+  f do jx 0.60; jy (-0.10); axle (mm 3.2) (-0.1)
+  f do jx 0.55; jy (-2.00); axle (mm 3.2) (-0.1)
+  f do jx 2.60; jy (-0.70); axle (mm 3.2) (-0.1)
+  f do jx 2.60; jy (-1.80); axle (mm 3.2) (-0.1)
 
   f $ extrude_z 10 (-0.05) $ shape do
     jx (-0.250)
     jy (-0.825)
-    jz (-0.200)
+    jz (-0.100)
     start
     rect 0.625 0.500
 
-  f $ extrude_z 1 (-0.2) $ shape do
+  f $ extrude_z 10 (-0.01) $ shape do
     start
     lx (0.55 + 0.05 + 2.00 - 0.05)
     lxy 0.05 (-0.05)
