@@ -25,7 +25,7 @@ reducer r1 r2 d p = do
 
 
 wheel :: Double -> Profile -> Cur ()
-wheel r p = spin_z 31 12 $ shape do start; lx r; p; lx (-r)
+wheel r p = spin_z 30 12 $ shape do start; lx r; p; lx (-r)
 
 
 gapped :: Double -> Profile -> Profile
@@ -50,39 +50,69 @@ j_profile n = replicateM_ n do
         tooth_h     = j_profile_depth 1 - 2 * slope_h
 
 axle :: Double -> Double -> Cur ()
-axle r l = wheel r $ do lz l
+axle od l = wheel (od/2) $ do lz l
 
 
 mm :: Double -> Double
 mm = (/ 25.4)
 
--- 608ZZ: 8mm bore, 22mm OD, 7mm thickness
-bearing_608zz :: Cur ()
-bearing_608zz = spin_z 61 6 $ shape do
-  jx (mm 8)
-  rx 90     -- swap Y and Z
+bearing :: Double -> Double -> Double -> Cur ()
+bearing id od t = spin_z 60 6 $ shape do
+  jx (id/2)
+  rx 90
   start
-  rect (mm 14) (mm 7)
+  rect (od/2 - id/2) t
 
+bearing_608zz    = bearing (mm 8) (mm 22) (mm 7)
+bearing_6203_2rs = bearing (mm 17) (mm 40) (mm 12)
+
+
+belt_gap    = 0.100
+wheel_depth = j_profile_depth 6 + belt_gap * 2
+wheel_gap   = 0.050
+axle_od     = mm 17
+axle_gap    = 0.150
+axle_len    = (wheel_depth + axle_gap + mm 12) * 2 - wheel_gap
 
 reducer_pulley :: Cur ()
 reducer_pulley = f do
-  reducer 3.0 1.5 wdepth (gapped bgap $ j_profile 6)
-  f do jz (-wdepth - wgap - mm 7); axle 0.375 alen
-  f do jz (-wdepth - wgap); bearing_608zz; jz (alen - mm 7); bearing_608zz
+  reducer 3.0 1.5 (wheel_depth + wheel_gap) (gapped belt_gap $ j_profile 6)
+  f do
+    jz (-wheel_depth - axle_gap - mm 12)
+    axle axle_od axle_len
+  f do
+    jz (-wheel_depth - axle_gap)
+    bearing_6203_2rs
+    jz (axle_len - mm 12)
+    bearing_6203_2rs
 
-  where wdepth = j_profile_depth 6 + bgap * 2
-        alen   = (wdepth + wgap + mm 7) * 2
-        bgap   = 0.100
-        wgap   = 0.150
+
+stack_n       = 3
+stack_spacing = 5.5
+
+pulley_stack :: Int -> Cur ()
+pulley_stack n = replicateM_ n do
+  reducer_pulley
+  jx stack_spacing
+  rx 180
+  jz (-2 * wheel_depth - wheel_gap)
+
+
+frame_clearance = 0.5 + mm 40
+
+frame_plate :: Cur ()
+frame_plate = do
+  jx (-frame_clearance)
+  jy (-frame_clearance)
+  jz (-belt_gap)
+  extrude_z 15 (-0.050) $ shape do
+    start
+    rect ((fromIntegral stack_n - 1) * stack_spacing + 2 * frame_clearance) (2 * frame_clearance)
 
 
 main :: Cur ()
 main = do
-  zoom 1
-  reducer_pulley
-  jx 6.5
-  f do ry 180; jz (2 * (-j_profile_depth 6 - 0.200)); reducer_pulley
-
-  jx 6.5
-  reducer_pulley
+  zoom 0.05
+  f $ pulley_stack stack_n
+  f $ frame_plate
+  f do jz (axle_len + 0.750 - mm 24); frame_plate
