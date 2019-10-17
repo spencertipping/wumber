@@ -73,3 +73,4 @@ screw_z n θ d m = do
   tell [replicate_of n (rotate_z_m θ & _z._w .~ d) e]
 
 extrude_z n d e = screw_z n 0 d e
+spin_z    n θ e = screw_z n θ 0 e

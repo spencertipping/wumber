@@ -16,5 +16,6 @@ import Linear.V4
 main :: Cur ()
 main = f do
   ry 90
-  screw_z 720 1 0.001 do
-    shape $ replicateM_ 3 do lx 0.2; rz 120
+  screw_z 72 10 0.01 do
+    shape do rect 0.2 0.2
+             replicateM_ 3 do lx 0.2; rz 120
