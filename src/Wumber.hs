@@ -23,8 +23,8 @@ d2f = double2Float
 tau      = 2 * pi
 sincos θ = (sin r, cos r) where r = θ / 360 * tau
 
-mm = (25.4 *)
-cm = (2.54 *)
+mm = (/ 25.4)
+cm = (/ 2.54)
 
 
 runWumber :: Cursor -> Wumber () -> [Element]
