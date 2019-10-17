@@ -27,7 +27,7 @@ import Linear.Vector
 import Wumber.Element
 
 
-type Cur    = RWS () [Element] Cursor
+type Wumber = RWS () [Element] Cursor
 type Cursor = M44 Double
 
 init_cursor :: Cursor

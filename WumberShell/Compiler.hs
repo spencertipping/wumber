@@ -14,7 +14,7 @@ import Text.Printf
 import Wumber
 
 
-compiler_loop :: MVar (Maybe (Cur ())) -> FilePath -> IO ()
+compiler_loop :: MVar (Maybe (Wumber ())) -> FilePath -> IO ()
 compiler_loop model f = do
   i <- initINotify
   addWatch i [MoveIn, Modify] (B8.fromString f) (const $ compile model f)
@@ -27,7 +27,7 @@ module_name p = map dotify $ take (length p - 3) p
         dotify  c  =  c
 
 
-compile :: MVar (Maybe (Cur ())) -> FilePath -> IO ()
+compile :: MVar (Maybe (Wumber ())) -> FilePath -> IO ()
 compile model f = do
   printf "\027[2J\027[1;1Hcompiling...\n"
 
@@ -49,7 +49,7 @@ compile model f = do
                 "Control.Monad.RWS.Strict",
                 "Graphics.Gloss",
                 "Wumber"]
-    interpret "main" (as :: Cur ())
+    interpret "main" (as :: Wumber ())
 
   case r of
     Left (WontCompile xs) -> do

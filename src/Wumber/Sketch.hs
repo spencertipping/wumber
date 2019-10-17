@@ -20,7 +20,7 @@ import Wumber.Cursor
 import Wumber.Element
 
 
-sub :: Cur a -> Cur (a, Cursor)
+sub :: Wumber a -> Wumber (a, Cursor)
 sub m = do
   r <- ask
   c <- get
@@ -32,14 +32,14 @@ sub m = do
 type ShapeGen = RWS (M44 Double) [V3 Double] Cursor
 
 
-shape :: ShapeGen a -> Cur a
+shape :: ShapeGen a -> Wumber a
 shape m = do
   c <- get
   let (v, vs) = evalRWS m c init_cursor
   tell [shape_of c vs]
   return v
 
-capture :: Cursor -> Cur a -> Cur Element
+capture :: Cursor -> Wumber a -> Wumber Element
 capture c m = do
   r <- ask
   let (_, [v]) = evalRWS m r c
@@ -69,7 +69,7 @@ lyz y z = l3 0 y z
 
 
 -- Second-order shapes
-screw_z :: Int -> Double -> Double -> Cur a -> Cur ()
+screw_z :: Int -> Double -> Double -> Wumber a -> Wumber ()
 screw_z n θ d m = do
   c <- get
   e <- capture init_cursor m

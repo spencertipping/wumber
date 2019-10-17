@@ -17,14 +17,14 @@ import Linear.V4
 type Profile = ShapeGen ()
 
 
-reducer :: Double -> Double -> Double -> Profile -> Cur ()
+reducer :: Double -> Double -> Double -> Profile -> Wumber ()
 reducer r1 r2 d p = do
   wheel r1 p
   jz d
   wheel r2 p
 
 
-wheel :: Double -> Profile -> Cur ()
+wheel :: Double -> Profile -> Wumber ()
 wheel r p = spin_z 30 12 $ shape do start; lx r; p; lx (-r)
 
 
@@ -49,14 +49,14 @@ j_profile n = replicateM_ n do
         slope_h     = slope_hypot * s
         tooth_h     = j_profile_depth 1 - 2 * slope_h
 
-axle :: Double -> Double -> Cur ()
+axle :: Double -> Double -> Wumber ()
 axle od l = wheel (od/2) $ do lz l
 
 
 mm :: Double -> Double
 mm = (/ 25.4)
 
-bearing :: Double -> Double -> Double -> Cur ()
+bearing :: Double -> Double -> Double -> Wumber ()
 bearing id od t = spin_z 60 6 $ shape do
   jx (id/2)
   rx 90
@@ -75,7 +75,7 @@ axle_od     = mm 17
 axle_gap    = 0.250
 axle_len    = (wheel_depth + axle_gap + mm 12) * 2 + wheel_gap
 
-reducer_pulley :: Cur ()
+reducer_pulley :: Wumber ()
 reducer_pulley = f do
   f $ reducer 3.0 1.1 (wheel_depth + wheel_gap)
                       (gapped belt_gap $ j_profile (j_teeth - 1))
@@ -96,7 +96,7 @@ stack_spacing = 5.5
 -- TODO
 -- We'll want two parallel drives for the final pulley. Otherwise we'll have a
 -- bunch of shear force on the frame.
-pulley_stack :: Int -> Cur ()
+pulley_stack :: Int -> Wumber ()
 pulley_stack n = replicateM_ n do
   reducer_pulley
   jx stack_spacing
@@ -106,7 +106,7 @@ pulley_stack n = replicateM_ n do
 
 frame_clearance = 0.5 + mm 40
 
-frame_plate :: Cur ()
+frame_plate :: Wumber ()
 frame_plate = do
   jx (-frame_clearance)
   jy (-frame_clearance)
@@ -117,7 +117,7 @@ frame_plate = do
          (2 * frame_clearance)
 
 
-main :: Cur ()
+main :: Wumber ()
 main = do
   zoom 0.05
   f $ pulley_stack stack_n

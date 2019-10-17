@@ -2,7 +2,7 @@ module Wumber (
   module Wumber.Cursor,
   module Wumber.Element,
   module Wumber.Sketch,
-  runCur,
+  runWumber,
   f2d, d2f,
   tau, sincos
 ) where
@@ -23,5 +23,5 @@ tau      = 2 * pi
 sincos θ = (sin r, cos r) where r = θ / 360 * tau
 
 
-runCur :: Cursor -> Cur () -> [Element]
-runCur c m = snd $ execRWS m () c
+runWumber :: Cursor -> Wumber () -> [Element]
+runWumber c m = snd $ execRWS m () c
