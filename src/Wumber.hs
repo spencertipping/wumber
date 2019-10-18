@@ -1,6 +1,7 @@
 module Wumber (
   module Wumber.Cursor,
   module Wumber.Element,
+  module Wumber.Iso,
   module Wumber.Sketch,
   runWumber,
   f2d, d2f, fi,
@@ -12,6 +13,7 @@ import GHC.Float
 
 import Wumber.Cursor
 import Wumber.Element
+import Wumber.Iso
 import Wumber.Sketch
 
 
@@ -25,5 +27,5 @@ tau      = 2 * pi
 sincos θ = (sin r, cos r) where r = θ / 360 * tau
 
 
-runWumber :: Cursor -> Wumber () -> [Element]
-runWumber c m = snd $ execRWS m () c
+runWumber :: Cursor -> Wumber () -> IO [Element]
+runWumber c m = snd <$> execRWST m () c

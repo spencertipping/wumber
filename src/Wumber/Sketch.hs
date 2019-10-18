@@ -24,7 +24,7 @@ sub :: Wumber a -> Wumber (a, Cursor)
 sub m = do
   r <- ask
   c <- get
-  let (v, c', w) = runRWS m r c
+  (v, c', w) <- liftIO $ runRWST m r c
   tell [multi_of w]
   return (v, c')
 
@@ -42,7 +42,7 @@ shape m = do
 capture :: Cursor -> Wumber a -> Wumber Element
 capture c m = do
   r <- ask
-  let (_, [v]) = evalRWS m r c
+  (_, [v]) <- liftIO $ evalRWST m r c
   return v
 
 

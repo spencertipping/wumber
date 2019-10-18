@@ -12,26 +12,6 @@ category:            CAD
 build-type:          Simple
 extra-source-files:  CHANGELOG.md, README.md
 
-executable itest
-  main-is:             ImplicitTest.hs
-  ghc-options:         -O3
-  build-depends:       base >= 4.9
-                     , wumber
-                     , bytestring
-                     , clock
-                     , containers >= 0.6.0.1
-                     , gloss
-                     , hinotify
-                     , hint
-                     , hmatrix
-                     , linear
-                     , microlens
-                     , microlens-th
-                     , mtl
-                     , text >= 1.2.3.1
-                     , utf8-string
-  default-language:    Haskell2010
-
 executable wumber
   main-is:             WumberShell.hs
   other-modules:       WumberShell.Compiler
@@ -52,6 +32,7 @@ executable wumber
                      , microlens
                      , microlens-th
                      , mtl
+                     , random
                      , text >= 1.2.3.1
                      , utf8-string
 
@@ -68,9 +49,11 @@ library
                      , microlens
                      , microlens-th
                      , mtl
+                     , random
                      , text
   exposed-modules:     Wumber
                      , Wumber.Cursor
                      , Wumber.Element
+                     , Wumber.Iso
                      , Wumber.Sketch
   default-language:    Haskell2010

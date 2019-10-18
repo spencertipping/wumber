@@ -25,9 +25,9 @@ f2d = float2Double
 
 
 eval :: V3 Double -> Implicit -> Double
-eval v (ISphere l)    = distance v l - 1
-eval v (Intersect xs) = foldl1 max $ map (eval v) xs
-eval v (Union xs)     = foldl1 min $ map (eval v) xs
+eval v (ISphere l)    = 1 - distance v l
+eval v (Intersect xs) = foldl1 min $ map (eval v) xs
+eval v (Union xs)     = foldl1 max $ map (eval v) xs
 eval v (Negate x)     = negate $ eval v x
 
 time_ns :: IO Int

@@ -32,8 +32,8 @@ main = do
     (InWindow ("Wumber " ++ fname) (1920, 1080) (100, 100))
     (makeColor 0.2 0.2 0.2 0)
     (init_view 1080)
-    (\v -> do m <- fromMaybe (return ()) <$> readMVar model
-              let m' = runWumber init_cursor m
+    (\v -> do m  <- fromMaybe (return ()) <$> readMVar model
+              m' <- runWumber init_cursor m
               return $ screenify v m')
     (\e v -> do Just c <- readIORef controller
                 controllerSetRedraw c
