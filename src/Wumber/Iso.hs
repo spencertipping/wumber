@@ -16,6 +16,7 @@ import Linear.V2
 import Linear.V3
 import Linear.V4
 import Linear.Vector
+import System.IO
 import System.Random
 
 import Wumber.Cursor
@@ -60,20 +61,63 @@ boundary_from i v = go i 0 v
           where v0 = i v
 
 
-big_random :: IO Double
-big_random = randomRIO (-2, 2)
-
 random_v :: IO (V3 Double)
 random_v = do
-  x <- big_random
-  y <- big_random
-  z <- big_random
+  x <- r
+  y <- r
+  z <- r
   return $ V3 x y z
+  where r = randomRIO (-2, 2)
+
+
+iso_from_points :: Iso -> [V3 Double] -> Element
+iso_from_points i ps = Multi (bb_of_points b) $ map each b
+  where each v = Shape (BB 0 1) identity [v, v ^-^ gradient i v ^* 0.04]
+        b      = map (boundary_from i) ps
+
+
+align :: V3 Double -> V3 Double
+align (V3 x y z)
+  | ax > ay && ax > az = V3 x 0 0
+  | ay > ax && ay > az = V3 0 y 0
+  | otherwise          = V3 0 0 z
+  where ax = abs x
+        ay = abs y
+        az = abs z
+
+
+iso_crawl :: Iso -> Int -> Double -> V3 Double -> IO [V3 Double]
+iso_crawl _ 0 _ _ = return []
+iso_crawl i n d v = do
+  hPutStr stderr "."
+  rv <- cross (gradient i v) <$> random_v
+  let v' = boundary_from i $ v ^+^ rv ^* d
+  vs <- iso_crawl i (n-1) d v'
+  return $ v':vs
+
+
+iso_crawler :: Int -> Double -> Iso -> IO Element
+iso_crawler n d i = do
+  setStdGen $ mkStdGen 0
+  vs     <- replicateM n random_v
+  crawls <- mapM (iso_crawl i n d) vs
+  return $ Multi (BB (-2) 2) $ map (shape_of identity) crawls
 
 
 iso_element :: Int -> Iso -> IO Element
 iso_element n i = do
   setStdGen $ mkStdGen 0
-  vs <- filter (/= 0) <$> map (boundary_from i) <$> replicateM n random_v
-  return $ Multi (bb_of_points vs) $ map each vs
-  where each v = Shape (BB 0 1) identity [v, v ^-^ gradient i v ^* 0.1]
+  iso_from_points i <$> replicateM n random_v
+
+
+iso_ring :: Int -> [V3 Double]
+iso_ring n = flip map [1..n] \i ->
+  let t = fromIntegral i / fromIntegral n * pi * 2 in
+    V3 (2 * sin t) (2 * cos t) 0
+
+
+iso_scan :: Int -> Iso -> Element
+iso_scan n i = Multi (BB (-2) 2) $ flip map [1..n] \zi ->
+  let z = fromIntegral zi / fromIntegral n * 4 - 2 in
+    iso_from_points i (map (\(V3 x y _) -> V3 x y z) r)
+  where r = iso_ring n

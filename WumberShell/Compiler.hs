@@ -14,7 +14,7 @@ import Text.Printf
 import Wumber
 
 
-compiler_loop :: MVar (Maybe (Wumber ())) -> FilePath -> IO ()
+compiler_loop :: MVar (Maybe [Element]) -> FilePath -> IO ()
 compiler_loop model f = do
   i <- initINotify
   addWatch i [MoveIn, Modify] (B8.fromString f) (const $ compile model f)
@@ -27,7 +27,7 @@ module_name p = map dotify $ take (length p - 3) p
         dotify  c  =  c
 
 
-compile :: MVar (Maybe (Wumber ())) -> FilePath -> IO ()
+compile :: MVar (Maybe [Element]) -> FilePath -> IO ()
 compile model f = do
   printf "\027[2J\027[1;1Hcompiling...\n"
 
@@ -63,5 +63,6 @@ compile model f = do
       printf "%s\n" (show e)
 
     Right p -> do
-      swapMVar model $ Just p
+      m <- runWumber init_cursor p
+      swapMVar model $ Just m
       printf "\027[2J\027[1;1H%s OK\n" f
