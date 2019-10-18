@@ -38,6 +38,8 @@ on objects that we don't have otherwise.
 
 
 ### CSG
+[Full design here.](design/csg.md)
+
 This is going to be difficult because our object model isn't built to support
 it. I've put everything together assuming that we're doing a fairly direct
 render-to-screen.
