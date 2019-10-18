@@ -30,11 +30,11 @@ main :: Wumber ()
 main = do
   zoom 0.01
   -- i <- liftIO $ iso_element 100000 model
-  -- i <- liftIO $ iso_crawler 300 0.05 model
-  -- tell [i]
-  tell [iso_scan 10 model]
+  i <- liftIO $ iso_crawler 200 0.05 model
+  tell [i]
+  -- tell [iso_scan 40 model]
 
-  where model v = scs v * 0.8 + cubes v * 0.2
+  where model v = scs v + cubes v * 0.2
 
         spheres = sphere 0 `iunion` sphere 0.8
         scs     = spheres `iunion` cube (BB (-1.5) (-0.5))

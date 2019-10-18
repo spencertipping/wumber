@@ -96,7 +96,7 @@ think about continuity is that `∂f/∂v` is bounded.
 ### Background reading
 + [HN thread on ImplicitCAD](https://news.ycombinator.com/item?id=9248174)
 + [Gröbner basis?](https://en.wikipedia.org/wiki/Gröbner_basis)
-+ [SolveSpace: parametric CAD](http://solvespace.com/index.pl**
++ [SolveSpace: parametric CAD](http://solvespace.com/index.pl)
 
 
 ### Constraints and implicits

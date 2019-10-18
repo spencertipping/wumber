@@ -44,7 +44,7 @@ This is going to be difficult because our object model isn't built to support
 it. I've put everything together assuming that we're doing a fairly direct
 render-to-screen.
 
-For example: we don't have a "strict contains** operator, so we don't know
+For example: we don't have a "strict contains" operator, so we don't know
 whether a point is inside an object. In fact, we barely have objects as such;
 they're just drawings of objects.
 
