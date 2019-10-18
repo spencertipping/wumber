@@ -69,4 +69,38 @@ I want to figure out two things:
 rendering.
 
 I think we can get by with two test cases. One is just a single sphere and the
-other is a grid of 10x10x10 spheres.
+other is a grid of 10x10x10 spheres. I'm going to prove this out on the `z = 0`
+plane before getting into view-matrix transformations.
+
+
+### The view matrix trick in detail
+...might not be possible.
+
+We're implicitly max-ing over a ray, which I don't think is something you can
+easily do. It's more complicated than doing an algebraic substitution for `z` or
+something. So to my knowledge, there isn't a closed-form way to reduce the
+boundary-solver dimensionality for perspective or ortho projection. The best we
+can do is to calculate fast cross-sections.
+
+Is it feasible to have our primitives support projection equations? I'm not sure
+it's possible; I think you can construct a solid that just requires a lot of
+work to project -- stuff with a lot of piecewise functions.
+
+
+### Max-gradient
+We get a lot of mileage out of any continuity we can assume: any continuous
+volume is one that we can potentially jump over. I think the simplest way to
+think about continuity is that `∂f/∂v` is bounded.
+
+
+### Background reading
++ [HN thread on ImplicitCAD](https://news.ycombinator.com/item?id=9248174)
++ [Gröbner basis?](https://en.wikipedia.org/wiki/Gröbner_basis)
++ [SolveSpace: parametric CAD](http://solvespace.com/index.pl)
+
+
+### Constraints and implicits
+...are totally compatible, I think. SolveSpace is a frontend that ends up
+deriving vertices for a model; ImplicitCAD is, if anything, more of a backend to
+calculate CSGs and meshes. I'm still bullish on implicits for meshing because
+they provide an unbiased representation of space.
