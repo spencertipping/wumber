@@ -57,3 +57,16 @@ we get a lot of mileage from reusing data.
 **Can we apply a view matrix to 3D objects while they're implicit?** I don't see
 why not; if we can, then we can solve everything in 2D unless we need face
 shading.
+
+
+### Proof of concept
+I want to figure out two things:
+
+1. Whether my view-matrix idea will work at all
+2. Whether we can solve for boundaries in realtime
+
+(2) may prevent us from using the view-matrix trick because it demands ~30FPS
+rendering.
+
+I think we can get by with two test cases. One is just a single sphere and the
+other is a grid of 10x10x10 spheres.
