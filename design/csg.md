@@ -96,7 +96,7 @@ think about continuity is that `∂f/∂v` is bounded.
 ### Background reading
 + [HN thread on ImplicitCAD](https://news.ycombinator.com/item?id=9248174)
 + [Gröbner basis?](https://en.wikipedia.org/wiki/Gröbner_basis)
-+ [SolveSpace: parametric CAD](http://solvespace.com/index.pl)
++ [SolveSpace: parametric CAD](http://solvespace.com/index.pl**
 
 
 ### Constraints and implicits
@@ -104,3 +104,6 @@ think about continuity is that `∂f/∂v` is bounded.
 deriving vertices for a model; ImplicitCAD is, if anything, more of a backend to
 calculate CSGs and meshes. I'm still bullish on implicits for meshing because
 they provide an unbiased representation of space.
+
+**Update:** implicits are the way to go for spatial evaluation. If we want a
+boundary representation, we can infer it using an iso-scanner.

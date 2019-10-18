@@ -12,6 +12,7 @@ import Control.Monad.RWS.Strict
 import Wumber
 import Debug.Trace
 import Graphics.Gloss
+import Linear.Matrix
 import Linear.V3
 import Linear.V4
 import Linear.Vector
@@ -21,15 +22,21 @@ for  = flip map
 cfor = flip concatMap
 
 
+screw :: Double -> V3 Double -> V3 Double
+screw dθ v@(V3 x y z) = v *! rotate_z_m (dθ * z)
+
+
 main :: Wumber ()
 main = do
   zoom 0.01
-  i <- liftIO $ iso_element 100000 $ scs
-  --i <- liftIO $ iso_crawler 300 0.05 $ scs
-  tell [i]
-  --tell [iso_scan 30 $ spheres]
+  -- i <- liftIO $ iso_element 100000 model
+  -- i <- liftIO $ iso_crawler 300 0.05 model
+  -- tell [i]
+  tell [iso_scan 10 model]
 
-  where spheres = sphere 0 `iunion` sphere 0.8
+  where model v = scs v * 0.8 + cubes v * 0.2
+
+        spheres = sphere 0 `iunion` sphere 0.8
         scs     = spheres `iunion` cube (BB (-1.5) (-0.5))
                           `iunion` cube (BB (-1.2) (-0.2))
         cubes   = cube (BB (-1) 1)

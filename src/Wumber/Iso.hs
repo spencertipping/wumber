@@ -1,11 +1,14 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 module Wumber.Iso where
 
+import Control.DeepSeq
 import Control.Monad.Identity
 import Control.Monad.RWS.Strict
+import Control.Parallel.Strategies
 import GHC.Float
 import Graphics.Gloss.Data.Color
 import Lens.Micro
@@ -42,6 +45,15 @@ inegate    f v   = negate (f v)
 ε = 1e-8
 
 
+pmap = parMap rdeepseq
+
+
+instance NFData Element where
+  rnf (Multi _ xs)          = rnf xs
+  rnf (Shape _ _ vs)        = rnf vs
+  rnf (Replicate _ _ _ _ v) = rnf v
+
+
 gradient :: Iso -> V3 Double -> V3 Double
 gradient i v@(V3 x y z) = V3 dx dy dz
   where v0 = i v
@@ -71,7 +83,7 @@ random_v = do
 
 
 iso_from_points :: Iso -> [V3 Double] -> Element
-iso_from_points i ps = Multi (bb_of_points b) $ map each b
+iso_from_points i ps = Multi (bb_of_points b) $ pmap each b
   where each v = Shape (BB 0 1) identity [v, v ^-^ gradient i v ^* 0.04]
         b      = map (boundary_from i) ps
 
@@ -89,19 +101,18 @@ align (V3 x y z)
 iso_crawl :: Iso -> Int -> Double -> V3 Double -> IO [V3 Double]
 iso_crawl _ 0 _ _ = return []
 iso_crawl i n d v = do
-  hPutStr stderr "."
   rv <- cross (gradient i v) <$> random_v
   let v' = boundary_from i $ v ^+^ rv ^* d
-  vs <- iso_crawl i (n-1) d v'
-  return $ v':vs
+  t <- iso_crawl i (n-1) d v'
+  return $ v' : t
 
 
 iso_crawler :: Int -> Double -> Iso -> IO Element
 iso_crawler n d i = do
   setStdGen $ mkStdGen 0
-  vs     <- replicateM n random_v
-  crawls <- mapM (iso_crawl i n d) vs
-  return $ Multi (BB (-2) 2) $ map (shape_of identity) crawls
+  vs <- replicateM n random_v
+  cs <- mapM (iso_crawl i n d) vs
+  return $ Multi (BB (-2) 2) $ map (shape_of identity) cs
 
 
 iso_element :: Int -> Iso -> IO Element
@@ -110,14 +121,14 @@ iso_element n i = do
   iso_from_points i <$> replicateM n random_v
 
 
-iso_ring :: Int -> [V3 Double]
-iso_ring n = flip map [1..n] \i ->
-  let t = fromIntegral i / fromIntegral n * pi * 2 in
-    V3 (2 * sin t) (2 * cos t) 0
+ifloat :: Int -> Int -> Double
+ifloat i n = fromIntegral i / fromIntegral n
 
 
 iso_scan :: Int -> Iso -> Element
-iso_scan n i = Multi (BB (-2) 2) $ flip map [1..n] \zi ->
-  let z = fromIntegral zi / fromIntegral n * 4 - 2 in
-    iso_from_points i (map (\(V3 x y _) -> V3 x y z) r)
-  where r = iso_ring n
+iso_scan n i = iso_from_points i $
+  flip concatMap [1..n] \xi ->
+  flip concatMap [1..n] \yi ->
+  flip map [1..n] \zi -> V3 (ifloat xi n * 4 - 2)
+                            (ifloat yi n * 4 - 2)
+                            (ifloat zi n * 4 - 2)

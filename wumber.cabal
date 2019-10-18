@@ -18,12 +18,12 @@ executable wumber
                      , WumberShell.Event
                      , WumberShell.Render
                      , WumberShell.View
-  ghc-options:         -O3
+  ghc-options:         -O3 -threaded +RTS -N -RTS
   build-depends:       base >= 4.9
-                     , wumber
                      , bytestring
                      , clock
                      , containers >= 0.6.0.1
+                     , deepseq >= 1.4.4.0
                      , gloss
                      , hinotify
                      , hint
@@ -35,20 +35,23 @@ executable wumber
                      , random
                      , text >= 1.2.3.1
                      , utf8-string
+                     , wumber
 
   default-language:    Haskell2010
 
 library
-  ghc-options:         -O3
+  ghc-options:         -O3 -threaded +RTS -N -RTS
   hs-source-dirs:      src
   build-depends:       base >= 4.9
                      , containers >= 0.6.0.1
+                     , deepseq >= 1.4.4.0
                      , gloss
                      , hmatrix
                      , linear
                      , microlens
                      , microlens-th
                      , mtl
+                     , parallel
                      , random
                      , text
   exposed-modules:     Wumber
