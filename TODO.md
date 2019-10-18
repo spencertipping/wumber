@@ -1,4 +1,11 @@
 # TODO
+## High-level
+1. Use implicit modeling for the backend
+2. Use numerical constraints (which are also implicits) to specify the model
+3. Use JIT for both constraints and implicits generally
+4. Ad-hoc meshing, possibly cached to disk
+
+
 ## CSG
 + Tool path profiles
 + Turning/milling operations with drive code?
