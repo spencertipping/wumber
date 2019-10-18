@@ -3,9 +3,8 @@ module Wumber (
   module Wumber.Element,
   module Wumber.Sketch,
   runWumber,
-  f2d, d2f,
-  tau, sincos,
-  mm, cm
+  f2d, d2f, fi,
+  tau, sincos
 ) where
 
 import Control.Monad.RWS.Strict
@@ -16,15 +15,14 @@ import Wumber.Element
 import Wumber.Sketch
 
 
+-- Remedial Haskell functions
 f2d = float2Double
 d2f = double2Float
+fi  = fromIntegral
 
 
 tau      = 2 * pi
 sincos θ = (sin r, cos r) where r = θ / 360 * tau
-
-mm = (/ 25.4)
-cm = (/ 2.54)
 
 
 runWumber :: Cursor -> Wumber () -> [Element]

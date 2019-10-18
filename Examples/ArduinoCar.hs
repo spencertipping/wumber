@@ -14,6 +14,9 @@ import Graphics.Gloss
 import Linear.V4
 
 
+mm = (/ 25.4)
+
+
 type Profile = ShapeGen ()
 
 
@@ -70,10 +73,10 @@ nema_17 = f do body; shaft; screw_holes; faceplate; cables
 -- Referenced from USB-plug corner, plane along XY
 arduino_uno :: Wumber ()
 arduino_uno = f do
-  f do jx 0.60; jy (-0.10); axle (mm 3.2) (-0.1)
-  f do jx 0.55; jy (-2.00); axle (mm 3.2) (-0.1)
-  f do jx 2.60; jy (-0.70); axle (mm 3.2) (-0.1)
-  f do jx 2.60; jy (-1.80); axle (mm 3.2) (-0.1)
+  forM_ holes $ \(x, y) -> f do
+    jx x
+    jy y
+    axle (mm 3.2) (-0.1)
 
   f $ extrude_z 10 (-0.05) $ shape do
     jx (-0.250)
@@ -93,6 +96,8 @@ arduino_uno = f do
     ly (-0.10)
     lx (-2.60)
     ly 2.10
+
+  where holes = [(0.60, -0.10), (0.55, -2.00), (2.60, -0.70), (2.60, -1.80)]
 
 
 wheel_profile :: Profile

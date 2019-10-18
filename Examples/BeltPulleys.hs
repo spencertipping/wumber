@@ -14,6 +14,9 @@ import Graphics.Gloss
 import Linear.V4
 
 
+mm = (/ 25.4)
+
+
 type Profile = ShapeGen ()
 
 
