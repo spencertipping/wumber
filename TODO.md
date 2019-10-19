@@ -61,3 +61,7 @@ we had generated/replicated edges or something.
 
 **The big question:** should wumber understand what solid objects are? Do _I_
 understand what solid objects are, mathematically speaking?
+
+
+### Constraints
+[Full design here.](design/constraints.md)

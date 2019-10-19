@@ -9,13 +9,14 @@ module Examples.Iso where
 import Control.Monad
 import Control.Monad.Identity
 import Control.Monad.RWS.Strict
-import Wumber
 import Debug.Trace
 import Graphics.Gloss
 import Linear.Matrix
 import Linear.V3
 import Linear.V4
 import Linear.Vector
+
+import Wumber
 
 
 for  = flip map
@@ -34,7 +35,7 @@ main = do
   tell [i]
   -- tell [iso_scan 40 model]
 
-  where model v = scs v + cubes v * 0.2
+  where model v = scs v + cubes v * (-0.2)
 
         spheres = sphere 0 `iunion` sphere 0.8
         scs     = spheres `iunion` cube (BB (-1.5) (-0.5))

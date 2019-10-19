@@ -1,6 +1,9 @@
 # Constructive solid geometry
 ...and really, I mean "wumber supporting real solid objects".
 
+**Conclusion:** we're gonna do CSG with implicits, and inferred boundaries when
+we care about boundaries. Boundary representations will never be canonical.
+
 
 ## Pros/cons
 + **Pros**
