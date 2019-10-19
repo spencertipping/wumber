@@ -72,3 +72,30 @@ autocorrect when you introduce a contradiction into the model.
 
 Again, we don't have these problems because our models are never edited: every
 time you run it from source is pure, so there's no state-transition for us.
+
+
+## Specifying constraints in Haskell
+Constraints are backreferences: you create a shape/line/whatever first, then
+refer to it later to constrain it.
+
+```haskell
+-- the current approach: constraints baked in using haskell variables
+axle ø l = extrude circle l
+  where circle = spin (line (ø / 2)) 360
+
+-- constrain-later approach: create objects that have identity, then refer back
+-- and modify them
+axle = extrude (spin line) l
+my_axle ø l = axle do
+  len "line"    =: ø / 2
+  angle "spin"  =: 360
+  len "extrude" =: l
+
+-- a better constraint system using lenses (and we could probably add some
+-- implicit inference to this to reduce redundancy)
+axle = extrude (spin line) l
+my_axle ø l = axle do
+  _form._form._len =: ø / 2
+  _len             =: l
+  _form._angle     =: 360
+```
