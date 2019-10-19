@@ -98,4 +98,17 @@ my_axle ø l = axle do
   _form._form._len =: ø / 2
   _len             =: l
   _form._angle     =: 360
+
+-- even better: mix the two systems by propagating haskell values as usual, but
+-- making those values be constraints rather than always constants
+axle ø l = extrude (spin 360 $ line (ø / 2)) l
+
+do shared_l <- var
+   shared_ø <- var
+   let a1 = axle shared_ø shared_l
+       a2 = axle shared_ø shared_l
+   shared_l =: shared_ø ** 2       -- example: tie length to diameter
+   ...
 ```
+
+**TODO**: what next?
