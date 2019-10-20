@@ -31,9 +31,9 @@ main :: Wumber ()
 main = do
   zoom 0.01
   -- i <- liftIO $ iso_element 100000 model
-  i <- liftIO $ iso_crawler 200 0.05 model
-  tell [i]
-  -- tell [iso_scan 40 model]
+  -- i <- liftIO $ iso_crawler 200 0.05 model
+  -- tell [i]
+  tell [iso_scan 40 model]
 
   where model v = scs v + cubes v * (-0.2)
 
