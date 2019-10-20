@@ -45,7 +45,8 @@ inegate    f v   = negate (f v)
 ε = 1e-8
 
 
-pmap = parMap rdeepseq
+pmap :: NFData b => (a -> b) -> [a] -> [b]
+pmap f = withStrategy (parListChunk 64 rdeepseq) . map f
 
 
 instance NFData Element where
