@@ -37,6 +37,7 @@ Let's go through the pros/cons of implicit geometries:
   + Bounding boxes can be inferred given a point in the object
   + Curves, splines, etc are trivial to handle
   + Cross sections are also trivial
+  + Maximum gradient -> very efficient collision detection
 + **Cons**
   + Rendering is expensive: need to find boundaries first
   + Solutions are inexact because we don't have a minimum detail size; i.e.
