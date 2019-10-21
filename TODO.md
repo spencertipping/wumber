@@ -28,6 +28,11 @@
 + Common ball bearings
 + TGP shafts
 + Dimensional lumber
++ Material properties
+  + Wood
+  + A36 steel
+  + Hardened steel
+  + Aluminum
 
 
 ## Rendering
@@ -60,8 +65,23 @@ isn't that odious to specify them by hand, at least so far. Maybe it would be if
 we had generated/replicated edges or something.
 
 **The big question:** should wumber understand what solid objects are? Do _I_
-understand what solid objects are, mathematically speaking?
+understand what solid objects are, mathematically speaking? (Update: yes and
+yes. They're volume functions with implicit boundaries.)
 
 
 ### Constraints
 [Full design here.](design/constraints.md)
+
+I don't want to JIT constraints initially; we're unlikely to spend nearly as
+much time solving them as we do scanning iso forms. I also want it to be easier
+to build higher-order constraints and quickly extend the DSL.
+
+We can detect under/overconstrained models by looking at the cost function
+derivatives. Local minimum at nonzero == overconstrained, zero-derivative at
+cost=0 == underconstrained.
+
+What do we do with underconstrained systems? We want to provide a function that
+takes an independent variable and produces new values, but (1) do we know the
+dimensionality of underspecified constraints; and (2) is there a simple way to
+map parameter values to outputs? Can we reliably trace the outline of all forms
+that result in linear paths?
