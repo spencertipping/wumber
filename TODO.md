@@ -86,6 +86,14 @@ dimensionality of underspecified constraints; and (2) is there a simple way to
 map parameter values to outputs? Can we reliably trace the outline of all forms
 that result in linear paths?
 
+The dumb option is to have the user manually define independent variables that
+are constrained to other things. So the system would be fully specified when
+those independent variables have fixed values. For example, we might say "this
+is a drive axis" and step it by 1° increments, re-solving the other variables in
+the system at each point.
+
+(If we do things like this, we may want JIT after all.)
+
 
 ### Implicit representation
 POV-ray does this really well: isosurfaces are specified by a bounding box,
