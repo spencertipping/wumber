@@ -85,3 +85,15 @@ takes an independent variable and produces new values, but (1) do we know the
 dimensionality of underspecified constraints; and (2) is there a simple way to
 map parameter values to outputs? Can we reliably trace the outline of all forms
 that result in linear paths?
+
+
+### Implicit representation
+POV-ray does this really well: isosurfaces are specified by a bounding box,
+numerical accuracy, and max-gradient. That seems like a perfectly reasonable
+representation for us to use.
+
+If we know the bounding box, that means we can ray-cast to detect intersections
+from the viewport. That, in turn, gives us a fast way to translate mouse actions
+into 3D space. (To justify why this is feasible: if iso-scanning involves 10k
+rays and takes less than five minutes, shooting one ray for mouse interactions
+will easily fit into our 30ms realtime budget.)
