@@ -94,6 +94,10 @@ the system at each point.
 
 (If we do things like this, we may want JIT after all.)
 
+We can also verify that the model converges to a single state, and maybe
+complain if it doesn't. Independent variable values should fully specify the
+system.
+
 
 ### Implicit representation
 POV-ray does this really well: isosurfaces are specified by a bounding box,
