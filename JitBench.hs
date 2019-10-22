@@ -72,8 +72,8 @@ solve f v | abs d <= ε = (v, g)
                 (f (v ^+^ (V3 0 0 ε)) - d) ^/ ε
 
 
--- NOTE: eval_model_handcoded is faster with these variables than it is with
--- (spheres !! 0) index expressions. This seems counterintuitive to me;
+-- NOTE: eval_model_handcoded is ~10% faster with these variables than it is
+-- with (spheres !! 0) index expressions. This seems counterintuitive to me;
 -- shouldn't those be compute-once?
 s1 = ISphere 5 1
 s2 = ISphere 4 2
