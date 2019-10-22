@@ -40,8 +40,7 @@ eval_sphere_handcoded (ISphere r (V3 cx cy cz)) (V3 x y z) =
         dz = cz - z
 
 
--- NOTE: eval is 16x slower than eval_handcoded without strictness annotations;
--- with annotations, the two functions have the same performance within 5%.
+-- NOTE: eval is 16x slower without strictness annotations.
 --
 -- Stream fusion doesn't happen between foldl1 and map. eval union with
 -- foldl1 max $ map ... is 40ns (100%) slower than the manually fused version.
@@ -93,8 +92,7 @@ eval_model_handcoded v =
 
 main = defaultMain
   [
-    bench "solve union" $ nf (solve eval_model) 0.1,
-    bench "solve union mono" $ nf (solve eval_model_mono) 0.1,
-    bench "solve union handcoded"
-      $ nf (solve eval_model_handcoded) 0.1
+    bench "solve union"           $ nf (solve eval_model) 0.1,
+    bench "solve union mono"      $ nf (solve eval_model_mono) 0.1,
+    bench "solve union handcoded" $ nf (solve eval_model_handcoded) 0.1
   ]
