@@ -109,3 +109,25 @@ from the viewport. That, in turn, gives us a fast way to translate mouse actions
 into 3D space. (To justify why this is feasible: if iso-scanning involves 10k
 rays and takes less than five minutes, shooting one ray for mouse interactions
 will easily fit into our 30ms realtime budget.)
+
+...and again, we can always just cache a boundary for an object. The real
+leverage of implicits is that they automate meshing.
+
+
+### Boundary representation
+It's worth getting some mileage from boundaries when we have them, which we will
+for basic shapes like cubes. If we trust our boundaries, we can apply some
+optimizations to CSG operations: the resulting form's boundary always consists
+of elements from the originals and/or their split intersections.
+
+...which I think means we just need two functions:
+
+```haskell
+split_triangle :: Triangle -> Triangle -> [Triangle]
+split_line     :: Line     -> Line     -> [Line]
+```
+
+I guess we also want [BVH][bvh] if this is going to be remotely efficient. We'll
+likely want it anyway to detect collisions faster than pure iso-intersection.
+
+[bvh]: https://en.wikipedia.org/wiki/Bounding_volume_hierarchy
