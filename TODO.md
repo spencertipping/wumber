@@ -2,8 +2,15 @@
 ## High-level
 1. Use implicit modeling for the backend
 2. Use numerical constraints (which are also implicits) to specify the model
-3. Use JIT for both constraints and implicits generally
+3. ~~Use JIT for both constraints and implicits generally~~
 4. Ad-hoc meshing, possibly cached to disk
+
+**NOTE:** JIT may or may not be worth it. It has two performance advantages: (1)
+we can get rid of Haskell's polymorphic dispatch (50% faster, maybe); and (2) we
+can use AVX for certain parts of the code -- but (2) isn't straightforward; we
+still have a lot of scalar logic.
+
+I don't think JIT makes sense out of the gate.
 
 
 ## CSG
