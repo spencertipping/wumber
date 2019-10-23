@@ -3,6 +3,8 @@
 #include <stdio.h>
 
 
+#define max(a, b) ((a) > (b) ? (a) : (b))
+
 struct sphere
 {
   double  const radius;
@@ -16,7 +18,7 @@ static struct sphere our_union[3] = {
 };
 
 
-static inline double avx_eval_sphere(sphere const &s, __m256d v)
+static inline double avx_eval_sphere(sphere const &s, __m256d const &v)
 {
   __m256d diff    = _mm256_sub_pd(s.center, v);
   __m256d squared = _mm256_mul_pd(diff, diff);
@@ -26,11 +28,13 @@ static inline double avx_eval_sphere(sphere const &s, __m256d v)
 }
 
 
-static inline double avx_eval_union(__m256d v)
+static inline double avx_eval_union(__m256d const &v)
 {
-  return fmax(avx_eval_sphere(our_union[0], v),
-              fmax(avx_eval_sphere(our_union[1], v),
-                   avx_eval_sphere(our_union[2], v)));
+  double const s1 = avx_eval_sphere(our_union[0], v);
+  double const s2 = avx_eval_sphere(our_union[1], v);
+  double const s3 = avx_eval_sphere(our_union[2], v);
+
+  return max(s1, max(s2, s3));
 }
 
 
