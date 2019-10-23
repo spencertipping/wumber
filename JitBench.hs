@@ -19,7 +19,11 @@ import Text.Printf
 import Criterion.Main
 
 
--- NOTE: can't be Float; the model never converges
+-- NOTE: "-threaded -with-rtsopts=-N" decreases performance by ~20% for
+-- single-threaded code.
+
+
+-- NOTE: can't be Float; the model never converges, even with ε = 1e-6
 type OurNumber = Double
 
 data Implicit = ISphere !OurNumber !(V3 OurNumber)
