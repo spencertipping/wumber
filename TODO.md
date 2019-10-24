@@ -41,6 +41,8 @@
 + Mesh to quads
 + Nonuniform/anisotropic material definitions (e.g. wood with knots)
 + Re-mesh to accommodate sharp force-distribution gradients
++ FEM for electronics
++ FEM for magnetics
 
 
 ## Rendering for development
@@ -59,6 +61,12 @@
 + Export to STL or similar
 + Export to cross-section PDFs or images
   + BigPrint-style image tiling?
+
+
+## CNC
++ Generate toolpaths and tool geometry constraints
+  + e.g. 1/2"x2" endmill, 4"x10" work envelope
+  + Tolerances?
 
 
 ## Notes
