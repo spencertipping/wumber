@@ -3,6 +3,7 @@
 1. Use implicit modeling for the backend
 2. Use numerical constraints (which are also implicits) to specify the model
 3. Ad-hoc meshing, possibly cached to disk
+4. Provide an interactive shell on the terminal, linked to the view
 
 
 ## CSG
@@ -72,6 +73,10 @@
 ## Notes
 CSG needs to happen early if we do it at all. It puts large mathematical demands
 on objects that we don't have otherwise.
+
+
+### Shell
+[Full design here.](design/shell.md)
 
 
 ### JIT
