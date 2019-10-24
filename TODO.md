@@ -5,6 +5,8 @@
 3. Ad-hoc meshing, possibly cached to disk
 4. Provide an interactive shell on the terminal, linked to the view
 
+[Full development strategy.](design/strategy.md)
+
 
 ## CSG
 + Tool path profiles
