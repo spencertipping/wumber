@@ -12,6 +12,10 @@ still have a lot of scalar logic.
 
 I don't think JIT makes sense out of the gate.
 
+At some point down the line I'd like to try making an auto-vectorizer that finds
+parallel expressions and builds an AVX pipeline to evaluate them. Processors
+only barely make this type of thing worthwhile, though.
+
 
 ## CSG
 + Tool path profiles
@@ -32,6 +36,8 @@ I don't think JIT makes sense out of the gate.
 + Machine bolt profiles, threading macros
 + NEMA stepper models
 + Arduino models
++ PCB elements
++ Prototyping breadboards
 + Common ball bearings
 + TGP shafts
 + Dimensional lumber
