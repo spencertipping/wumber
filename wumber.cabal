@@ -12,7 +12,34 @@ category:            CAD
 build-type:          Simple
 extra-source-files:  CHANGELOG.md, README.md
 
+
+-- CAD engine
+library
+  ghc-options:         -O3
+  hs-source-dirs:      wumber
+  default-language:    Haskell2010
+  build-depends:       base >= 4.9
+                     , containers >= 0.6.0.1
+                     , deepseq >= 1.4.4.0
+                     , gloss
+                     , hmatrix
+                     , linear
+                     , microlens
+                     , microlens-th
+                     , mtl
+                     , parallel
+                     , random
+                     , text
+  exposed-modules:     Wumber
+                     , Wumber.Cursor
+                     , Wumber.Element
+                     , Wumber.Iso
+                     , Wumber.Sketch
+
+
+-- IDE
 executable wumber
+  hs-source-dirs:      shell
   main-is:             WumberShell.hs
   other-modules:       WumberShell.Compiler
                      , WumberShell.Event
@@ -38,47 +65,27 @@ executable wumber
                      , utf8-string
                      , wumber
 
-executable jitbench
-  main-is:             JitBench.hs
-  ghc-options:         -O3 -fforce-recomp -ddump-asm -dumpdir=dumps -fllvm
-  default-language:    Haskell2010
-  build-depends:       base >= 4.9
-                     , bytestring
-                     , clock
-                     , containers >= 0.6.0.1
-                     , criterion
-                     , deepseq >= 1.4.4.0
-                     , gloss
-                     , hinotify
-                     , hint
-                     , hmatrix
-                     , linear
-                     , microlens
-                     , microlens-th
-                     , mtl
-                     , random
-                     , text >= 1.2.3.1
-                     , utf8-string
-                     , wumber
 
-library
-  ghc-options:         -O3
-  hs-source-dirs:      wumber
-  default-language:    Haskell2010
-  build-depends:       base >= 4.9
-                     , containers >= 0.6.0.1
-                     , deepseq >= 1.4.4.0
-                     , gloss
-                     , hmatrix
-                     , linear
-                     , microlens
-                     , microlens-th
-                     , mtl
-                     , parallel
-                     , random
-                     , text
-  exposed-modules:     Wumber
-                     , Wumber.Cursor
-                     , Wumber.Element
-                     , Wumber.Iso
-                     , Wumber.Sketch
+-- executable jitbench
+--   hs-source-dirs:      dev/hackery
+--   main-is:             JitBench.hs
+--   ghc-options:         -O3 -fforce-recomp -ddump-asm -dumpdir=dumps -fllvm
+--   default-language:    Haskell2010
+--   build-depends:       base >= 4.9
+--                      , bytestring
+--                      , clock
+--                      , containers >= 0.6.0.1
+--                      , criterion
+--                      , deepseq >= 1.4.4.0
+--                      , gloss
+--                      , hinotify
+--                      , hint
+--                      , hmatrix
+--                      , linear
+--                      , microlens
+--                      , microlens-th
+--                      , mtl
+--                      , random
+--                      , text >= 1.2.3.1
+--                      , utf8-string
+--                      , wumber

@@ -43,12 +43,6 @@ compile model f = do
 
     loadModules [f]
     setTopLevelModules [module_name f]
-    setImports ["Prelude",
-                "Control.Monad",
-                "Control.Monad.Identity",
-                "Control.Monad.RWS.Strict",
-                "Graphics.Gloss",
-                "Wumber"]
     interpret "main" (as :: Wumber ())
 
   case r of
