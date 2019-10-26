@@ -56,11 +56,11 @@ type Constraint = CVal Double
 -- | Constraint equivalence. The premise is that we can reduce each constraint
 --   down to one or more scalar values that describe its out-of-whackness. The
 --   solver attempts to set these values to zero.
-class CEq a where (===) :: a -> a -> Constrained ()
-instance CEq (CVal Double)   where a        === b        = tell [a - b]
-instance CEq a => CEq (V1 a) where V1 a     === V1 b     = do a === b
-instance CEq a => CEq (V2 a) where V2 a b   === V2 c d   = do a === c; b === d
-instance CEq a => CEq (V3 a) where V3 a b c === V3 d e f = do a === d; b === e; c === f
+class CEq a where (=:=) :: a -> a -> Constrained ()
+instance CEq (CVal Double)   where a        =:= b        = tell [a - b]
+instance CEq a => CEq (V1 a) where V1 a     =:= V1 b     = do a =:= b
+instance CEq a => CEq (V2 a) where V2 a b   =:= V2 c d   = do a =:= c; b =:= d
+instance CEq a => CEq (V3 a) where V3 a b c =:= V3 d e f = do a =:= d; b =:= e; c =:= f
 
 
 -- | Boolean 'and' (intersection) of a set of constraints.
