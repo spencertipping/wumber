@@ -1,9 +1,11 @@
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE ExistentialQuantification #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 module Wumber.Constraint where
@@ -17,6 +19,7 @@ import Data.Array.Unboxed
 import GHC.Float
 import Lens.Micro
 import Lens.Micro.TH
+import Linear.V1
 import Linear.V2
 import Linear.V3
 
@@ -27,31 +30,46 @@ import Linear.V3
 
 -- | A constrained variable, constant, or transformation of one or more such
 --   values. You build these up with numeric expressions and then assert
---   equivalence using '===', which emits a constraint to the solver.
-data CVal a = CVar    !Int !a
-            | CConst  !a
-            | CLinear { _cl_m :: !a, _cl_b :: !a, _cl_v :: !(CVal a) }
+--   equivalence using '===', which emits constraints to the solver.
+--
+--   NOTE: although we have a type parameter, 'a' is almost always 'Double'.
+--   Higher-dimensional quantities are things like 'V2 (CVal Double)', not
+--   'CVal (V2 Double)'. Higher-dimensional equivalence assertions are
+--   generalized by 'CEq', defined below.
+data CVal a = CVar       !Int !a
+            | CConst     !a
+            | CLinear    { _cl_m :: !a, _cl_b :: !a, _cl_v :: !(CVal a) }
             | CNonlinear { _cln_operands :: ![CVal a],
                            _cln_fn       :: !([a] -> a) }
 makeLenses ''CVal
 
 
--- | Constraints are just values that are set to zero.
-type Constraint a = CVal a
-
--- | Boolean 'and' (intersection) of a set of constraints.
-cand :: Ord a => [Constraint a] -> Constraint a
-cand xs = CNonlinear xs (foldl1 min)
-
--- | Boolean 'or' (union) of a set of constraints.
-cor :: Ord a => [Constraint a] -> Constraint a
-cor xs = CNonlinear xs (foldl1 max)
-
-
 -- | 'Constrained' is a monad that keeps track of 'CVar' IDs and collects
 --   constraint expressions whose values should end up being zero. Constraints
 --   are solved in the 'ST' monad using mutable unboxed 'Double' arrays.
-type Constrained n a = RWS () [Constraint n] Int a
+type Constrained a = RWS () [Constraint] Int a
+
+-- | Constraints are just values that we want to set to zero.
+type Constraint = CVal Double
+
+
+-- | Constraint equivalence. The premise is that we can reduce each constraint
+--   down to one or more scalar values that describe its out-of-whackness. The
+--   solver attempts to set these values to zero.
+class CEq a where (===) :: a -> a -> Constrained ()
+instance CEq (CVal Double)   where a        === b        = tell [a - b]
+instance CEq a => CEq (V1 a) where V1 a     === V1 b     = do a === b
+instance CEq a => CEq (V2 a) where V2 a b   === V2 c d   = do a === c; b === d
+instance CEq a => CEq (V3 a) where V3 a b c === V3 d e f = do a === d; b === e; c === f
+
+
+-- | Boolean 'and' (intersection) of a set of constraints.
+cand :: [Constraint] -> Constraint
+cand xs = CNonlinear xs (foldl1 min)
+
+-- | Boolean 'or' (union) of a set of constraints.
+cor :: [Constraint] -> Constraint
+cor xs = CNonlinear xs (foldl1 max)
 
 
 -- | Apply a linear transformation to a single constrained value.
@@ -62,13 +80,13 @@ linear m b v                 = CLinear m b v
 
 -- | Promote a unary function to a nonlinear transformation, with constant
 --   folding.
-nonlinear_unary :: Num a => (a -> a) -> CVal a -> CVal a
+nonlinear_unary :: (a -> a) -> CVal a -> CVal a
 nonlinear_unary f (CConst x) = CConst (f x)
 nonlinear_unary f v = CNonlinear [v] (f . head)
 
 -- | Promote a binary function to a nonlinear transformation, with constant
 --   folding.
-nonlinear_binary :: Num a => (a -> a -> a) -> CVal a -> CVal a -> CVal a
+nonlinear_binary :: (a -> a -> a) -> CVal a -> CVal a -> CVal a
 nonlinear_binary f (CConst x) (CConst y) = CConst (f x y)
 nonlinear_binary f x y = CNonlinear [x, y] (\[a, b] -> f a b)
 
@@ -110,21 +128,14 @@ instance Floating a => Floating (CVal a) where
 
 
 -- | Create a new constrained variable initialized to the given value.
-var :: a -> Constrained n (CVal a)
+var :: a -> Constrained (CVal a)
 var init = do id <- get
               modify (+ 1)
               return $ CVar id init
 
 
-eval :: (MArray a e m, Num e) => CVal e -> a Int e -> m e
-eval (CVar i _)         xs = readArray xs i
-eval (CConst x)         _  = return x
-eval (CLinear m b v)    xs = do x <- eval v xs; return $ m*x + b
-eval (CNonlinear ops f) xs = f <$> mapM (flip eval xs) ops
-
-
--- | Specifies that two constrained expressions should have the same value. We
---   assert this by creating a zero crossing when they are equal -- i.e. we
---   subtract them.
-(===) :: Num a => CVal a -> CVal a -> Constrained a ()
-a === b = tell [a - b]
+eval :: Num e => CVal e -> Array Int e -> e
+eval (CVar i _)         xs = xs ! i
+eval (CConst x)         _  = x
+eval (CLinear m b v)    xs = let x = eval v xs in m*x + b
+eval (CNonlinear ops f) xs = f $! map (flip eval xs) ops
