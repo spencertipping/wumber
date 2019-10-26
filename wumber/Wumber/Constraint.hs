@@ -30,8 +30,12 @@ data CVal = CVar    !Int !Double
                          _cln_fn       :: !([Double] -> Double) }
 makeLenses ''CVal
 
-type Constraint    = ([CVal], [Double] -> Double)
-type Constrained a = forall s. RWST () [Constraint] Int (ST s) a
+-- | 'Constrained' is a monad that keeps track of 'CVar' IDs and collects
+--   constraint expressions whose values should end up being zero. Constraints
+--   are solved in the 'ST' monad using mutable unboxed 'Double' arrays.
+--
+--   TODO: do we need RWST here, or is this RWS and then post-ST?
+type Constrained a = forall s. RWST () [CVal] Int (ST s) a
 
 
 -- | Apply a linear transformation to a single constrained value.
@@ -97,5 +101,15 @@ var init = do
   return $ CVar id init
 
 
--- eq_constraint :: CVal -> CVal -> Constraint
--- TODO
+eval :: forall s. CVal -> STUArray s Int Double -> ST s Double
+eval (CVar i _)         xs = readArray xs i
+eval (CConst x)         _  = return x
+eval (CLinear m b v)    xs = do x <- eval v xs; return $ m*x + b
+eval (CNonlinear ops f) xs = f <$> mapM (flip eval xs) ops
+
+
+-- | Specifies that two constrained expressions should have the same value. We
+--   assert this by creating a zero crossing when they are equal -- i.e. we
+--   subtract them.
+(===) :: CVal -> CVal -> Constrained ()
+a === b = tell [a - b]
