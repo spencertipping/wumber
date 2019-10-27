@@ -1,27 +1,13 @@
-{-# LANGUAGE TupleSections #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE BlockArguments #-}
-{-# LANGUAGE LambdaCase #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE ExistentialQuantification #-}
-{-# LANGUAGE MultiWayIf #-}
-{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 module Wumber.ConstraintSolver where
 
 import Control.Monad
-import Control.Monad.ST
-import Control.Monad.Reader
 import Control.Monad.RWS
 import qualified Data.Set as S
 import qualified Data.Vector.Storable as V
 import GHC.Float
-import Lens.Micro
 import Numeric.GSL.Minimization
 import Numeric.LinearAlgebra.Data
 import qualified Linear.Metric as LM

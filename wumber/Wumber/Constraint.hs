@@ -1,22 +1,13 @@
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE KindSignatures #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE ExistentialQuantification #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 module Wumber.Constraint where
 
 import Control.Monad
-import Control.Monad.ST
 import Control.Monad.RWS
-import Data.Array.MArray
-import Data.Array.ST
-import Data.Array.Unboxed
-import GHC.Float
 import Lens.Micro
 import Lens.Micro.TH
 import Linear.V1
@@ -25,8 +16,10 @@ import Linear.V3
 import Text.Printf
 
 
-type N     = Double
+-- | For documentation. Variable IDs are always going to be integers, and these
+--   integers will always refer to indexes in an array or vector.
 type VarID = Int
+type N     = Double
 
 
 -- | A constrained variable, constant, or transformation of one or more such
@@ -44,7 +37,7 @@ data CVal = CVar        { _cv_id :: !VarID, _cv_init :: !N }
                           _clnb_fname   :: String }
           | CNonlinear  { _cln_operands :: ![CVal],
                           _cln_fn       :: !([N] -> N),
-                          _cln_fname    :: String}
+                          _cln_fname    :: String }
 
 makeLenses ''CVal
 
