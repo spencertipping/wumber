@@ -9,6 +9,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE MultiWayIf #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 module Wumber.ConstraintSolver where
@@ -28,6 +29,7 @@ import Data.STRef
 import GHC.Float
 import Lens.Micro
 import Lens.Micro.TH
+import qualified Linear.Metric as LM
 import Linear.V1
 import Linear.V2
 import Linear.V3
@@ -68,7 +70,7 @@ nan = 0/0
 
 -- | Calculates the value and the partial derivative of the sum of specified
 --   functions at the variable in question.
-{-# SPECIALIZE
+{-# SPECIALIZE INLINE
     partial :: [Constraint] -> (STUArray s) VarID CE -> VarID -> ST s (CE, CE) #-}
 partial :: MArray a CE m => [Constraint] -> a VarID CE -> VarID -> m (CE, CE)
 partial cs xs i = do
@@ -82,50 +84,80 @@ partial cs xs i = do
   return (v0, (vg - v0) / ε)
 
 
+-- | Adjusts the estimate used in Newton's method. This handles some edge cases
+--   around very small gradients.
+{-# INLINE newton_adjust #-}
+newton_adjust :: CE -> CE -> CE -> (CE, CE)
+newton_adjust v g s
+  | g == 0            = (0, s')
+  | abs g < max_slope = (abs s' * v/max_slope * signum g, s')
+  | otherwise         = (abs s' * v/g, s')
+  where max_slope = sqrt ε
+        s'        = if signum g == signum s
+                    then s * 1.1
+                    else s * (-0.5)
+
+
 -- | Steps Newton's method by one iteration.
-newton_step :: MArray a CE (ST s)
-            => (a VarID CE -> VarID -> ST s (CE, CE))
-            -> [VarID] -> a VarID CE -> a VarID CE -> a VarID CE -> ST s CE
 newton_step partial var_ids xs ps ss = do
   t <- newSTRef 0
-  forM_ var_ids \i -> do (v, g) <- partial xs i
-                         writeArray ps i (v * signum g / max ε g)
-                         modifySTRef t (+ v)
-  forM_ var_ids \i -> do x <- readArray xs i
-                         d <- readArray ps i
-                         s <- readArray ss i
-                         if signum s /= signum d
-                           then writeArray ss i (s * (-0.5))
-                           else writeArray ss i (s * 1.01)
-                         writeArray xs i $ trace ("(x, d, s) = " ++ show (x, d, s)) (x - d * abs s)
+  calculate_partials t
+  update_variables
   readSTRef t
 
-newton_solve :: MArray a CE (ST s)
-             => Int
-             -> (a VarID CE -> VarID -> ST s (CE, CE))
-             -> [VarID] -> a VarID CE -> a VarID CE -> a VarID CE -> ST s CE
+  where calculate_partials t = forM_ var_ids \i -> do
+          (!v, !g) <- partial xs i
+          s <- readArray ss i
+          let (x', s') = newton_adjust v g s
+          writeArray ps i x'
+          writeArray ss i s'
+          modifySTRef t (+ v)
+
+        update_variables = forM_ var_ids \i -> do
+          !x <- readArray xs i
+          !d <- readArray ps i
+          writeArray xs i $! x - d
+
+
+-- | Solves a system using up to 'n' iterations.
 newton_solve n partial var_ids xs ps ss = do
   v <- newton_step partial var_ids xs ps ss
-  if trace (show v) v <= ε || n <= 0
-    then return v
+  if v <= ε || n <= 0
+    then return (v, n)
     else newton_solve (n - 1) partial var_ids xs ps ss
 
 
 -- | Collects constraints, sets initial values, and solves a system using
 --   gradient descent. All provided 'CVal's will be minimized, although perhaps
 --   not zero.
-solve :: Constrained a -> (CE, UArray VarID CE)
-solve m = runST do
-  xs <- newArray (0, vmax) 0
-  ps <- newArray (0, vmax) 0
-  ss <- newArray (0, vmax) 1
-
+solve :: Int -> Constrained a -> (CE, Int, UArray VarID CE)
+solve n m = runST do
+  xs <- newArray (0, vmax) 0  :: ST s (STUArray s VarID CE)
+  ps <- newArray (0, vmax) 0  :: ST s (STUArray s VarID CE)
+  ss <- newArray (0, vmax) s0 :: ST s (STUArray s VarID CE)
   forM_ vars \(i, v) -> writeArray xs i v
-  r   <- newton_solve 10000 (partial cs) var_ids xs ps ss
-  xs' <- unsafeFreezeSTUArray xs
-  return (r, xs')
+
+  (r, n') <- newton_solve n (partial cs) var_ids xs ps ss
+  xs'     <- unsafeFreezeSTUArray xs
+  return (r, n', xs')
 
   where cs      = snd $ evalRWS m () 0
         vars    = unions (map deps cs)
         vmax    = fst $ S.findMax vars
         var_ids = map fst $ S.toList vars
+        s0      = 1 / sqrt (fromIntegral $ length var_ids)
+
+
+testcase1 = do
+  v1 <- vars (V3 1 1 1)
+  v2 <- vars (V2 1 1)
+  LM.norm v1 =:= 1
+  LM.norm v2 =:= 1
+
+
+testcase2 = do
+  v1 <- vars (V2 1 1)
+  v2 <- vars (V2 2 3)
+  LM.distance v1 v2 =:= 4
+  v1^._x =:= v1^._y
+  v2^._x =:= v2^._y

@@ -22,6 +22,7 @@ import Lens.Micro.TH
 import Linear.V1
 import Linear.V2
 import Linear.V3
+import Text.Printf
 
 
 type CE    = Double
@@ -37,6 +38,13 @@ data CVal = CVar       !VarID !CE
           | CNonlinear { _cln_operands :: ![CVal],
                          _cln_fn       :: !([CE] -> CE) }
 makeLenses ''CVal
+
+
+instance Show CVal where
+  show (CVar i v)         = printf "CVar %d %f" i v
+  show (CConst v)         = printf "CConst %f" v
+  show (CLinear m b v)    = printf "CLinear %f %f (%s)" m b (show v)
+  show (CNonlinear ops f) = printf "CNonlinear %s" (show ops)
 
 
 -- | 'Constrained' is a monad that keeps track of 'CVar' IDs and collects
