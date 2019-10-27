@@ -113,7 +113,7 @@ instance Num CVal where
   signum v          = nonlinear_unary signum v
 
 instance Fractional CVal where
-  fromRational = CConst . fromRational
+  fromRational     = CConst . fromRational
   recip (CConst x) = CConst (recip x)
   recip v          = nonlinear_unary recip v
 
@@ -134,10 +134,10 @@ instance Floating CVal where
 
 
 -- | Create a new constrained variable initialized to the given value.
-vars :: Traversable t => t CE -> Constrained (t CVal)
-vars = mapM var
-
 var :: CE -> Constrained CVal
 var init = do id <- get
               modify (+ 1)
               return $ CVar id init
+
+vars :: Traversable t => t CE -> Constrained (t CVal)
+vars = mapM var

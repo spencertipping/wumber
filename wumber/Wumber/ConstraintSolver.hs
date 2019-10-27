@@ -94,7 +94,7 @@ newton_adjust v g s
   | otherwise         = (abs s' * v/g, s')
   where max_slope = sqrt ε
         s'        = if signum g == signum s
-                    then s * 1.1
+                    then s * 1.0
                     else s * (-0.5)
 
 
