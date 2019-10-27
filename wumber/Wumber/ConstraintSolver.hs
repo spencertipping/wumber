@@ -40,39 +40,45 @@ import Debug.Trace
 
 
 -- | A solved system whose values are available using 'evalM'.
-type Solved a = Reader (UArray VarID CE) a
+type Solved a = Reader (UArray VarID N) a
 
 
 -- | All independent variables used to calculate the given value.
-deps :: CVal -> Set (VarID, CE)
-deps (CVar i v)        = singleton (i, v)
-deps (CConst _)        = empty
-deps (CLinear _ _ v)   = deps v
-deps (CNonlinear xs _) = unions (map deps xs)
+deps :: CVal -> Set (VarID, N)
+deps (CVar i v)            = singleton (i, v)
+deps (CConst _)            = empty
+deps (CLinear _ _ v)       = deps v
+deps (CNonlinear xs _ _)   = unions (map deps xs)
+deps (CNonlinearU v _ _)   = deps v
+deps (CNonlinearB l r _ _) = deps l `S.union` deps r
 
 
-eval :: CVal -> UArray VarID CE -> CE
-eval (CVar i _)         xs = xs ! i
-eval (CConst x)         _  = x
-eval (CLinear m b v)    xs = let !x = eval v xs in m*x + b
-eval (CNonlinear ops f) xs = f $! map (flip eval xs) ops
+eval :: CVal -> UArray VarID N -> N
+eval (CVar i _)            xs = xs ! i
+eval (CConst x)            _  = x
+eval (CLinear m b v)       xs = let !x = eval v xs in m*x + b
+eval (CNonlinear ops f _)  xs = f $ map (flip eval xs) ops
+eval (CNonlinearU v f _)   xs = f (eval v xs)
+eval (CNonlinearB l r f _) xs = eval l xs `f` eval r xs
 
 
-evalM :: CVal -> Solved CE
+evalM :: CVal -> Solved N
 evalM v = eval v <$> ask
 
 
-ε :: CE
+-- TODO
+-- We shouldn't use a global epsilon; for cases like 'partial' we should
+-- parameterize it on the current values. Epsilon should provided a fixed number
+-- of mantissa bits of displacement, not a fixed real-world magnitude.
+ε :: N
 ε = 1e-8
 
-nan :: CE
-nan = 0/0
 
 -- | Calculates the value and the partial derivative of the sum of specified
 --   functions at the variable in question.
 {-# SPECIALIZE INLINE
-    partial :: [Constraint] -> (STUArray s) VarID CE -> VarID -> ST s (CE, CE) #-}
-partial :: MArray a CE m => [Constraint] -> a VarID CE -> VarID -> m (CE, CE)
+    partial :: [Constraint] -> (STUArray s) VarID N -> VarID -> ST s (N, N) #-}
+partial :: MArray a N (ST s) => [Constraint] -> a VarID N -> VarID -> ST s (N, N)
 partial cs xs i = do
   xs'  <- unsafeFreeze xs
   !v0  <- return $! foldl (\t v -> t + eval v xs') 0 cs
@@ -85,23 +91,26 @@ partial cs xs i = do
 
 
 -- | Adjusts the estimate used in Newton's method. This handles some edge cases
---   around very small gradients.
+--   and limits the step size when the gradient is very small.
+--
+--   If the gradient is zero, we adjust by a small amount: √ε. This won't move
+--   us closer to a solution, but it might get us past the plateau.
+
 {-# INLINE newton_adjust #-}
-newton_adjust :: CE -> CE -> CE -> (CE, CE)
+newton_adjust :: N -> N -> N -> (N, N)
 newton_adjust v g s
-  | g == 0            = (0, s')
+  | g == 0            = (signum s' * sqrt ε, s')
   | abs g < max_slope = (abs s' * v/max_slope * signum g, s')
   | otherwise         = (abs s' * v/g, s')
+
   where max_slope = sqrt ε
-
-        -- TODO: this logic is horrible and grossly inaccurate. 0.9 works, but
-        -- sqrt 0.5 doesn't (on testcase1). 0.5 also folds up too fast.
-        s'        = if signum g == signum s
-                    then s * 1.1
-                    else s * (-0.5)
+        s'        = if | signum g == signum s -> s * 1.1
+                       | signum g == 0        -> s
+                       | otherwise            -> s * (-0.5)
 
 
--- | Steps Newton's method by one iteration.
+-- | Steps Newton's method by one iteration. Updates both partials and the
+--   current position.
 newton_step partial var_ids xs ps ss = do
   t <- newSTRef 0
   calculate_partials t
@@ -131,13 +140,21 @@ newton_solve n partial var_ids xs ps ss = do
 
 
 -- | Collects constraints, sets initial values, and solves a system using
---   gradient descent. All provided 'CVal's will be minimized, although perhaps
---   not zero.
-solve :: Int -> Constrained a -> (CE, Int, UArray VarID CE)
+--   Newton's method.
+--
+--   Linear constraints are easily solvable unless the system is overspecified:
+--
+--   prop>       solvable 100 $ do v <- var x; v =-= CConst y
+--   prop> not $ solvable 100 $ do v <- var x; v =-= CConst y; v =-= CConst (y+1)
+--
+--   'solve' also handles nonlinear constraints, but initial values matter
+--   because we're using Newton's method.
+
+solve :: Int -> Constrained a -> (N, Int, UArray VarID N)
 solve n m = runST do
-  xs <- newArray (0, vmax) 0  :: ST s (STUArray s VarID CE)
-  ps <- newArray (0, vmax) 0  :: ST s (STUArray s VarID CE)
-  ss <- newArray (0, vmax) s0 :: ST s (STUArray s VarID CE)
+  xs <- newArray (0, vmax) 0  :: ST s (STUArray s VarID N)
+  ps <- newArray (0, vmax) 0  :: ST s (STUArray s VarID N)
+  ss <- newArray (0, vmax) s0 :: ST s (STUArray s VarID N)
   forM_ vars \(i, v) -> writeArray xs i v
 
   (r, n') <- newton_solve n (partial cs) var_ids xs ps ss
@@ -148,19 +165,25 @@ solve n m = runST do
         vars    = unions (map deps cs)
         vmax    = fst $ S.findMax vars
         var_ids = map fst $ S.toList vars
-        s0      = 1 / sqrt (fromIntegral $ length var_ids)
+        s0      = 0.5 / sqrt (fromIntegral $ length var_ids)
+
+
+-- | For testing: a system is solvable iff it converges to error below the
+--   epsilon and hasn't exhausted its iteration count.
+solvable :: Int -> Constrained a -> Bool
+solvable n m = v <= ε && n' > 0 where (v, n', _) = solve n m
 
 
 testcase1 = do
   v1 <- vars (V3 1 1 1)
   v2 <- vars (V2 1 1)
-  LM.norm v1 =:= 1
-  LM.norm v2 =:= 1
+  LM.norm v1 =-= 1
+  LM.norm v2 =-= 1
 
 
 testcase2 = do
   v1 <- vars (V2 1 1)
   v2 <- vars (V2 2 3)
-  LM.distance v1 v2 =:= 4
-  v1^._x =:= v1^._y
-  v2^._x =:= v2^._y
+  LM.distance v1 v2 =-= 4
+  v1^._x =-= v1^._y
+  v2^._x =-= v2^._y
