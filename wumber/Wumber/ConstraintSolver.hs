@@ -93,8 +93,11 @@ newton_adjust v g s
   | abs g < max_slope = (abs s' * v/max_slope * signum g, s')
   | otherwise         = (abs s' * v/g, s')
   where max_slope = sqrt ε
+
+        -- TODO: this logic is horrible and grossly inaccurate. 0.9 works, but
+        -- sqrt 0.5 doesn't (on testcase1). 0.5 also folds up too fast.
         s'        = if signum g == signum s
-                    then s * 1.0
+                    then s * 1.1
                     else s * (-0.5)
 
 
