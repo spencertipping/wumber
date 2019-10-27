@@ -133,8 +133,9 @@ solve_step v0 cs ci xs = do
 
   is <- indices <$> unsafeFreezeSTUArray xs
   forM_ is \i -> do x  <- readArray xs i
-                    optimize_axis (ci ! i) xs i
-                    x' <- readArray xs i
+                    --optimize_axis (ci ! i) xs i
+                    (v, g) <- val_partial cs i xs x
+                    let x' = x - v/g
                     writeArray gs i (x' - x)
                     writeArray xs i x
                     writeArray ys i x'
@@ -145,8 +146,11 @@ solve_step v0 cs ci xs = do
                     g <- readArray gs i
                     writeArray xs i (x + g*gm)
 
+  -- TODO
+  -- Fix this bisection algorithm; we should use the gradients to locally
+  -- minimize.
   where bisect is gs ys l u vl vu
-          | u - l < δ 1 = return l
+          | u - l < δ 1 = return m -- $ trace (show m) m
           | otherwise   = do
               forM_ is \i -> do x <- readArray xs i
                                 g <- readArray gs i
