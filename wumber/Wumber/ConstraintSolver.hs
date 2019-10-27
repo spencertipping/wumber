@@ -67,10 +67,47 @@ evalM :: CVal -> Solved N
 evalM v = eval v <$> ask
 
 
-{-# INLINE δ #-}
+-- | Produces a delta sized appropriately to the number in question: that is,
+--   halfway into the mantissa. We want parameterized deltas for numerical
+--   stability.
 δ :: Double -> Double
-δ x = x * 1e-8
+δ x = x * 2**(-26)
 
+
+{-|
+Solves a system of constraints (or minimizes the error) and returns a tuple of
+results:
+
+> (error, remaining_iterations, solution)
+
+We use a modified multivariate Newton's method that finds the gradient by
+bisecting the partial derivatives for zero crossings.
+-}
+solve :: Int -> N -> Constrained a -> (N, Int, UArray VarID N)
+solve n ε m = (0, 0, listArray (0, 0) [0])
+  where cs      = snd $ evalRWS m () 0
+        vars    = unions (map deps cs)
+        vmax    = fst $ S.findMax vars
+        var_ids = map fst $ S.toList vars
+        s0      = 0.5 / fromIntegral (length var_ids)
+
+
+csum :: [Constraint] -> UArray VarID N -> N
+csum cs xs = foldl (\t v -> t + eval v xs) 0 cs
+
+
+-- | Calculates the partial derivative of the given axis at the given point.
+partial :: N -> [Constraint] -> STUArray s VarID N -> VarID -> ST s N
+partial v0 cs xs i = do
+  x <- readArray xs i
+  writeArray xs i (x + δ x)
+  xs' <- unsafeFreezeSTUArray xs
+  !v  <- return $! csum cs xs'
+  writeArray xs i x
+  return $ (v - v0) / δ x
+
+
+{-
 -- | Calculates the value and the partial derivative of the sum of specified
 --   functions at the variable in question.
 {-# SPECIALIZE INLINE
@@ -139,7 +176,6 @@ newton_solve n ε partial var_ids xs ps ss = do
 -- | Collects constraints, sets initial values, and solves a system using a
 --   modified Newton's method. Linear constraints are trivially solvable;
 --   nonlinear constraints generally work but depend on initial values.
-solve :: Int -> N -> Constrained a -> (N, Int, UArray VarID N)
 solve n ε m = runST do
   xs <- newArray (0, vmax) 0  :: ST s (STUArray s VarID N)
   ps <- newArray (0, vmax) 0  :: ST s (STUArray s VarID N)
@@ -155,24 +191,10 @@ solve n ε m = runST do
         vmax    = fst $ S.findMax vars
         var_ids = map fst $ S.toList vars
         s0      = 0.5 / fromIntegral (length var_ids)
+-}
 
 
 -- | For testing: a system is solvable iff it converges to error below the
 --   epsilon and hasn't exhausted its iteration count.
 solvable :: Int -> N -> Constrained a -> Bool
 solvable n ε m = v <= ε && n' > 0 where (v, n', _) = solve n ε m
-
-
-testcase1 = do
-  v1 <- vars (V3 1 1 1)
-  v2 <- vars (V2 1 1)
-  LM.norm v1 =-= 1
-  LM.norm v2 =-= 1
-
-
-testcase2 = do
-  v1 <- vars (V2 1 1)
-  v2 <- vars (V2 2 3)
-  LM.distance v1 v2 =-= 4
-  v1^._x =-= v1^._y
-  v2^._x =-= v2^._y

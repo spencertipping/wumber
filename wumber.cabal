@@ -22,7 +22,6 @@ library
                      , base >= 4.9
                      , containers >= 0.6.0.1
                      , deepseq >= 1.4.4.0
-                     , ghc-prim >= 0.5.3
                      , gloss
                      , hmatrix
                      , linear
