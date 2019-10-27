@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
@@ -7,12 +8,10 @@ module Wumber.Constraint where
 import Control.Monad
 import Control.Monad.RWS
 import qualified Data.Map.Lazy as M
+import Data.Foldable
 import Data.Maybe
 import Lens.Micro
 import Lens.Micro.TH
-import Linear.V1
-import Linear.V2
-import Linear.V3
 import Text.Printf
 
 
@@ -76,29 +75,19 @@ CNonlinearB l r f fn // m = CNonlinearB (l // m) (r // m) f fn
 -- | Constraint equivalence. The premise is that we can reduce each constraint
 --   down to one or more scalar values that describe its out-of-whackness. The
 --   solver attempts to set these values to zero.
-class CEq a where (=-=) :: a -> a -> Constrained ()
-                  (<-=) :: a -> a -> Constrained ()
-                  (>-=) :: a -> a -> Constrained ()
-                  (>-=) = flip (<-=)
-infix 4 =-=
-infix 4 <-=
-infix 4 >-=
+class CEq a where
+  infix 4 =-=; (=-=) :: a -> a -> Constrained ()
+  infix 4 <-=; (<-=) :: a -> a -> Constrained ()
+  infix 4 >-=; (>-=) :: a -> a -> Constrained ()
+  (>-=) = flip (<-=)
 
 instance CEq CVal where
   a =-= b = tell [CEqual a b]
   a <-= b = tell [CCostFn $ CNonlinearU (a - b) (max 0) "max 0"]
 
-instance CEq a => CEq (V1 a) where
-  V1 a =-= V1 b = do a =-= b
-  V1 a <-= V1 b = do a <-= b
-
-instance CEq a => CEq (V2 a) where
-  V2 a b =-= V2 c d = do a =-= c; b =-= d
-  V2 a b <-= V2 c d = do a <-= c; b <-= d
-
-instance CEq a => CEq (V3 a) where
-  V3 a b c =-= V3 d e f = do a =-= d; b =-= e; c =-= f
-  V3 a b c <-= V3 d e f = do a <-= d; b <-= e; c <-= f
+instance (Foldable f, CEq a) => CEq (f a) where
+  a =-= b = sequence_ $ zipWith (=-=) (toList a) (toList b)
+  a <-= b = sequence_ $ zipWith (<-=) (toList a) (toList b)
 
 
 -- | Apply a linear transformation to a single constrained value. The value
