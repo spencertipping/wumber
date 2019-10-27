@@ -42,27 +42,29 @@ deps (CNonlinearU v _ _)   = deps v
 deps (CNonlinearB l r _ _) = deps l `S.union` deps r
 
 
-eval :: CVal -> Vector N -> N
-eval (CVar i _)            xs = xs ! i
-eval (CConst x)            _  = x
-eval (CLinear m b v)       xs = let x = eval v xs in m*x + b
-eval (CNonlinear ops f _)  xs = f $ map (flip eval xs) ops
-eval (CNonlinearU v f _)   xs = f (eval v xs)
-eval (CNonlinearB l r f _) xs = eval l xs `f` eval r xs
+eval :: Vector N -> CVal -> N
+eval xs (CVar i _)            = xs ! i
+eval _  (CConst x)            = x
+eval xs (CLinear m b v)       = let x = eval xs v in m*x + b
+eval xs (CNonlinear ops f _)  = f $ map (eval xs) ops
+eval xs (CNonlinearU v f _)   = f (eval xs v)
+eval xs (CNonlinearB l r f _) = eval xs l `f` eval xs r
 
 
 eval_all :: [Constraint] -> Vector N -> N
-eval_all cs xs = foldl (\t v -> t + eval v xs) 0 cs
+eval_all cs xs = foldl (\t v -> t + eval xs v) 0 cs
 
 
 constraints_from :: Constrained a -> (a, [Constraint])
 constraints_from m = evalRWS m () 0
 
 
-solve :: N -> Int -> Constrained a -> (a, Vector N, [Constraint])
-solve ε n m = (a, fst $ minimizeV NMSimplex2 (ε/2) n search_size f start, cs)
+solve :: Functor f => N -> Int -> Constrained (f CVal)
+      -> (f N, Vector N, [Constraint])
+solve ε n m = (eval solution <$> a, solution, cs)
   where (a, cs)     = constraints_from m
         f           = eval_all cs
         vars        = S.unions $ map deps cs
         start       = V.replicate (1 + fst (S.findMax vars)) 0 V.// S.toList vars
         search_size = V.replicate (1 + fst (S.findMax vars)) 1
+        solution    = fst $ minimizeV NMSimplex2 (ε/2) n search_size f start
