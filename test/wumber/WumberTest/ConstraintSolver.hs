@@ -33,54 +33,55 @@ instance Arbitrary (V3 N) where
 
 -- | A system is solvable iff it converges to error below the epsilon and hasn't
 --   exhausted its iteration count.
-solvable :: Int -> N -> Constrained a -> Property
-solvable n ε m = counterexample (show (v, n', xs)) $ v <= ε && n' > 0
-  where (_, v, n', xs) = solve n ε m
+--
+--   TODO: figure out exactly what ε means to the minimize functions from GSL.
+solvable :: N -> Int -> Constrained a -> Property
+solvable ε n m = counterexample (show (xs, v)) $ v <= sqrt ε
+  where (_, xs, cs) = solve ε n m
+        v           = eval_all cs xs
 
 
 solve_ε = 1e-6
+iterations = 10000
+
+t = solvable solve_ε iterations
 
 
 prop_uni_linear :: N -> NonZero N -> CVal -> CVal -> Property
-prop_uni_linear x (NonZero m) b y =
-  solvable 100 solve_ε do v <- var x
-                          v * CConst m + b =-= y
+prop_uni_linear x (NonZero m) b y = t do
+  v <- var x
+  v * CConst m + b =-= y
 
 
 prop_uni_quadratic :: NonNegative N -> NonNegative N -> Property
-prop_uni_quadratic (NonNegative x) (NonNegative y) =
-  solvable 100 solve_ε do
-    v <- var x
-    v*v =-= CConst y
+prop_uni_quadratic (NonNegative x) (NonNegative y) = t do
+  v <- var x
+  v*v =-= CConst y
 
 
 prop_v2dist :: V2 N -> NonNegative N -> Property
-prop_v2dist vec (NonNegative d) =
-  solvable 100 solve_ε do
-    v <- vars vec
-    norm v =-= CConst d
+prop_v2dist vec (NonNegative d) = t do
+  v <- vars vec
+  norm v =-= CConst d
 
 
 prop_v2joint_lt :: V2 N -> NonNegative N -> Property
-prop_v2joint_lt vec (NonNegative d) =
-  solvable 100 (sqrt solve_ε) do
-    v <- vars vec
-    v^._x  <-= v^._y
-    norm v =-= CConst d
+prop_v2joint_lt vec (NonNegative d) = t do
+  v <- vars vec
+  v^._x  <-= v^._y
+  norm v =-= CConst d
 
 prop_v2joint_eq :: V2 N -> NonNegative N -> Property
-prop_v2joint_eq vec (NonNegative d) =
-  solvable 100 (sqrt solve_ε) do
-    v <- vars vec
-    v^._x  =-= v^._y
-    norm v =-= CConst d
+prop_v2joint_eq vec (NonNegative d) = t do
+  v <- vars vec
+  v^._x  =-= v^._y
+  norm v =-= CConst d
 
 
 prop_v3dist :: V3 N -> NonNegative N -> Property
-prop_v3dist vec (NonNegative d) =
-  solvable 100 solve_ε do
-    v <- vars vec
-    norm v =-= CConst d
+prop_v3dist vec (NonNegative d) = t do
+  v <- vars vec
+  norm v =-= CConst d
 
 
 return []

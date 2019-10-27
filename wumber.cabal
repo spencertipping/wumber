@@ -24,6 +24,7 @@ library
                      , deepseq >= 1.4.4.0
                      , gloss
                      , hmatrix
+                     , hmatrix-gsl
                      , linear
                      , microlens
                      , microlens-th
@@ -31,6 +32,7 @@ library
                      , parallel
                      , random
                      , text
+                     , vector >= 0.12.0.3
   exposed-modules:     Wumber
                      , Wumber.Constraint
                      , Wumber.ConstraintSolver
