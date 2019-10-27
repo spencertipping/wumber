@@ -66,28 +66,10 @@ data Constraint = CEqual  !CVal !CVal
 (//) :: CVal -> M.Map Int CVal -> CVal
 v@(CVar i _)         // m = fromMaybe v (M.lookup i m)
 v@(CConst _)         // m = v
-CLinear m' b v       // m = CLinear m' b (v // m)
+CLinear m' b v       // m = linear m' b (v // m)
 CNonlinear ops f fn  // m = CNonlinear (map (// m) ops) f fn
-CNonlinearU op f fn  // m = CNonlinearU (op // m) f fn
-CNonlinearB l r f fn // m = CNonlinearB (l // m) (r // m) f fn
-
-
--- | Constraint equivalence. The premise is that we can reduce each constraint
---   down to one or more scalar values that describe its out-of-whackness. The
---   solver attempts to set these values to zero.
-class CEq a where
-  infix 4 =-=; (=-=) :: a -> a -> Constrained ()
-  infix 4 <-=; (<-=) :: a -> a -> Constrained ()
-  infix 4 >-=; (>-=) :: a -> a -> Constrained ()
-  (>-=) = flip (<-=)
-
-instance CEq CVal where
-  a =-= b = tell [CEqual a b]
-  a <-= b = tell [CCostFn $ CNonlinearU (a - b) (max 0) "max 0"]
-
-instance (Foldable f, CEq a) => CEq (f a) where
-  a =-= b = sequence_ $ zipWith (=-=) (toList a) (toList b)
-  a <-= b = sequence_ $ zipWith (<-=) (toList a) (toList b)
+CNonlinearU op f fn  // m = nonlinear_unary  f fn (op // m)
+CNonlinearB l r f fn // m = nonlinear_binary f fn (l // m) (r // m)
 
 
 -- | Apply a linear transformation to a single constrained value. The value
@@ -109,6 +91,24 @@ nonlinear_unary f fname v = CNonlinearU v f fname
 nonlinear_binary :: (N -> N -> N) -> String -> CVal -> CVal -> CVal
 nonlinear_binary f fname (CConst x) (CConst y) = CConst (f x y)
 nonlinear_binary f fname x y = CNonlinearB x y f fname
+
+
+-- | Constraint equivalence. The premise is that we can reduce each constraint
+--   down to one or more scalar values that describe its out-of-whackness. The
+--   solver attempts to set these values to zero.
+class CEq a where
+  infix 4 =-=; (=-=) :: a -> a -> Constrained ()
+  infix 4 <-=; (<-=) :: a -> a -> Constrained ()
+  infix 4 >-=; (>-=) :: a -> a -> Constrained ()
+  (>-=) = flip (<-=)
+
+instance CEq CVal where
+  a =-= b = tell [CEqual a b]
+  a <-= b = tell [CCostFn $ CNonlinearU (a - b) (max 0) "max 0"]
+
+instance (Foldable f, CEq a) => CEq (f a) where
+  a =-= b = sequence_ $ zipWith (=-=) (toList a) (toList b)
+  a <-= b = sequence_ $ zipWith (<-=) (toList a) (toList b)
 
 
 instance Num CVal where
