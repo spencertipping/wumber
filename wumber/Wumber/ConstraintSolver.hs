@@ -5,6 +5,7 @@ module Wumber.ConstraintSolver where
 
 import Control.Monad
 import Control.Monad.RWS
+import qualified Data.List as L
 import qualified Data.Set as S
 import qualified Data.Vector.Storable as V
 import Data.Vector.Storable (Vector, (!))
@@ -43,7 +44,7 @@ eval_constraint xs (CCostFn v)  = max 0 $ eval xs v
 
 
 eval_all :: [Constraint] -> Vector N -> N
-eval_all cs xs = foldl (\t v -> t + eval_constraint xs v) 0 cs
+eval_all cs xs = L.foldl' (\t v -> t + eval_constraint xs v) 0 cs
 
 
 constraints_from :: Constrained a -> (a, [Constraint])
