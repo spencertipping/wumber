@@ -6,6 +6,8 @@ module Wumber.Constraint where
 
 import Control.Monad
 import Control.Monad.RWS
+import qualified Data.Map.Lazy as M
+import Data.Maybe
 import Lens.Micro
 import Lens.Micro.TH
 import Linear.V1
@@ -50,12 +52,25 @@ instance Show CVal where
 
 
 -- | 'Constrained' is a monad that keeps track of 'CVar' IDs and collects
---   constraint expressions whose values should end up being zero. Constraints
---   are solved in the 'ST' monad using mutable unboxed 'Double' arrays.
+--   constraint expressions whose values should end up being zero.
 type Constrained a = RWS () [Constraint] Int a
 
--- | Constraints are just values that we want to set to zero.
-type Constraint = CVal
+
+data Constraint = CEqual  !CVal !CVal
+                | CCostFn !CVal
+
+
+-- | Rewrite a 'CVal' by replacing one or more variables with different
+--   expressions. Some 'CEqual' constraints can reduce the number of independent
+--   variables before we send anything to the numerical optimizer, which makes
+--   optimization considerably faster.
+(//) :: CVal -> M.Map Int CVal -> CVal
+v@(CVar i _)         // m = fromMaybe v (M.lookup i m)
+v@(CConst _)         // m = v
+CLinear m' b v       // m = CLinear m' b (v // m)
+CNonlinear ops f fn  // m = CNonlinear (map (// m) ops) f fn
+CNonlinearU op f fn  // m = CNonlinearU (op // m) f fn
+CNonlinearB l r f fn // m = CNonlinearB (l // m) (r // m) f fn
 
 
 -- | Constraint equivalence. The premise is that we can reduce each constraint
@@ -70,8 +85,8 @@ infix 4 <-=
 infix 4 >-=
 
 instance CEq CVal where
-  a =-= b = tell [(a - b) ** 2]
-  a <-= b = tell [CNonlinearU (a - b) (max 0) "max 0"]
+  a =-= b = tell [CEqual a b]
+  a <-= b = tell [CCostFn $ CNonlinearU (a - b) (max 0) "max 0"]
 
 instance CEq a => CEq (V1 a) where
   V1 a =-= V1 b = do a =-= b
@@ -84,15 +99,6 @@ instance CEq a => CEq (V2 a) where
 instance CEq a => CEq (V3 a) where
   V3 a b c =-= V3 d e f = do a =-= d; b =-= e; c =-= f
   V3 a b c <-= V3 d e f = do a <-= d; b <-= e; c <-= f
-
-
--- | Boolean 'and' (intersection) of a set of constraints.
-cand :: [Constraint] -> Constraint
-cand xs = CNonlinear xs (foldl1 min) "cand"
-
--- | Boolean 'or' (union) of a set of constraints.
-cor :: [Constraint] -> Constraint
-cor xs = CNonlinear xs (foldl1 max) "cor"
 
 
 -- | Apply a linear transformation to a single constrained value. The value
