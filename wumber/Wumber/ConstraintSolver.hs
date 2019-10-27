@@ -23,6 +23,7 @@ import Data.Array.MArray
 import Data.Array.ST
 import Data.Array.Unsafe
 import Data.Array.Unboxed
+import Data.Bits
 import Data.Set (Set, singleton, empty, unions)
 import qualified Data.Set as S
 import Data.STRef
@@ -66,13 +67,9 @@ evalM :: CVal -> Solved N
 evalM v = eval v <$> ask
 
 
--- TODO
--- We shouldn't use a global epsilon; for cases like 'partial' we should
--- parameterize it on the current values. Epsilon should provided a fixed number
--- of mantissa bits of displacement, not a fixed real-world magnitude.
-δ :: N
-δ = 1e-8
-
+{-# INLINE δ #-}
+δ :: Double -> Double
+δ x = x * 1e-8
 
 -- | Calculates the value and the partial derivative of the sum of specified
 --   functions at the variable in question.
@@ -82,12 +79,12 @@ partial :: MArray a N (ST s) => [Constraint] -> a VarID N -> VarID -> ST s (N, N
 partial cs xs i = do
   xs'  <- unsafeFreeze xs
   !v0  <- return $! foldl (\t v -> t + eval v xs') 0 cs
-  !v   <- readArray xs i
-  writeArray xs i (v + δ)
+  !x   <- readArray xs i
+  writeArray xs i (x + δ x)
   xs'' <- unsafeFreeze xs   -- Rebind to defeat subexpression caching
   !vg  <- return $! foldl (\t v -> t + eval v xs'') 0 cs
-  writeArray xs i v
-  return (v0, (vg - v0) / δ)
+  writeArray xs i x
+  return (v0, (vg - v0) / δ x)
 
 
 -- | Adjusts the estimate used in Newton's method. This handles some edge cases
@@ -99,11 +96,11 @@ partial cs xs i = do
 {-# INLINE newton_adjust #-}
 newton_adjust :: N -> N -> N -> (N, N)
 newton_adjust v g s
-  | g == 0            = (s' * sqrt δ, s')
+  | g == 0            = (s' * sqrt (δ v), s')
   | abs g < max_slope = (abs s' * v/max_slope * signum g, s')
   | otherwise         = (abs s' * v/g, s')
 
-  where max_slope = sqrt δ
+  where max_slope = sqrt (δ 1)
         s'        = if | signum g == signum s -> s * 1.1
                        | signum g == 0        -> s
                        | otherwise            -> s * (-0.5)
