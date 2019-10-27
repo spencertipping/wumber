@@ -25,9 +25,9 @@ type N     = Double
 data CVal = CVar        !VarID !N
           | CConst      !N
           | CLinear     !N !N !CVal
-          | CNonlinearU !CVal !(N -> N) String
+          | CNonlinearU !CVal       !(N -> N)      String
           | CNonlinearB !CVal !CVal !(N -> N -> N) String
-          | CNonlinear  ![CVal] !([N] -> N) String
+          | CNonlinear  ![CVal]     !([N] -> N)    String
 
 
 instance Show CVal where
