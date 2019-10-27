@@ -9,6 +9,9 @@ import Linear.Metric
 import Linear.V2
 import Linear.V3
 import Test.QuickCheck
+import Text.Printf
+
+import Debug.Trace
 
 import Wumber.Constraint
 import Wumber.ConstraintSolver
@@ -28,42 +31,56 @@ instance Arbitrary (V3 N) where
   arbitrary = V3 <$> arbitrary <*> arbitrary <*> arbitrary
 
 
+-- | A system is solvable iff it converges to error below the epsilon and hasn't
+--   exhausted its iteration count.
+solvable :: Int -> N -> Constrained a -> Property
+solvable n ε m = counterexample (show (v, n', xs)) $ v <= ε && n' > 0
+  where (_, v, n', xs) = solve n ε m
+
+
 solve_ε = 1e-6
 
 
--- | Linear equations are always solvable as long as the slope isn't too steep
---   for our desired tolerance.
-prop_uni_linear :: N -> CVal -> CVal -> CVal -> Property
-prop_uni_linear x m b y = _cc_val m /= 0 && abs (_cc_val m) < 100 ==>
+prop_uni_linear :: N -> NonZero N -> CVal -> CVal -> Property
+prop_uni_linear x (NonZero m) b y =
+  solvable 100 solve_ε do v <- var x
+                          v * CConst m + b =-= y
+
+
+prop_uni_quadratic :: NonNegative N -> NonNegative N -> Property
+prop_uni_quadratic (NonNegative x) (NonNegative y) =
   solvable 100 solve_ε do
     v <- var x
-    v*m + b =-= y
+    v*v =-= CConst y
 
 
--- | Quadratic equations are solvable when the initial values are reasonably
---   close to the final values.
-prop_uni_quadratic :: NonNegative N -> UnitInterval N -> Bool
-prop_uni_quadratic (NonNegative x) (UnitInterval f) = solvable 100 solve_ε do
-  v <- var x
-  v*v =-= CConst (x*x * 2**f)
-
-
-prop_v2dist :: V2 N -> UnitInterval N -> Property
-prop_v2dist vec (UnitInterval f) = norm vec < 50 ==>
+prop_v2dist :: V2 N -> NonNegative N -> Property
+prop_v2dist vec (NonNegative d) =
   solvable 100 solve_ε do
     v <- vars vec
-    norm v =-= CConst (norm vec * 2**f)
+    norm v =-= CConst d
 
 
-prop_v3dist :: V3 N -> UnitInterval N -> Property
-prop_v3dist vec (UnitInterval f) = norm vec < 50 ==>
+prop_v2joint_lt :: V2 N -> NonNegative N -> Property
+prop_v2joint_lt vec (NonNegative d) =
   solvable 100 solve_ε do
     v <- vars vec
-    norm v =-= CConst (norm vec * 2**f)
+    v^._x  <-= v^._y
+    norm v =-= CConst d
+
+prop_v2joint_eq :: V2 N -> NonNegative N -> Property
+prop_v2joint_eq vec (NonNegative d) =
+  solvable 100 solve_ε do
+    v <- vars vec
+    v^._x  =-= v^._y
+    norm v =-= CConst d
 
 
-v1 = V3 3.2872818349610062 0.17974700836563873 (-3.8500449102237173)
-f1 = -0.8541325263857837
+prop_v3dist :: V3 N -> NonNegative N -> Property
+prop_v3dist vec (NonNegative d) =
+  solvable 100 solve_ε do
+    v <- vars vec
+    norm v =-= CConst d
 
 
 return []
