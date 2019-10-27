@@ -70,8 +70,8 @@ evalM v = eval v <$> ask
 -- We shouldn't use a global epsilon; for cases like 'partial' we should
 -- parameterize it on the current values. Epsilon should provided a fixed number
 -- of mantissa bits of displacement, not a fixed real-world magnitude.
-ε :: N
-ε = 1e-8
+δ :: N
+δ = 1e-8
 
 
 -- | Calculates the value and the partial derivative of the sum of specified
@@ -83,27 +83,27 @@ partial cs xs i = do
   xs'  <- unsafeFreeze xs
   !v0  <- return $! foldl (\t v -> t + eval v xs') 0 cs
   !v   <- readArray xs i
-  writeArray xs i (v + ε)
+  writeArray xs i (v + δ)
   xs'' <- unsafeFreeze xs   -- Rebind to defeat subexpression caching
   !vg  <- return $! foldl (\t v -> t + eval v xs'') 0 cs
   writeArray xs i v
-  return (v0, (vg - v0) / ε)
+  return (v0, (vg - v0) / δ)
 
 
 -- | Adjusts the estimate used in Newton's method. This handles some edge cases
 --   and limits the step size when the gradient is very small.
 --
---   If the gradient is zero, we adjust by a small amount: √ε. This won't move
+--   If the gradient is zero, we adjust by a small amount: √δ. This won't move
 --   us closer to a solution, but it might get us past the plateau.
 
 {-# INLINE newton_adjust #-}
 newton_adjust :: N -> N -> N -> (N, N)
 newton_adjust v g s
-  | g == 0            = (signum s' * sqrt ε, s')
+  | g == 0            = (s' * sqrt δ, s')
   | abs g < max_slope = (abs s' * v/max_slope * signum g, s')
   | otherwise         = (abs s' * v/g, s')
 
-  where max_slope = sqrt ε
+  where max_slope = sqrt δ
         s'        = if | signum g == signum s -> s * 1.1
                        | signum g == 0        -> s
                        | otherwise            -> s * (-0.5)
@@ -120,44 +120,36 @@ newton_step partial var_ids xs ps ss = do
   where calculate_partials t = forM_ var_ids \i -> do
           (!v, !g) <- partial xs i
           s <- readArray ss i
-          let (x', s') = newton_adjust v g s
-          writeArray ps i x'
+          let (p', s') = newton_adjust v g s
+          writeArray ps i p'
           writeArray ss i s'
           modifySTRef t (+ v)
 
         update_variables = forM_ var_ids \i -> do
           !x <- readArray xs i
           !d <- readArray ps i
-          writeArray xs i $! x - d
+          writeArray xs i $ x - d
 
 
 -- | Solves a system using up to 'n' iterations.
-newton_solve n partial var_ids xs ps ss = do
+newton_solve n ε partial var_ids xs ps ss = do
   v <- newton_step partial var_ids xs ps ss
   if v <= ε || n <= 0
     then return (v, n)
-    else newton_solve (n - 1) partial var_ids xs ps ss
+    else newton_solve (n - 1) ε partial var_ids xs ps ss
 
 
--- | Collects constraints, sets initial values, and solves a system using
---   Newton's method.
---
---   Linear constraints are easily solvable unless the system is overspecified:
---
---   prop>       solvable 100 $ do v <- var x; v =-= CConst y
---   prop> not $ solvable 100 $ do v <- var x; v =-= CConst y; v =-= CConst (y+1)
---
---   'solve' also handles nonlinear constraints, but initial values matter
---   because we're using Newton's method.
-
-solve :: Int -> Constrained a -> (N, Int, UArray VarID N)
-solve n m = runST do
+-- | Collects constraints, sets initial values, and solves a system using a
+--   modified Newton's method. Linear constraints are trivially solvable;
+--   nonlinear constraints generally work but depend on initial values.
+solve :: Int -> N -> Constrained a -> (N, Int, UArray VarID N)
+solve n ε m = runST do
   xs <- newArray (0, vmax) 0  :: ST s (STUArray s VarID N)
   ps <- newArray (0, vmax) 0  :: ST s (STUArray s VarID N)
   ss <- newArray (0, vmax) s0 :: ST s (STUArray s VarID N)
   forM_ vars \(i, v) -> writeArray xs i v
 
-  (r, n') <- newton_solve n (partial cs) var_ids xs ps ss
+  (r, n') <- newton_solve n ε (partial cs) var_ids xs ps ss
   xs'     <- unsafeFreezeSTUArray xs
   return (r, n', xs')
 
@@ -165,13 +157,13 @@ solve n m = runST do
         vars    = unions (map deps cs)
         vmax    = fst $ S.findMax vars
         var_ids = map fst $ S.toList vars
-        s0      = 0.5 / sqrt (fromIntegral $ length var_ids)
+        s0      = 0.5 / fromIntegral (length var_ids)
 
 
 -- | For testing: a system is solvable iff it converges to error below the
 --   epsilon and hasn't exhausted its iteration count.
-solvable :: Int -> Constrained a -> Bool
-solvable n m = v <= ε && n' > 0 where (v, n', _) = solve n m
+solvable :: Int -> N -> Constrained a -> Bool
+solvable n ε m = v <= ε && n' > 0 where (v, n', _) = solve n ε m
 
 
 testcase1 = do

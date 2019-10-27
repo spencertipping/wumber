@@ -32,8 +32,8 @@ type VarID = Int
 -- | A constrained variable, constant, or transformation of one or more such
 --   values. You build these up with numeric expressions and then assert
 --   equivalence using '===', which emits constraints to the solver.
-data CVal = CVar        !VarID !N
-          | CConst      !N
+data CVal = CVar        { _cv_id :: !VarID, _cv_init :: !N }
+          | CConst      { _cc_val :: !N }
           | CLinear     { _cl_m :: !N, _cl_b :: !N, _cl_v :: !CVal }
           | CNonlinearU { _clnu_op      :: !CVal,
                           _clnu_fn      :: !(N -> N),
