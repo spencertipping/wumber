@@ -132,34 +132,47 @@ solve_step v0 cs ci xs = do
   ys <- newArray b 0 :: ST s (STUArray s VarID N)
 
   is <- indices <$> unsafeFreezeSTUArray xs
-  forM_ is \i -> do x  <- readArray xs i
-                    --optimize_axis (ci ! i) xs i
-                    (v, g) <- val_partial cs i xs x
-                    let x' = x - v/g
-                    writeArray gs i (x' - x)
-                    writeArray xs i x
-                    writeArray ys i x'
-
-  !v1 <- eval_all cs <$> unsafeFreezeSTUArray ys
-  gm  <- bisect is gs ys 0 1 v0 v1
   forM_ is \i -> do x <- readArray xs i
-                    g <- readArray gs i
-                    writeArray xs i (x + g*gm)
+                    (_, g) <- val_partial cs i xs x
+                    writeArray gs i (-g)
 
-  -- TODO
-  -- Fix this bisection algorithm; we should use the gradients to locally
-  -- minimize.
-  where bisect is gs ys l u vl vu
-          | u - l < δ 1 = return m -- $ trace (show m) m
+  xs' <- unsafeFreezeSTUArray xs
+  gs' <- unsafeFreezeSTUArray gs
+  gm  <- optimize_vector cs is xs' gs'
+  forM_ is \i -> writeArray xs i (xs'!i + gm * gs'!i)
+
+
+optimize_vector :: [Constraint] -> [VarID]
+                -> UArray VarID N -> UArray VarID N -> ST s N
+optimize_vector cs is xs gs = do
+  ys         <- newArray (bounds xs) 0 :: ST s (STUArray s VarID N)
+  (!lv, !lg) <- vector_gradient cs is xs gs ys 0
+  (!uv, !ug) <- vector_gradient cs is xs gs ys 1
+  if signum lg == signum ug
+    then return 0.5
+    else bisect ys 0 1 lv uv (signum lg)
+
+  where bisect ys l u lv uv lgs
+          | u - l < δ 1 = return m
           | otherwise   = do
-              forM_ is \i -> do x <- readArray xs i
-                                g <- readArray gs i
-                                writeArray ys i (x + m*g)
-              !vm <- eval_all cs <$> unsafeFreezeSTUArray ys
-              if vl < vu
-                then bisect is gs ys l m vl vm
-                else bisect is gs ys m u vm vu
+              (mv, mg) <- vector_gradient cs is xs gs ys m
+              if signum mg == lgs
+                then bisect ys m u mv uv (signum mg)
+                else bisect ys l m lv mv lgs
           where m = (l + u) / 2
+
+
+vector_gradient :: [Constraint] -> [VarID]
+                -> UArray VarID N -> UArray VarID N -> STUArray s VarID N
+                -> N -> ST s (N, N)
+vector_gradient cs is xs gs ys g = do
+  let δg = δ g
+      g' = g + δg
+  forM_ is \i -> do writeArray ys i (xs!i + g * gs!i)
+  !v0 <- eval_all cs <$> unsafeFreezeSTUArray ys
+  forM_ is \i -> do writeArray ys i (xs!i + g' * gs!i)
+  !v1 <- eval_all cs <$> unsafeFreezeSTUArray ys
+  return (v0, (v1 - v0) / δg)
 
 
 -- | Either applies one iteration of Newton's method to this axis (if the
