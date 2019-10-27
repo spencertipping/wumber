@@ -18,7 +18,7 @@ import Control.Monad
 import Control.Monad.ST
 import Control.Monad.Reader
 import Control.Monad.RWS
-import Data.Array.Base (unsafeFreezeSTUArray)
+import Data.Array.Base (freezeSTUArray, unsafeFreezeSTUArray)
 import Data.Array.MArray
 import Data.Array.ST
 import Data.Array.Unsafe
@@ -35,6 +35,8 @@ import Linear.V2
 import Linear.V3
 
 import Wumber.Constraint
+
+import Debug.Trace
 
 
 -- | A solved system whose values are available using 'evalM'.
@@ -82,9 +84,7 @@ constraints_from m = evalRWS m () 0
 
 solve :: Int -> N -> Constrained a -> (a, N, Int, UArray VarID N)
 solve n ε m = runST do
-  xs <- var_array
-  gs <- newArray (var_bounds vars) 0 :: ST s (STUArray s VarID N)
-  (v, n', xs') <- loop n xs gs
+  (v, n', xs') <- var_array >>= loop n
   return (a, v, n', xs')
 
   where (a, cs)   = constraints_from m
@@ -95,12 +95,12 @@ solve n ε m = runST do
           forM_ vars \(i, v) -> writeArray xs i v
           return xs
 
-        loop n xs gs = do xs' <- unsafeFreezeSTUArray xs
-                          let v = eval_all cs xs'
-                          if v <= ε || n <= 0
-                            then return (v, n, xs')
-                            else do solve_step ci xs gs
-                                    loop (n-1) xs gs
+        loop n xs = do xs' <- unsafeFreezeSTUArray xs
+                       let v = eval_all cs xs'
+                       if v <= ε || n <= 0
+                         then return (v, n, xs')
+                         else do solve_step v cs ci xs
+                                 loop (n-1) xs
 
 
 constraint_variables :: [Constraint] -> S.Set (VarID, N)
@@ -122,23 +122,40 @@ indexed_by_deps cs vars = runSTArray do
   return ix
 
 
--- | Locally minimizes each axis, one at a time.
-solve_step :: Array VarID [Constraint]
-           -> STUArray s VarID N -> STUArray s VarID N -> ST s ()
-solve_step ci xs gs = do
-  is <- indices <$> unsafeFreezeSTUArray xs
-  lδ <- sqrt <$> sum <$> forM is \i -> do
-    x  <- readArray xs i
-    δv <- optimize_axis (ci ! i) xs i
-    x' <- readArray xs i
-    writeArray gs i ((x' - x) * δv)
-    writeArray xs i x
-    return $ δv * δv
+-- | Locally minimizes each axis, one at a time, to find gradients. Then we
+--   locally minimize the full constraint set along the gradient line.
+solve_step :: N -> [Constraint] -> Array VarID [Constraint]
+           -> STUArray s VarID N -> ST s ()
+solve_step v0 cs ci xs = do
+  b  <- getBounds xs
+  gs <- newArray b 0 :: ST s (STUArray s VarID N)
+  ys <- newArray b 0 :: ST s (STUArray s VarID N)
 
-  let lδ' = if lδ == 0 then 1 else lδ
+  is <- indices <$> unsafeFreezeSTUArray xs
+  forM_ is \i -> do x  <- readArray xs i
+                    optimize_axis (ci ! i) xs i
+                    x' <- readArray xs i
+                    writeArray gs i (x' - x)
+                    writeArray xs i x
+                    writeArray ys i x'
+
+  !v1 <- eval_all cs <$> unsafeFreezeSTUArray ys
+  gm  <- bisect is gs ys 0 1 v0 v1
   forM_ is \i -> do x <- readArray xs i
                     g <- readArray gs i
-                    writeArray xs i (x + g/lδ')
+                    writeArray xs i (x + g*gm)
+
+  where bisect is gs ys l u vl vu
+          | u - l < δ 1 = return l
+          | otherwise   = do
+              forM_ is \i -> do x <- readArray xs i
+                                g <- readArray gs i
+                                writeArray ys i (x + m*g)
+              !vm <- eval_all cs <$> unsafeFreezeSTUArray ys
+              if vl < vu
+                then bisect is gs ys l m vl vm
+                else bisect is gs ys m u vm vu
+          where m = (l + u) / 2
 
 
 -- | Either applies one iteration of Newton's method to this axis (if the
