@@ -7,13 +7,8 @@ import Control.Monad
 import Control.Monad.RWS
 import qualified Data.Set as S
 import qualified Data.Vector.Storable as V
-import GHC.Float
+import Data.Vector.Storable (Vector, (!))
 import Numeric.GSL.Minimization
-import Numeric.LinearAlgebra.Data
-import qualified Linear.Metric as LM
-import Linear.V1
-import Linear.V2
-import Linear.V3
 
 import Wumber.Constraint
 
