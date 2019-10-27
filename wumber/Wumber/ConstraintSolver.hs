@@ -24,7 +24,6 @@ import Data.Array.ST
 import Data.Array.Unsafe
 import Data.Array.Unboxed
 import Data.Bits
-import Data.Set (Set, singleton, empty, unions)
 import qualified Data.Set as S
 import Data.STRef
 import GHC.Float
@@ -45,11 +44,11 @@ type Solved a = Reader (UArray VarID N) a
 
 
 -- | All independent variables used to calculate the given value.
-deps :: CVal -> Set (VarID, N)
-deps (CVar i v)            = singleton (i, v)
-deps (CConst _)            = empty
+deps :: CVal -> S.Set (VarID, N)
+deps (CVar i v)            = S.singleton (i, v)
+deps (CConst _)            = S.empty
 deps (CLinear _ _ v)       = deps v
-deps (CNonlinear xs _ _)   = unions (map deps xs)
+deps (CNonlinear xs _ _)   = S.unions (map deps xs)
 deps (CNonlinearU v _ _)   = deps v
 deps (CNonlinearB l r _ _) = deps l `S.union` deps r
 
@@ -67,44 +66,116 @@ evalM :: CVal -> Solved N
 evalM v = eval v <$> ask
 
 
+eval_all :: [Constraint] -> UArray VarID N -> N
+eval_all cs xs = foldl (\t v -> t + eval v xs) 0 cs
+
+
+constraints_from :: Constrained a -> (a, [Constraint])
+constraints_from m = evalRWS m () 0
+
+
+-- | Solves a system of constraints (or minimizes the error) and returns a tuple
+--   of results:
+--
+--   > (error, remaining_iterations, solution)
+--
+--   We use a modified multivariate Newton's method that finds the gradient by
+--   bisecting the partial derivatives for zero crossings.
+
+solve :: Int -> N -> Constrained a -> (a, N, Int, UArray VarID N)
+solve n ε m = runST do
+  (v, n', xs') <- var_array >>= loop n
+  return (a, v, n', xs')
+
+  where (a, cs)   = constraints_from m
+        vars      = constraint_variables cs
+        ci        = indexed_by_deps cs vars
+        var_array = do
+          xs <- newArray (var_bounds vars) 0 :: ST s (STUArray s VarID N)
+          forM_ vars \(i, v) -> writeArray xs i v
+          return xs
+
+        loop n xs = do xs' <- unsafeFreezeSTUArray xs
+                       let v = eval_all cs xs'
+                       if v <= ε || n <= 0
+                         then return (v, n, xs')
+                         else do solve_step v ci xs
+                                 loop (n-1) xs
+
+
+constraint_variables :: [Constraint] -> S.Set (VarID, N)
+constraint_variables = S.unions . map deps
+
+var_bounds :: S.Set (VarID, N) -> (VarID, VarID)
+var_bounds = (0, ) . fst . S.findMax
+
+
+-- | Constructs an index of constraints that refer to each variable. This lets
+--   us minimize the amount of evaluation we need to do to calculate things like
+--   partial derivatives.
+indexed_by_deps :: [Constraint] -> S.Set (VarID, N) -> Array Int [Constraint]
+indexed_by_deps cs vars = runSTArray do
+  ix <- newArray (var_bounds vars) []
+  forM_ cs \c -> do
+    forM_ (deps c) \(i, _) -> do
+      l <- readArray ix i
+      writeArray ix i (c:l)
+  return ix
+
+
+-- TODO
+solve_step v0 ci xs = return ()
+
+
+-- | Either applies one iteration of Newton's method to this axis (if the
+--   derivative sign doesn't flip), or bisects it to find a local minimum.
+--   Returns the total error reduction and leaves the array in its optimized
+--   state.
+step_axis :: N -> [Constraint] -> STUArray s VarID N -> VarID -> ST s N
+step_axis ε cs xs i = do
+  (!v0, !g)  <- val_partial cs i xs
+  x          <- readArray xs i
+  let x' = x - v0 / (if g /= 0 then g else 1)
+  writeArray xs i x'
+  (!v1, !g') <- val_partial cs i xs
+  if signum g == signum g' && v1 < v0
+    then return (v0 - v1)
+    else (v0 -) <$> bisect_axis (δ x) cs xs i v0 x x' (signum g)
+
+
+-- | Finds a local minimum by bisection and returns the new total error.
+bisect_axis :: N -> [Constraint] -> STUArray s VarID N -> VarID
+            -> N -> N -> N -> N -> ST s N
+bisect_axis minδ cs xs i v0 l u lgsign
+  | u - l <= minδ = return v0
+  | otherwise     = do
+      writeArray xs i m
+      (!v, !g) <- val_partial cs i xs
+      if signum g == lgsign
+        then bisect_axis minδ cs xs i v m u (signum g)
+        else bisect_axis minδ cs xs i v l m lgsign
+  where m = (l + u) / 2
+
+
 -- | Produces a delta sized appropriately to the number in question: that is,
 --   halfway into the mantissa. We want parameterized deltas for numerical
 --   stability.
+--
+--   NOTE: parameterized to Double specifically, not N; we need to change the
+--   constant if we change the FP precision.
 δ :: Double -> Double
 δ x = x * 2**(-26)
 
 
-{-|
-Solves a system of constraints (or minimizes the error) and returns a tuple of
-results:
-
-> (error, remaining_iterations, solution)
-
-We use a modified multivariate Newton's method that finds the gradient by
-bisecting the partial derivatives for zero crossings.
--}
-solve :: Int -> N -> Constrained a -> (N, Int, UArray VarID N)
-solve n ε m = (0, 0, listArray (0, 0) [0])
-  where cs      = snd $ evalRWS m () 0
-        vars    = unions (map deps cs)
-        vmax    = fst $ S.findMax vars
-        var_ids = map fst $ S.toList vars
-        s0      = 0.5 / fromIntegral (length var_ids)
-
-
-csum :: [Constraint] -> UArray VarID N -> N
-csum cs xs = foldl (\t v -> t + eval v xs) 0 cs
-
-
 -- | Calculates the partial derivative of the given axis at the given point.
-partial :: N -> [Constraint] -> STUArray s VarID N -> VarID -> ST s N
-partial v0 cs xs i = do
-  x <- readArray xs i
-  writeArray xs i (x + δ x)
-  xs' <- unsafeFreezeSTUArray xs
-  !v  <- return $! csum cs xs'
-  writeArray xs i x
-  return $ (v - v0) / δ x
+val_partial :: [Constraint] -> VarID -> STUArray s VarID N -> ST s (N, N)
+val_partial cs i xs = do !v0 <- eval_all cs <$> unsafeFreezeSTUArray xs
+                         x <- readArray xs i
+                         let δx = δ x
+                         writeArray xs i (x + δx)
+                         !v <- eval_all cs <$> unsafeFreezeSTUArray xs
+                         writeArray xs i x
+                         return (v0, (v - v0) / δx)
 
 
 {-
@@ -197,4 +268,4 @@ solve n ε m = runST do
 -- | For testing: a system is solvable iff it converges to error below the
 --   epsilon and hasn't exhausted its iteration count.
 solvable :: Int -> N -> Constrained a -> Bool
-solvable n ε m = v <= ε && n' > 0 where (v, n', _) = solve n ε m
+solvable n ε m = v <= ε && n' > 0 where (_, v, n', _) = solve n ε m
