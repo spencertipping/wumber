@@ -131,8 +131,8 @@ solve_step v0 ci xs = return ()
 --   derivative sign doesn't flip), or bisects it to find a local minimum.
 --   Returns the total error reduction and leaves the array in its optimized
 --   state.
-step_axis :: N -> [Constraint] -> STUArray s VarID N -> VarID -> ST s N
-step_axis ε cs xs i = do
+step_axis :: [Constraint] -> STUArray s VarID N -> VarID -> ST s N
+step_axis cs xs i = do
   (!v0, !g)  <- val_partial cs i xs
   x          <- readArray xs i
   let x' = x - v0 / (if g /= 0 then g else 1)
