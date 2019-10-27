@@ -84,5 +84,28 @@ prop_v3dist vec (NonNegative d) = t do
   norm v =-= CConst d
 
 
+prop_hexagon :: V2 N -> V2 N -> V2 N -> V2 N -> V2 N -> V2 N
+             -> NonNegative N -> Property
+prop_hexagon a b c d e f (NonNegative dist) = t do
+  av <- vars a
+  bv <- vars b
+  cv <- vars c
+  dv <- vars d
+  ev <- vars e
+  fv <- vars f
+  distance av bv =-= CConst dist
+  distance bv cv =-= CConst dist
+  distance cv dv =-= CConst dist
+  distance dv ev =-= CConst dist
+  distance ev fv =-= CConst dist
+  distance fv av =-= CConst dist
+  av^._x =-= ev^._x
+  bv^._x =-= dv^._x
+  fv^._y =-= cv^._y
+  distance av dv =-= distance bv ev
+  distance bv ev =-= distance cv fv
+  distance cv fv =-= distance av dv
+
+
 return []
 runTests = $quickCheckAll

@@ -79,7 +79,7 @@ infix 4 <-=
 infix 4 >-=
 
 instance CEq CVal where
-  a =-= b = tell [abs (a - b)]
+  a =-= b = tell [(a - b) ** 2]
   a <-= b = tell [CNonlinearU (a - b) (max 0) "max 0"]
 
 instance CEq a => CEq (V1 a) where
