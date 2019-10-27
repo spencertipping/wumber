@@ -152,8 +152,8 @@ bisect_axis minδ cs xs i v0 l u lgsign
       writeArray xs i m
       (!v, !g) <- val_partial cs i xs
       if signum g == lgsign
-        then bisect_axis minδ cs xs i v m u (signum g)
-        else bisect_axis minδ cs xs i v l m lgsign
+        then bisect_axis minδ cs xs i v  m u (signum g)
+        else bisect_axis minδ cs xs i v0 l m lgsign
   where m = (l + u) / 2
 
 
