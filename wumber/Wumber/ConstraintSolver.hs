@@ -133,8 +133,8 @@ solve_step v0 cs ci xs = do
 
   is <- indices <$> unsafeFreezeSTUArray xs
   forM_ is \i -> do x <- readArray xs i
-                    (_, g) <- val_partial cs i xs x
-                    writeArray gs i (-g)
+                    (v, g) <- val_partial (ci ! i) i xs x
+                    writeArray gs i (- v/g)
 
   xs' <- unsafeFreezeSTUArray xs
   gs' <- unsafeFreezeSTUArray gs
@@ -147,18 +147,22 @@ optimize_vector :: [Constraint] -> [VarID]
 optimize_vector cs is xs gs = do
   ys         <- newArray (bounds xs) 0 :: ST s (STUArray s VarID N)
   (!lv, !lg) <- vector_gradient cs is xs gs ys 0
-  (!uv, !ug) <- vector_gradient cs is xs gs ys 1
-  if signum lg == signum ug
-    then return 0.5
-    else bisect ys 0 1 lv uv (signum lg)
+  ulim       <- find_signchange (signum lg) ys 1
+  bisect ys 0 ulim (signum lg)
 
-  where bisect ys l u lv uv lgs
+  where find_signchange lgs ys u = do
+          (!uv, !ug) <- vector_gradient cs is xs gs ys u
+          if signum ug == lgs && u < 8
+            then find_signchange lgs ys (u*2)
+            else return u
+
+        bisect ys l u lgs
           | u - l < δ 1 = return m
           | otherwise   = do
-              (mv, mg) <- vector_gradient cs is xs gs ys m
+              (_, !mg) <- vector_gradient cs is xs gs ys m
               if signum mg == lgs
-                then bisect ys m u mv uv (signum mg)
-                else bisect ys l m lv mv lgs
+                then bisect ys m u (signum mg)
+                else bisect ys l m lgs
           where m = (l + u) / 2
 
 

@@ -63,14 +63,14 @@ prop_v2dist vec (NonNegative d) =
 
 prop_v2joint_lt :: V2 N -> NonNegative N -> Property
 prop_v2joint_lt vec (NonNegative d) =
-  solvable 100 solve_ε do
+  solvable 100 (sqrt solve_ε) do
     v <- vars vec
     v^._x  <-= v^._y
     norm v =-= CConst d
 
 prop_v2joint_eq :: V2 N -> NonNegative N -> Property
 prop_v2joint_eq vec (NonNegative d) =
-  solvable 100 solve_ε do
+  solvable 100 (sqrt solve_ε) do
     v <- vars vec
     v^._x  =-= v^._y
     norm v =-= CConst d
