@@ -10,8 +10,6 @@ import Control.Monad.RWS
 import qualified Data.Map.Lazy as M
 import Data.Foldable
 import Data.Maybe
-import Lens.Micro
-import Lens.Micro.TH
 import Text.Printf
 
 
@@ -24,21 +22,12 @@ type N     = Double
 -- | A constrained variable, constant, or transformation of one or more such
 --   values. You build these up with numeric expressions and then assert
 --   equivalence using '===', which emits constraints to the solver.
-data CVal = CVar        { _cv_id :: !VarID, _cv_init :: !N }
-          | CConst      { _cc_val :: !N }
-          | CLinear     { _cl_m :: !N, _cl_b :: !N, _cl_v :: !CVal }
-          | CNonlinearU { _clnu_op      :: !CVal,
-                          _clnu_fn      :: !(N -> N),
-                          _clnu_fname   :: String }
-          | CNonlinearB { _clnb_lhs     :: !CVal,
-                          _clnb_rhs     :: !CVal,
-                          _clnb_fn      :: !(N -> N -> N),
-                          _clnb_fname   :: String }
-          | CNonlinear  { _cln_operands :: ![CVal],
-                          _cln_fn       :: !([N] -> N),
-                          _cln_fname    :: String }
-
-makeLenses ''CVal
+data CVal = CVar        !VarID !N
+          | CConst      !N
+          | CLinear     !N !N !CVal
+          | CNonlinearU !CVal !(N -> N) String
+          | CNonlinearB !CVal !CVal !(N -> N -> N) String
+          | CNonlinear  ![CVal] !([N] -> N) String
 
 
 instance Show CVal where
