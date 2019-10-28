@@ -34,9 +34,9 @@ import Wumber.Constraint
 data Rect a = Rect { _rstart :: a, _rsize :: a } deriving (Show, Eq, Functor)
 makeLenses ''Rect
 
-rend :: (Num a, Additive f) => Lens (Rect (f a)) (Rect (f a)) (f a) (f a)
-rend = lens g s where g r    =        _rstart r ^+^ _rsize r
-                      s r e' = r & rstart .~ e' ^-^ _rsize r
+rend :: Num a => Lens (Rect a) (Rect a) a a
+rend = lens g s where g r    =        _rstart r + _rsize r
+                      s r e' = r & rstart .~ e' - _rsize r
 
 
 -- | Measure or constrain the cosine of the angle between A and C, relative to a
@@ -55,7 +55,7 @@ vector_angle_cos a b = a `dot` b / (norm a * norm b)
 
 -- | Constrain a vector value to a proper rectangle (one whose size is
 --   nonnegative).
-inside :: (Foldable f, Additive f) => Rect (f CVal) -> f CVal -> Constrained ()
+inside :: (Num a, CEq a) => Rect a -> a -> Constrained ()
 inside r p = do p >-= r^.rstart; p <-= r^.rend
 
 
