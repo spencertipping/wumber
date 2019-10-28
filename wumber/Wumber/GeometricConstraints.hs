@@ -37,9 +37,17 @@ rend = lens g s where g r    =        _rstart r ^+^ _rsize r
                       s r e' = r & rstart .~ e' ^-^ _rsize r
 
 
+instance Functor f => Functor (Rect f) where
+  fmap f (Rect s z) = Rect (fmap f s) (fmap f z)
+
+
 -- | Measure or constrain the cosine of the angle between A and C, relative to a
 --   centerpoint B. 'inner_angle_cos' 'A' 'B' 'C' is 'vector_angle_cos' 'BA'
 --   'BC'.
+--
+--   The only reason this function doesn't 'acos' for you is that it slows down
+--   the solver by adding an extra step. Most of the time it's a lot faster to
+--   'cos' the angle instead.
 inner_angle_cos :: (Floating a, Additive f, Metric f) => f a -> f a -> f a -> a
 inner_angle_cos a b c = vector_angle_cos (a ^-^ b) (c ^-^ b)
 
