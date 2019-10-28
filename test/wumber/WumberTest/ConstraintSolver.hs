@@ -16,6 +16,7 @@ import Debug.Trace
 
 import Wumber.Constraint
 import Wumber.ConstraintSolver
+import Wumber.GeometricConstraints
 
 
 newtype UnitInterval a = UnitInterval a deriving Show
@@ -92,26 +93,47 @@ prop_v3dist vec (NonNegative d) = t do
 
 
 prop_hexagon :: V2 N -> V2 N -> V2 N -> V2 N -> V2 N -> V2 N
-             -> NonNegative N -> Property
-prop_hexagon a b c d e f (NonNegative dist) = t do
+             -> Positive N -> Property
+prop_hexagon a b c d e f (Positive dist) = t do
   av <- vars a
   bv <- vars b
   cv <- vars c
   dv <- vars d
   ev <- vars e
   fv <- vars f
-  distance av bv =-= CConst dist
-  distance bv cv =-= CConst dist
-  distance cv dv =-= CConst dist
-  distance dv ev =-= CConst dist
-  distance ev fv =-= CConst dist
-  distance fv av =-= CConst dist
-  av^._x =-= ev^._x
-  bv^._x =-= dv^._x
-  fv^._y =-= cv^._y
-  distance av dv =-= distance bv ev
-  distance bv ev =-= distance cv fv
-  distance cv fv =-= distance av dv
+
+  all_equal [CConst dist,
+             distance av bv,
+             distance bv cv,
+             distance cv dv,
+             distance dv ev,
+             distance ev fv,
+             distance fv av]
+
+  -- TODO: these fail to converge if all points have equal starting values (and
+  -- possibly in other cases).
+  {-
+  all_equal [cos $ CConst (τ / 6),
+             inner_angle_cos av bv cv,
+             inner_angle_cos bv cv dv,
+             inner_angle_cos cv dv ev,
+             inner_angle_cos dv ev fv,
+             inner_angle_cos ev fv av,
+             inner_angle_cos fv av bv]
+  -}
+
+  aligned _x [av, ev]
+  aligned _x [bv, dv]
+
+  -- TODO: why do these constraints cause the test case to fail to converge?
+  --aligned _y   [av, bv]
+  --aligned _y [fv,     cv]
+  --aligned _y   [ev, dv]
+
+  all_equal [distance av dv,
+             distance bv ev,
+             distance cv fv]
+
   return av
 
 

@@ -66,7 +66,7 @@ CNonlinearB l r f fn // m = nonlinear_binary f fn (l // m) (r // m)
 linear :: N -> N -> CVal -> CVal
 linear 0 b _                 = CConst  b
 linear m b (CConst x)        = CConst  (m * x + b)
-linear m b (CLinear m' b' v) = CLinear (m * m') (b + b') v
+linear m b (CLinear m' b' v) = linear  (m * m') (b + b') v
 linear m b v                 = CLinear m b v
 
 -- | Promote a unary function to a nonlinear transformation, with constant
@@ -93,7 +93,7 @@ class CEq a where
 
 instance CEq CVal where
   a =-= b = tell [CEqual a b]
-  a <-= b = tell [CCostFn $ CNonlinearU (a - b) (max 0) "max 0"]
+  a <-= b = tell [CCostFn $ CNonlinearU (b - a) (max 0) "max 0"]
 
 instance (Foldable f, CEq a) => CEq (f a) where
   a =-= b = sequence_ $ zipWith (=-=) (toList a) (toList b)
@@ -118,7 +118,7 @@ instance Num CVal where
 instance Fractional CVal where
   fromRational     = CConst . fromRational
   recip (CConst x) = CConst (recip x)
-  recip v          = nonlinear_unary recip "recip" v
+  recip v          = nonlinear_unary safe_recip "recip" v
 
 instance Floating CVal where
   pi    = CConst pi
@@ -136,6 +136,13 @@ instance Floating CVal where
   asinh = nonlinear_unary asinh "asinh"
   acosh = nonlinear_unary acosh "acosh"
   atanh = nonlinear_unary atanh "atanh"
+
+
+-- | Calculate a reciprocal, but return zero instead of Infinity or NaN. We need
+--   this workaround to avoid crashing the GSL solver.
+safe_recip :: N -> N
+safe_recip 0 = 0
+safe_recip x = recip x
 
 
 -- | Create a new constrained variable initialized to the given value.

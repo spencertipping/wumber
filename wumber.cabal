@@ -36,6 +36,7 @@ library
   exposed-modules:     Wumber
                      , Wumber.Constraint
                      , Wumber.ConstraintSolver
+                     , Wumber.GeometricConstraints
                      , Wumber.Cursor
                      , Wumber.Element
                      , Wumber.Iso
