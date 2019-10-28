@@ -34,8 +34,7 @@ import Wumber.Constraint
 data Rect a = Rect { _rstart :: a, _rsize :: a } deriving (Show, Eq, Functor)
 makeLenses ''Rect
 
-rend :: (Num a, Functor f, Additive f)
-     => Lens (Rect (f a)) (Rect (f a)) (f a) (f a)
+rend :: (Num a, Additive f) => Lens (Rect (f a)) (Rect (f a)) (f a) (f a)
 rend = lens g s where g r    =        _rstart r ^+^ _rsize r
                       s r e' = r & rstart .~ e' ^-^ _rsize r
 
