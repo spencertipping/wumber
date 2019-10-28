@@ -1,3 +1,4 @@
+{-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -16,6 +17,7 @@ import Linear.Vector
 import Wumber.Constraint
 
 
+-- | The real circle constant. We all know π was a mistake.
 τ :: Floating a => a
 τ = pi * 2
 
@@ -29,16 +31,13 @@ import Wumber.Constraint
 --   lets you address and modify a rectangle's endpoint. Moving the endpoint
 --   moves the rectangle and preserves its size.
 
-data Rect f a = Rect { _rstart :: f a, _rsize :: f a }
+data Rect a = Rect { _rstart :: a, _rsize :: a } deriving (Show, Eq, Functor)
 makeLenses ''Rect
 
-rend :: (Num a, Functor f, Additive f) => Lens (Rect f a) (Rect f a) (f a) (f a)
+rend :: (Num a, Functor f, Additive f)
+     => Lens (Rect (f a)) (Rect (f a)) (f a) (f a)
 rend = lens g s where g r    =        _rstart r ^+^ _rsize r
                       s r e' = r & rstart .~ e' ^-^ _rsize r
-
-
-instance Functor f => Functor (Rect f) where
-  fmap f (Rect s z) = Rect (fmap f s) (fmap f z)
 
 
 -- | Measure or constrain the cosine of the angle between A and C, relative to a
@@ -57,7 +56,7 @@ vector_angle_cos a b = a `dot` b / (norm a * norm b)
 
 -- | Constrain a vector value to a proper rectangle (one whose size is
 --   nonnegative).
-inside :: (Foldable f, Additive f) => Rect f CVal -> f CVal -> Constrained ()
+inside :: (Foldable f, Additive f) => Rect (f CVal) -> f CVal -> Constrained ()
 inside r p = do p >-= r^.rstart; p <-= r^.rend
 
 

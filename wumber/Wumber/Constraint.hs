@@ -48,12 +48,13 @@ data Constraint = CEqual  !CVal !CVal
                 | CCostFn !CVal
 
 
--- | Rewrite a 'CVal' by replacing one or more variables with different
+-- | Rewrite 'CVal's by replacing one or more variables with different
 --   expressions. Some 'CEqual' constraints can reduce the number of independent
 --   variables before we send anything to the numerical optimizer, which makes
 --   optimization considerably faster.
-(//) :: CVal -> M.Map Int CVal -> CVal
-v@(CVar i _)         // m = fromMaybe v (M.lookup i m)
+(//) :: CVal -> (VarID -> Maybe CVal) -> CVal
+
+v@(CVar i _)         // m = fromMaybe v (m i)
 v@(CConst _)         // m = v
 CLinear m' b v       // m = linear m' b (v // m)
 CNonlinear ops f fn  // m = CNonlinear (map (// m) ops) f fn

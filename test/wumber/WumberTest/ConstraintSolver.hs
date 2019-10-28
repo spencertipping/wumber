@@ -36,17 +36,22 @@ instance Arbitrary (V3 N) where
 -- | A system is solvable iff it converges to error below the epsilon and hasn't
 --   exhausted its iteration count.
 --
---   TODO: figure out exactly what ε means to the minimize functions from GSL.
-solvable :: (Functor f, Show (f N)) => N -> Int -> Constrained (f CVal) -> Property
-solvable ε n m = counterexample (show (xs, v, a)) $ v <= sqrt ε
-  where (a, xs, cs) = solve ε n m
-        v           = eval_all cs xs
+--   GSL specifies tolerance in terms of /input/ distance, not output cost
+--   function distance from the optimum -- so I'm verifying by assuming the
+--   resulting cost will be at most √δ. There's no mathematical rigor to this
+--   other than saying it's half as precise in log-terms.
+
+solvable :: (Rewritable a b, Show b) => N -> Int -> Constrained a -> Property
+solvable δ n m = counterexample (show (xs, v, a)) $ v <= ε
+  where ε           = sqrt δ
+        (a, xs, cs) = solve δ n m
+        v           = eval_constraints cs xs
 
 
-solve_ε = 1e-6
+solve_δ    = 1e-6
 iterations = 10000
 
-t = solvable solve_ε iterations
+t = solvable solve_δ iterations
 
 
 prop_uni_linear :: N -> NonZero N -> CVal -> CVal -> Property

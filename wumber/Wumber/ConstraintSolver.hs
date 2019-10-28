@@ -1,4 +1,8 @@
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 module Wumber.ConstraintSolver where
@@ -23,12 +27,6 @@ deps (CNonlinear xs _ _)   = S.unions (map deps xs)
 deps (CNonlinearU v _ _)   = deps v
 deps (CNonlinearB l r _ _) = deps l `S.union` deps r
 
-
-constraint_deps :: Constraint -> S.Set (VarID, N)
-constraint_deps (CEqual a b) = deps a `S.union` deps b
-constraint_deps (CCostFn v)  = deps v
-
-
 eval :: Vector N -> CVal -> N
 eval xs (CVar i _)            = xs ! i
 eval _  (CConst x)            = x
@@ -38,27 +36,34 @@ eval xs (CNonlinearU v f _)   = f (eval xs v)
 eval xs (CNonlinearB l r f _) = eval xs l `f` eval xs r
 
 
-eval_constraint :: Vector N -> Constraint -> N
-eval_constraint xs (CEqual a b) = (eval xs a - eval xs b) ** 2
-eval_constraint xs (CCostFn v)  = max 0 $ eval xs v
+constraints_deps :: [Constraint] -> S.Set (VarID, N)
+constraints_deps = S.unions . map \case CEqual a b -> deps a `S.union` deps b
+                                        CCostFn v  -> deps v
+
+eval_constraints :: [Constraint] -> Vector N -> N
+eval_constraints cs xs = L.foldl' (\t v -> t + each v) 0 cs
+  where each (CEqual a b) = (eval xs a - eval xs b) ** 2
+        each (CCostFn v)  = max 0 $ eval xs v
 
 
-eval_all :: [Constraint] -> Vector N -> N
-eval_all cs xs = L.foldl' (\t v -> t + eval_constraint xs v) 0 cs
+-- | The class of objects that can have constraint variables rewritten into
+--   fixed values. Not all objects will preserve form when you do this; you
+--   might start with constraint-friendly data structures that render themselves
+--   into more optimized final types.
+class Rewritable a b | a -> b where rewrite :: (CVal -> N) -> a -> b
+
+instance              Rewritable    CVal     N  where rewrite = id
+instance Functor f => Rewritable (f CVal) (f N) where rewrite = fmap
 
 
-constraints_from :: Constrained a -> (a, [Constraint])
-constraints_from m = evalRWS m () 0
-
-
--- TODO
--- Solve by substitution when we see usable 'CEqual' constraints
-solve :: Functor f => N -> Int -> Constrained (f CVal)
-      -> (f N, Vector N, [Constraint])
-solve ε n m = (eval solution <$> a, solution, cs)
-  where (a, cs)     = constraints_from m
-        f           = eval_all cs
-        vars        = S.unions $ map constraint_deps cs
+-- TODO: solve by substitution when we see usable 'CEqual' constraints
+-- TODO: figure out what 'search_size' is for
+solve :: Rewritable a b
+      => N -> Int -> Constrained a -> (b, Vector N, [Constraint])
+solve δ n m = (rewrite (eval solution) a, solution, cs)
+  where (a, cs)     = evalRWS m () 0
+        f           = eval_constraints cs
+        vars        = constraints_deps cs
         start       = V.replicate (1 + fst (S.findMax vars)) 0 V.// S.toList vars
         search_size = V.replicate (1 + fst (S.findMax vars)) 1
-        solution    = fst $ minimizeV NMSimplex2 (ε/2) n search_size f start
+        solution    = fst $ minimizeV NMSimplex2 δ n search_size f start
