@@ -59,13 +59,30 @@ instance (Functor f, Rewritable a b) => Rewritable (f a) (f b) where
 
 
 -- TODO: solve by substitution when we see usable 'CEqual' constraints
+
+-- | Solves a constrained system that returns a rewritable value, and rewrites
+--   that value with the constraint solution.
+solve :: Rewritable a b => N -> Int -> Constrained a -> b
+solve δ n m = b where (b, _, _) = solve_full δ n m
+
+
+-- | Like 'solve', but returns the solution vector and constraints alongside the
+--   result. This is useful if you want to verify tolerances.
+solve_full :: Rewritable a b
+           => N -> Int -> Constrained a -> (b, Vector N, [Constraint])
+solve_full δ n m = (rewrite (eval solution) a, solution, cs)
+  where (a, cs)  = evalRWS m () 0
+        solution = solve' δ n cs
+
+
+-- TODO: make sure vectors are compact even if the set of VarIDs isn't
 -- TODO: figure out what 'search_size' is for
-solve :: Rewritable a b
-      => N -> Int -> Constrained a -> (b, Vector N, [Constraint])
-solve δ n m = (rewrite (eval solution) a, solution, cs)
-  where (a, cs)     = evalRWS m () 0
-        f           = eval_constraints cs
+
+-- | Solves a constrained system and returns the solution vector. This is a
+--   low-level function used by 'solve'.
+solve' :: N -> Int -> [Constraint] -> Vector N
+solve' δ n cs = fst $ minimizeV NMSimplex2 δ n search_size f start
+  where f           = eval_constraints cs
         vars        = constraints_deps cs
         start       = V.replicate (1 + fst (S.findMax vars)) 0 V.// S.toList vars
         search_size = V.replicate (1 + fst (S.findMax vars)) 1
-        solution    = fst $ minimizeV NMSimplex2 δ n search_size f start

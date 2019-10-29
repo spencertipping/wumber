@@ -44,7 +44,7 @@ instance Arbitrary (V3 N) where
 solvable :: (Rewritable a b, Show b) => N -> Int -> Constrained a -> Property
 solvable δ n m = counterexample (show (xs, v, a)) $ v <= ε
   where ε           = sqrt δ
-        (a, xs, cs) = solve δ n m
+        (a, xs, cs) = solve_full δ n m
         v           = eval_constraints cs xs
 
 
