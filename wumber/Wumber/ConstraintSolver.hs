@@ -37,16 +37,6 @@ eval xs (CNonlinearU v f _)   = f (eval xs v)
 eval xs (CNonlinearB l r f _) = eval xs l `f` eval xs r
 
 
-constraints_deps :: [Constraint] -> S.Set (VarID, N)
-constraints_deps = S.unions . map \case CEqual a b -> deps a `S.union` deps b
-                                        CCostFn v  -> deps v
-
-eval_constraints :: [Constraint] -> Vector N -> N
-eval_constraints cs xs = L.foldl' (\t v -> t + each v) 0 cs
-  where each (CEqual a b) = (eval xs a - eval xs b) ** 2
-        each (CCostFn v)  = max 0 $ eval xs v
-
-
 -- | The class of objects that can have constraint variables rewritten into
 --   fixed values. Not all objects will preserve form when you do this; you
 --   might start with constraint-friendly data structures that render themselves
@@ -72,17 +62,56 @@ solve_full :: Rewritable a b
            => N -> Int -> Constrained a -> (b, Vector N, [Constraint])
 solve_full δ n m = (rewrite (eval solution) a, solution, cs)
   where (a, cs)  = evalRWS m () 0
-        solution = solve' δ n cs
+        solved   = concatMap (solve' δ n) $ simplify cs
+        solution = V.replicate (1 + foldl1 max (map fst solved)) 0 V.// solved
 
 
 -- TODO: make sure vectors are compact even if the set of VarIDs isn't
 -- TODO: figure out what 'search_size' is for
 
--- | Solves a constrained system and returns the solution vector. This is a
---   low-level function used by 'solve'.
-solve' :: N -> Int -> [Constraint] -> Vector N
-solve' δ n cs = fst $ minimizeV NMSimplex2 δ n search_size f start
+-- | Solves a constrained system and returns the solution as a list of
+--   '(VarID, N)' tuples. This is a low-level function used by 'solve'.
+solve' :: N -> Int -> Simplified -> [(VarID, N)]
+solve' δ n (Simplified maxid cs mi) = remap_solution mi xs
   where f           = eval_constraints cs
         vars        = constraints_deps cs
-        start       = V.replicate (1 + fst (S.findMax vars)) 0 V.// S.toList vars
-        search_size = V.replicate (1 + fst (S.findMax vars)) 1
+        start       = V.replicate (1 + maxid) 0 V.// S.toList vars
+        search_size = V.replicate (1 + maxid) 1
+        (xs, _)     = minimizeV NMSimplex2 δ n search_size f start
+
+
+-- | Remaps a compact solution vector into the original variable space,
+--   returning the list of vector updates that should be applied. We do things
+--   in terms of vector update lists because it's common for constraint systems
+--   to get partitioned into multiple subproblems and recombined after the fact
+--   (which isn't an operation that vectors are particularly good at).
+remap_solution :: V.Vector VarID -> V.Vector N -> [(VarID, N)]
+remap_solution mi xs = V.toList mi `zip` V.toList xs
+
+
+-- | The full set of initial values in a list of constraints.
+constraints_deps :: [Constraint] -> S.Set (VarID, N)
+constraints_deps = S.unions . map \case CEqual a b -> deps a `S.union` deps b
+                                        CCostFn v  -> deps v
+
+
+-- | The cost function for a set of constraints at a given solution value. This
+--   is called by the GSL minimizer.
+eval_constraints :: [Constraint] -> Vector N -> N
+eval_constraints cs xs = L.foldl' (\t v -> t + each v) 0 cs
+  where each (CEqual a b) = (eval xs a - eval xs b) ** 2
+        each (CCostFn v)  = max 0 $ eval xs v
+
+
+-- | 'Simplified m cs v' means "a set of constraints whose variables have
+--   compact 'VarID's of which the maximum is 'm', and you can convert each back
+--   to the original using 'v ! i'".
+data Simplified = Simplified VarID [Constraint] (V.Vector Int)
+
+
+-- | Reduces a set of constraints to a set of simplified constraint bundles,
+--   each with compactly-identified variables (whose 'VarID's correspond to
+--   'Vector' indexes used by the GSL minimizer).
+simplify :: [Constraint] -> [Simplified]
+simplify cs = [Simplified maxid cs (V.generate (maxid + 1) id)]
+  where (maxid, _) = S.findMax (constraints_deps cs)
