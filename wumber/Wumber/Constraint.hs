@@ -1,7 +1,7 @@
-{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 module Wumber.Constraint where
@@ -18,17 +18,18 @@ import Text.Printf
 --   integers will always refer to indexes in an array or vector.
 type VarID = Int
 type N     = Double
+type FName = String
 
 
 -- | A constrained variable, constant, or transformation of one or more such
 --   values. You build these up with numeric expressions and then assert
---   equivalence using '===', which emits constraints to the solver.
+--   equivalence using methods in 'CEq', which emit constraints to the solver.
 data CVal = CVar        !VarID !N
           | CConst      !N
           | CLinear     !N !N !CVal
-          | CNonlinearU !CVal       !(N -> N)      String
-          | CNonlinearB !CVal !CVal !(N -> N -> N) String
-          | CNonlinear  ![CVal]     !([N] -> N)    String
+          | CNonlinearU !CVal       !(N -> N)      FName
+          | CNonlinearB !CVal !CVal !(N -> N -> N) FName
+          | CNonlinear  ![CVal]     !([N] -> N)    FName
 
 
 instance Show CVal where
@@ -45,8 +46,23 @@ instance Show CVal where
 type Constrained a = RWS () [Constraint] Int a
 
 
-data Constraint = CEqual  !CVal !CVal
-                | CCostFn !CVal
+-- | Create a new constrained variable initialized to the given value.
+var :: N -> Constrained CVal
+var init = do id <- get
+              modify (+ 1)
+              return $ CVar id init
+
+-- | A multidimensional variant of 'var'.
+vars :: Traversable t => t N -> Constrained (t CVal)
+vars = mapM var
+
+
+-- | Constraints to be solved or minimized. Although both can be reduced to cost
+--   functions, you should use 'CEqual' when possible because the solver can
+--   often do some algebra up front to simplify equation systems before the
+--   numerical step.
+data Constraint = CEqual    !CVal !CVal
+                | CMinimize !CVal
 
 
 -- | Rewrite 'CVal's by replacing one or more variables with different
@@ -73,15 +89,20 @@ linear m b v                 = CLinear m b v
 
 -- | Promote a unary function to a nonlinear transformation, with constant
 --   folding.
-nonlinear_unary :: (N -> N) -> String -> CVal -> CVal
-nonlinear_unary f fname (CConst x) = CConst (f x)
-nonlinear_unary f fname v = CNonlinearU v f fname
+nonlinear_unary :: (N -> N) -> FName -> CVal -> CVal
+nonlinear_unary f fname v = case v of
+  CConst x              -> CConst (f x)
+  CNonlinearU v' f' fn' -> nonlinear_unary (f . f') (fname ++ " . " ++ fn') v'
+  _                     -> CNonlinearU v f fname
 
 -- | Promote a binary function to a nonlinear transformation, with constant
 --   folding.
-nonlinear_binary :: (N -> N -> N) -> String -> CVal -> CVal -> CVal
-nonlinear_binary f fname (CConst x) (CConst y) = CConst (f x y)
-nonlinear_binary f fname x y = CNonlinearB x y f fname
+nonlinear_binary :: (N -> N -> N) -> FName -> CVal -> CVal -> CVal
+nonlinear_binary f fname x y = case (x, y) of
+  (CConst x', CConst y') -> CConst (f x' y')
+  (CConst x', _) -> nonlinear_unary (     f x') (fname ++   " " ++ show x') y
+  (_, CConst y') -> nonlinear_unary (flip f y') (fname ++ " _ " ++ show y') x
+  _              -> CNonlinearB x y f fname
 
 
 -- | Constraint equivalence. The premise is that we can reduce each constraint
@@ -95,7 +116,7 @@ class CEq a where
 
 instance CEq CVal where
   a =-= b = tell [CEqual a b]
-  a <-= b = tell [CCostFn $ CNonlinearU (b - a) (max 0) "max 0"]
+  a <-= b = tell [CMinimize $ (b - a) `cmax` CConst 0]
 
 instance (Foldable f, CEq a) => CEq (f a) where
   a =-= b = sequence_ $ zipWith (=-=) (toList a) (toList b)
@@ -112,10 +133,8 @@ instance Num CVal where
   x * CConst y = linear y 0 x
   x * y        = nonlinear_binary (*) "*" x y
 
-  abs (CConst x)    = CConst (abs x)
-  abs v             = nonlinear_unary abs "abs" v
-  signum (CConst x) = CConst (signum x)
-  signum v          = nonlinear_unary signum "signum" v
+  abs v        = nonlinear_unary abs "abs" v
+  signum v     = nonlinear_unary signum "signum" v
 
 instance Fractional CVal where
   fromRational     = CConst . fromRational
@@ -158,25 +177,23 @@ class EventuallyOrd a where
   cmin :: a -> a -> a
   cmax :: a -> a -> a
 
-instance Ord a => EventuallyOrd a where
-  cmin = min
-  cmax = max
-
 instance EventuallyOrd CVal where
   cmin = nonlinear_binary min "min"
   cmax = nonlinear_binary max "max"
 
+-- TODO
+-- Due to what I can only assume is a Haskell bug, this definition causes GHC to
+-- fail with "overlapping instances". This despite the fact that CVal isn't Ord,
+-- nor does GHC let us treat it as such.
+--
+-- Oh. https://stackoverflow.com/a/55952285
+
+{-
+instance Ord a => EventuallyOrd a where
+  cmin = min
+  cmax = max
+-}
+
 instance (Applicative f, EventuallyOrd a) => EventuallyOrd (f a) where
   cmin = liftA2 cmin
   cmax = liftA2 cmax
-
-
--- | Create a new constrained variable initialized to the given value.
-var :: N -> Constrained CVal
-var init = do id <- get
-              modify (+ 1)
-              return $ CVar id init
-
--- | A multidimensional variant of 'var'.
-vars :: Traversable t => t N -> Constrained (t CVal)
-vars = mapM var
