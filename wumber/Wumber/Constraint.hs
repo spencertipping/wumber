@@ -9,7 +9,6 @@ module Wumber.Constraint where
 import Control.Applicative
 import Control.Monad
 import Control.Monad.RWS
-import qualified Data.Map.Lazy as M
 import Data.Foldable
 import Data.Maybe
 import Text.Printf
