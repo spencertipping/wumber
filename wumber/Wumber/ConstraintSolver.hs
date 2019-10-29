@@ -74,7 +74,7 @@ solve_full δ n m = (rewrite (eval solution) a, solution, cs)
 solve' :: N -> Int -> Simplified -> [(VarID, N)]
 solve' δ n (Simplified maxid cs mi) = remap_solution mi xs
   where f           = eval_constraints cs
-        vars        = constraints_deps cs
+        vars        = S.unions (map constraint_deps cs)
         start       = V.replicate (1 + maxid) 0 V.// S.toList vars
         search_size = V.replicate (1 + maxid) 1
         (xs, _)     = minimizeV NMSimplex2 δ n search_size f start
@@ -89,10 +89,10 @@ remap_solution :: V.Vector VarID -> V.Vector N -> [(VarID, N)]
 remap_solution mi xs = V.toList mi `zip` V.toList xs
 
 
--- | The full set of initial values in a list of constraints.
-constraints_deps :: [Constraint] -> S.Set (VarID, N)
-constraints_deps = S.unions . map \case CEqual a b -> deps a `S.union` deps b
-                                        CCostFn v  -> deps v
+-- | The full set of initial values in a constraint.
+constraint_deps :: Constraint -> S.Set (VarID, N)
+constraint_deps (CEqual a b) = deps a `S.union` deps b
+constraint_deps (CCostFn v)  = deps v
 
 
 -- | The cost function for a set of constraints at a given solution value. This
@@ -114,4 +114,12 @@ data Simplified = Simplified VarID [Constraint] (V.Vector Int)
 --   'Vector' indexes used by the GSL minimizer).
 simplify :: [Constraint] -> [Simplified]
 simplify cs = [Simplified maxid cs (V.generate (maxid + 1) id)]
-  where (maxid, _) = S.findMax (constraints_deps cs)
+  where (maxid, _) = foldl1 max $ map (S.findMax . constraint_deps) cs
+
+
+-- | Separates independent subsystems. This is the first thing we do when
+--   simplifying a set of constraints.
+partition_by_unknowns :: [Constraint] -> [[Constraint]]
+
+-- TODO
+partition_by_unknowns cs = []
