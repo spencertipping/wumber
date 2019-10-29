@@ -1,3 +1,4 @@
+{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -5,6 +6,7 @@
 
 module Wumber.Constraint where
 
+import Control.Applicative
 import Control.Monad
 import Control.Monad.RWS
 import qualified Data.Map.Lazy as M
@@ -146,11 +148,36 @@ safe_recip 0 = 0
 safe_recip x = recip x
 
 
+-- | Normal 'min' and 'max' don't apply to 'CVal's because there isn't a way for
+--   'CVal's to implement 'Ord'. What we can do, however, is defer the
+--   orderedness to evaluation time.
+--
+--   'EventuallyOrd' is weaker than 'Ord' in that it lets you construct a value
+--   that represents the 'min' or 'max', but doesn't let you compare values.
+
+class EventuallyOrd a where
+  cmin :: a -> a -> a
+  cmax :: a -> a -> a
+
+instance Ord a => EventuallyOrd a where
+  cmin = min
+  cmax = max
+
+instance EventuallyOrd CVal where
+  cmin = nonlinear_binary min "min"
+  cmax = nonlinear_binary max "max"
+
+instance (Applicative f, EventuallyOrd a) => EventuallyOrd (f a) where
+  cmin = liftA2 cmin
+  cmax = liftA2 cmax
+
+
 -- | Create a new constrained variable initialized to the given value.
 var :: N -> Constrained CVal
 var init = do id <- get
               modify (+ 1)
               return $ CVar id init
 
+-- | A multidimensional variant of 'var'.
 vars :: Traversable t => t N -> Constrained (t CVal)
 vars = mapM var

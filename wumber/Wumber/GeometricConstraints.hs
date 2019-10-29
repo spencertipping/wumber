@@ -1,12 +1,15 @@
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 module Wumber.GeometricConstraints where
 
+import Control.Applicative
 import Control.Monad
 import Data.Foldable
 import Lens.Micro
@@ -39,6 +42,38 @@ rend = lens g s where g r    =        _rstart r + _rsize r
                       s r e' = r & rstart .~ e' - _rsize r
 
 
+-- | Builds a rectangle from start+end instead of start+displacement.
+rect_from_ends :: Num a => a -> a -> Rect a
+rect_from_ends s e = Rect s (e - s)
+
+
+-- | Objects that can provide bounding boxes. These bounding boxes should always
+--   be proper.
+class HasBoundingBox a v | a -> v where bounds :: a -> Rect v
+
+instance (EventuallyOrd a, Num a) => HasBoundingBox (Rect a) a where
+  bounds r = rect_from_ends (cmin s e) (cmax s e)
+    where s = r^.rstart
+          e = r^.rend
+
+
+-- | An N-dimensional line defined by start and displacement vectors. Lines also
+--   provide an endpoint lens, but this lens modifies the length instead of the
+--   start point.
+
+data Line a = Line { _lstart :: a, _llen :: a } deriving (Show, Eq, Functor)
+makeLenses ''Line
+
+lend :: Num a => Lens (Line a) (Line a) a a
+lend = lens g s where g l    =      _lstart l + _llen l
+                      s l e' = l & llen .~ e' - _lstart l
+
+instance (EventuallyOrd a, Num a) => HasBoundingBox (Line a) a where
+  bounds l = rect_from_ends (cmin s e) (cmax s e)
+    where s = l^.lstart
+          e = l^.lend
+
+
 -- | Measure or constrain the cosine of the angle between A and C, relative to a
 --   centerpoint B. 'inner_angle_cos' 'A' 'B' 'C' is 'vector_angle_cos' 'BA'
 --   'BC'.
@@ -46,6 +81,7 @@ rend = lens g s where g r    =        _rstart r + _rsize r
 --   The only reason this function doesn't 'acos' for you is that it slows down
 --   the solver by adding an extra step. Most of the time it's a lot faster to
 --   'cos' the angle instead.
+
 inner_angle_cos :: (Floating a, Additive f, Metric f) => f a -> f a -> f a -> a
 inner_angle_cos a b c = vector_angle_cos (a ^-^ b) (c ^-^ b)
 

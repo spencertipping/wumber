@@ -3,6 +3,7 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 module Wumber.ConstraintSolver where
@@ -52,8 +53,9 @@ eval_constraints cs xs = L.foldl' (\t v -> t + each v) 0 cs
 --   into more optimized final types.
 class Rewritable a b | a -> b where rewrite :: (CVal -> N) -> a -> b
 
-instance              Rewritable    CVal     N  where rewrite = id
-instance Functor f => Rewritable (f CVal) (f N) where rewrite = fmap
+instance Rewritable CVal N where rewrite = id
+instance (Functor f, Rewritable a b) => Rewritable (f a) (f b) where
+  rewrite = fmap . rewrite
 
 
 -- TODO: solve by substitution when we see usable 'CEqual' constraints
