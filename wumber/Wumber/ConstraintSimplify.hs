@@ -45,14 +45,9 @@ remap_solution mi xs = V.toList mi `zip` VS.toList xs
 
 -- | Separates independent subsystems. This is the first thing we do when
 --   simplifying a set of constraints.
-partition_by_unknowns :: [Constraint] -> [[Constraint]]
-partition_by_unknowns cs = [cs]
-  where cv     = V.fromList cs
-
-        by_var :: M.Map VarID (S.Set Int)
-        by_var = zip [0..] (map (S.map fst . constraint_deps) cs)
-                 & concatMap (\(n, xs) -> map (, S.singleton n) (S.toList xs))
-                 & M.fromListWith S.union
+partition_by_vars :: [Constraint] -> [[Constraint]]
+partition_by_vars cs = [cs]
+  where pairs = cs & map \c -> ([c], S.map fst (constraint_deps c))
 
 
 -- | The full set of initial values in a constraint.

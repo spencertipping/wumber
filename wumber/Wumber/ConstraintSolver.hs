@@ -48,8 +48,7 @@ solve_full :: Rewritable a b
 solve_full δ n m = (rewrite (eval solution) a, solution, cs)
   where solution = VS.replicate (1 + foldl1 max (map fst solved)) 0 VS.// solved
         (a, cs)  = evalRWS m () 0
-        solved   = concatMap (solve' δ n)
-                   $ map simplify $ partition_by_unknowns cs
+        solved   = partition_by_vars cs & map simplify & concatMap (solve' δ n)
 
 
 -- | Solves a constrained system and returns the solution as a list of
@@ -78,6 +77,6 @@ eval :: Vector N -> CVal -> N
 eval xs (CVar i _)            = xs ! i
 eval _  (CConst x)            = x
 eval xs (CLinear m b v)       = let !x = eval xs v in m*x + b
-eval xs (CNonlinear ops f _)  = f $ map (eval xs) ops
+eval xs (CNonlinear ops f _)  = f $! map (eval xs) ops
 eval xs (CNonlinearU v f _)   = f $! eval xs v
 eval xs (CNonlinearB l r f _) = eval xs l `f` eval xs r
