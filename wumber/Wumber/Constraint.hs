@@ -171,28 +171,22 @@ safe_recip x = recip x
 --   orderedness to evaluation time.
 --
 --   'EventuallyOrd' is weaker than 'Ord' in that it lets you construct a value
---   that represents the 'min' or 'max', but doesn't let you compare values.
+--   that represents the 'min' or 'max', but doesn't let you decide the ordering
+--   of those values.
 
 class EventuallyOrd a where
   cmin :: a -> a -> a
   cmax :: a -> a -> a
 
-instance EventuallyOrd CVal where
+-- OVERLAPPABLE because GHC doesn't look at constraints when it matches
+-- typeclasses. I have no idea why.
+instance {-# OVERLAPPABLE #-} EventuallyOrd CVal where
   cmin = nonlinear_binary min "min"
   cmax = nonlinear_binary max "max"
 
--- TODO
--- Due to what I can only assume is a Haskell bug, this definition causes GHC to
--- fail with "overlapping instances". This despite the fact that CVal isn't Ord,
--- nor does GHC let us treat it as such.
---
--- Oh. https://stackoverflow.com/a/55952285
-
-{-
-instance Ord a => EventuallyOrd a where
+instance {-# OVERLAPPABLE #-} Ord a => EventuallyOrd a where
   cmin = min
   cmax = max
--}
 
 instance (Applicative f, EventuallyOrd a) => EventuallyOrd (f a) where
   cmin = liftA2 cmin
