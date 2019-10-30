@@ -37,6 +37,7 @@ import Wumber.Element
 -- TODO
 -- Replace all of this with a dual contouring implementation, e.g.
 -- https://www.boristhebrave.com/2018/04/15/dual-contouring-tutorial/
+-- https://www.mattkeeter.com/projects/contours/
 
 
 type Iso = V3 Double -> Double
