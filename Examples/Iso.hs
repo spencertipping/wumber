@@ -30,12 +30,12 @@ screw dθ v@(V3 x y z) = v *! rotate_z_m (dθ * z)
 main :: Wumber ()
 main = do
   zoom 0.01
-  -- i <- liftIO $ iso_element 100000 model
-  -- i <- liftIO $ iso_crawler 200 0.05 model
+  -- i <- liftIO $ iso_element 50000 model
+  -- i <- liftIO $ iso_crawler 200 0.1 model
   -- tell [i]
-  tell [iso_scan 40 model]
+  tell [iso_scan 30 model]
 
-  where model v = scs v + cubes v * (-0.2)
+  where model v = scs v -- + cubes v * (-0.8)
 
         spheres = sphere 0 `iunion` sphere 0.8
         scs     = spheres `iunion` cube (BB (-1.5) (-0.5))

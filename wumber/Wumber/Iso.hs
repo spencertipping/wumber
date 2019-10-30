@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 module Wumber.Iso where
@@ -8,7 +9,14 @@ module Wumber.Iso where
 import Control.DeepSeq
 import Control.Monad.Identity
 import Control.Monad.RWS.Strict
+import Control.Monad.ST
 import Control.Parallel.Strategies
+import Data.Array
+import Data.Array.MArray
+import Data.Array.ST
+import Data.Foldable
+import Data.Function
+import Data.List
 import GHC.Float
 import Graphics.Gloss.Data.Color
 import Lens.Micro
@@ -24,6 +32,11 @@ import System.Random
 
 import Wumber.Cursor
 import Wumber.Element
+
+
+-- TODO
+-- Replace all of this with a dual contouring implementation, e.g.
+-- https://www.boristhebrave.com/2018/04/15/dual-contouring-tutorial/
 
 
 type Iso = V3 Double -> Double
@@ -80,13 +93,14 @@ random_v = do
   y <- r
   z <- r
   return $ V3 x y z
-  where r = randomRIO (-2, 2)
+  where r = randomRIO (-1, 1)
 
 
 iso_from_points :: Iso -> [V3 Double] -> Element
 iso_from_points i ps = Multi (bb_of_points b) $ pmap each b
-  where each v = Shape (BB 0 1) identity [v, v ^-^ gradient i v ^* 0.04]
+  where each v = Shape (BB 0 1) identity [v, boundary_from i $ nv v]
         b      = map (boundary_from i) ps
+        nv v   = v ^-^ ((gradient i v ^* 0.1) `cross` v)
 
 
 align :: V3 Double -> V3 Double
@@ -128,8 +142,41 @@ ifloat i n = fromIntegral i / fromIntegral n
 
 iso_scan :: Int -> Iso -> Element
 iso_scan n i = iso_from_points i $
-  flip concatMap [1..n] \xi ->
-  flip concatMap [1..n] \yi ->
-  flip map [1..n] \zi -> V3 (ifloat xi n * 4 - 2)
-                            (ifloat yi n * 4 - 2)
-                            (ifloat zi n * 4 - 2)
+  flip map [1..n*n*n] \p ->
+    let (xi, yi, zi) = unpack n p in
+      V3 (ifloat xi n * 4 - 2) (ifloat yi n * 4 - 2) (ifloat zi n * 4 - 2)
+
+
+pack :: Int -> (Int, Int, Int) -> Int
+pack n (x, y, z) = n*(n*x + y) + z
+
+unpack :: Int -> Int -> (Int, Int, Int)
+unpack n xyz = (x, y, z)
+  where (xy, z) = xyz `divMod` n
+        (x, y)  = xy  `divMod` n
+
+
+iso_scan2 :: Int -> Iso -> Element
+iso_scan2 n i = Multi (BB (-2) 2) $ elems es
+  where es = runSTArray do
+          vs  <- newArray (0, n*n*n) (V3 0 0 0) :: ST s (STArray s Int (V3 Double))
+          vis <- getAssocs vs
+          forM_ vis \(p, _) -> do
+            let (x, y, z) = unpack n p
+            writeArray vs p $ boundary_from i $ V3 (ifloat x n * 4 - 2)
+                                                   (ifloat y n * 4 - 2)
+                                                   (ifloat z n * 4 - 2)
+
+          ps  <- newArray_ (0, (n-1)*(n-1)*(n-1))
+          pis <- getAssocs ps
+          forM_ pis \(p, _) -> do
+            let (x, y, z) = unpack (n-1) p
+            va <- readArray vs $ pack n (x, y, z)
+            v1 <- readArray vs $ pack n (x+1, y, z)
+            v2 <- readArray vs $ pack n (x, y+1, z)
+            v3 <- readArray vs $ pack n (x, y, z+1)
+
+            let [_, vb, vc] = sortBy (compare `on` distance va) [v1, v2, v3]
+            writeArray ps p $ shape_of identity [vb, va, vc]
+
+          return ps
