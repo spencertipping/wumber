@@ -57,16 +57,21 @@ instance (EventuallyOrd a, Num a) => HasBoundingBox (Rect a) a where
           e = r^.rend
 
 
--- | An N-dimensional line defined by start and displacement vectors. Lines also
---   provide an endpoint lens, but this lens modifies the length instead of the
---   start point.
+-- | An N-dimensional line defined by start and displacement vectors. Lines
+--   provide two accessor lenses: one for the endpoint (which modifies the line
+--   length), and one for the line length (which modifies the endpoint by
+--   scaling the displacement).
 
-data Line a = Line { _lstart :: a, _llen :: a } deriving (Show, Eq, Functor)
+data Line a = Line { _lstart :: a, _ldisp :: a } deriving (Show, Eq, Functor)
 makeLenses ''Line
 
 lend :: Num a => Lens (Line a) (Line a) a a
-lend = lens g s where g l    =      _lstart l + _llen l
-                      s l e' = l & llen .~ e' - _lstart l
+lend = lens g s where g l    =       _lstart l + _ldisp l
+                      s l e' = l & ldisp .~ e' - _lstart l
+
+llen :: (Metric f, Floating a) => Lens (Line (f a)) (Line (f a)) a a
+llen = lens g s where g (Line _ d)    = norm d
+                      s (Line s d) l' = Line s $ d ^* (l' / norm d)
 
 instance (EventuallyOrd a, Num a) => HasBoundingBox (Line a) a where
   bounds l = rect_from_ends (cmin s e) (cmax s e)
