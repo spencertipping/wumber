@@ -4,6 +4,13 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
+
+-- TODO
+-- Most of the stuff happening here can generalize to iso-shapes; CVal
+-- expressions are ultimately just indirectly-evaluated things, and the
+-- representation lends itself well to JIT. Let's move this into a more general
+-- module where we can pull out the common bits.
+
 module Wumber.Constraint where
 
 import Control.Applicative
@@ -18,12 +25,25 @@ import Text.Printf
 --   integers will always refer to indexes in an array or vector.
 type VarID = Int
 type N     = Double
+
+-- TODO: we'll be more JIT-able if we go with a typeclass or 'data' with
+-- symbolic functions. Then we get name/compile/etc functions, and we might also
+-- be in a better position to solve equations without relying on 'CLinear'.
 type FName = String
 
 
 -- | A constrained variable, constant, or transformation of one or more such
 --   values. You build these up with numeric expressions and then assert
 --   equivalence using methods in 'CEq', which emit constraints to the solver.
+
+-- TODO: add CSum or some such; we want multi-term quantities to remain symbolic
+-- so we can reduce dimensionality via matrix inversion in the constraint
+-- simplifier.
+
+-- TODO: dependencies of CVal, where deps can come out tagged with linear
+-- metadata, e.g. "this CVal depends linearly on variable 5: slope is 8, offset
+-- is 10".
+
 data CVal = CVar        !VarID !N
           | CConst      !N
           | CLinear     !N !N !CVal
