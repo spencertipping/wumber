@@ -66,8 +66,8 @@ data Line a = Line { _lstart :: a, _ldisp :: a } deriving (Show, Eq, Functor)
 makeLenses ''Line
 
 lend :: Num a => Lens (Line a) (Line a) a a
-lend = lens g s where g l    =       _lstart l + _ldisp l
-                      s l e' = l & ldisp .~ e' - _lstart l
+lend = lens g s where g (Line s d)    = s + d
+                      s (Line s d) e' = Line s $ e' - s
 
 llen :: (Metric f, Floating a) => Lens (Line (f a)) (Line (f a)) a a
 llen = lens g s where g (Line _ d)    = norm d
@@ -87,11 +87,11 @@ instance (EventuallyOrd a, Num a) => HasBoundingBox (Line a) a where
 --   the solver by adding an extra step. Most of the time it's a lot faster to
 --   'cos' the angle instead.
 
-inner_angle_cos :: (Floating a, Additive f, Metric f) => f a -> f a -> f a -> a
-inner_angle_cos a b c = vector_angle_cos (a ^-^ b) (c ^-^ b)
+inner_angle_cos :: (Floating a, Num (f a), Metric f) => f a -> f a -> f a -> a
+inner_angle_cos a b c = vector_angle_cos (a - b) (c - b)
 
 vector_angle_cos :: (Floating a, Metric f) => f a -> f a -> a
-vector_angle_cos a b = a `dot` b / (norm a * norm b)
+vector_angle_cos a b = a `dot` b / sqrt (quadrance a * quadrance b)
 
 
 -- | Constrain a vector value to a proper rectangle (one whose size is
