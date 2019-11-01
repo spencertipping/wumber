@@ -1,4 +1,6 @@
 module Wumber (
+  module Wumber.BoundingBox,
+  module Wumber.ClosedComparable,
   module Wumber.Cursor,
   module Wumber.Element,
   module Wumber.Iso,
@@ -11,6 +13,8 @@ module Wumber (
 import Control.Monad.RWS.Strict
 import GHC.Float
 
+import Wumber.BoundingBox
+import Wumber.ClosedComparable
 import Wumber.Cursor
 import Wumber.Element
 import Wumber.Iso

@@ -30,6 +30,7 @@ import Linear.Vector
 import System.IO
 import System.Random
 
+import Wumber.BoundingBox
 import Wumber.Cursor
 import Wumber.Element
 
@@ -45,7 +46,7 @@ type Iso = V3 Double -> Double
 sphere :: V3 Double -> Iso
 sphere l v = 1 - distance v l
 
-cube :: BoundingBox -> Iso
+cube :: BB3D -> Iso
 cube (BB (V3 x1 y1 z1) (V3 x2 y2 z2)) (V3 x y z) =
   foldl1 min [ x - x1, x2 - x, y - y1, y2 - y, z - z1, z2 - z ]
 
@@ -98,7 +99,7 @@ random_v = do
 
 
 iso_from_points :: Iso -> [V3 Double] -> Element
-iso_from_points i ps = Multi (bb_of_points b) $ pmap each b
+iso_from_points i ps = Multi (of_points b) $ pmap each b
   where each v = Shape (BB 0 1) identity [v, boundary_from i $ nv v]
         b      = map (boundary_from i) ps
         nv v   = v ^-^ ((gradient i v ^* 0.1) `cross` v)

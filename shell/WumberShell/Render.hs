@@ -33,7 +33,7 @@ screenify v = color init_color . scale sz sz . pictures . map (render v')
 --
 -- We should also take clipping into account so we don't render offscreen
 -- things.
-screen_size :: View -> BoundingBox -> Double
+screen_size :: View -> BB3D -> Double
 screen_size v (BB vmin vmax) = foldl1 max [ LM.distance v0 v1,
                                             LM.distance v0 v2,
                                             LM.distance v0 v3 ]

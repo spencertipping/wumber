@@ -20,6 +20,8 @@ import Data.Foldable
 import Data.Maybe
 import Text.Printf
 
+import Wumber.ClosedComparable
+
 
 -- | For documentation. Variable IDs are always going to be integers, and these
 --   integers will always refer to indexes in an array or vector.
@@ -59,6 +61,10 @@ instance Show CVal where
   show (CNonlinear ops _ fn)  = printf "(%s %s)" (show fn) (show ops)
   show (CNonlinearU op _ fn)  = printf "(%s %s)" (show fn) (show op)
   show (CNonlinearB l r _ fn) = printf "(%s %s %s)" (show l) (show fn) (show r)
+
+instance {-# OVERLAPPABLE #-} ClosedComparable CVal where
+  lower = nonlinear_binary min "min"
+  upper = nonlinear_binary max "max"
 
 
 -- | 'Constrained' is a monad that keeps track of 'CVar' IDs and collects
@@ -136,7 +142,7 @@ class CEq a where
 
 instance CEq CVal where
   a =-= b = tell [CEqual a b]
-  a <-= b = tell [CMinimize $ (b - a) `cmax` CConst 0]
+  a <-= b = tell [CMinimize $ (b - a) `upper` CConst 0]
 
 instance (Foldable f, CEq a) => CEq (f a) where
   a =-= b = sequence_ $ zipWith (=-=) (toList a) (toList b)
@@ -184,30 +190,3 @@ instance Floating CVal where
 safe_recip :: N -> N
 safe_recip 0 = 0
 safe_recip x = recip x
-
-
--- | Normal 'min' and 'max' don't apply to 'CVal's because there isn't a way for
---   'CVal's to implement 'Ord'. What we can do, however, is defer the
---   orderedness to evaluation time.
---
---   'EventuallyOrd' is weaker than 'Ord' in that it lets you construct a value
---   that represents the 'min' or 'max', but doesn't let you decide the ordering
---   of those values.
-
-class EventuallyOrd a where
-  cmin :: a -> a -> a
-  cmax :: a -> a -> a
-
--- OVERLAPPABLE because GHC doesn't look at constraints when it matches
--- typeclasses. I have no idea why.
-instance {-# OVERLAPPABLE #-} EventuallyOrd CVal where
-  cmin = nonlinear_binary min "min"
-  cmax = nonlinear_binary max "max"
-
-instance {-# OVERLAPPABLE #-} Ord a => EventuallyOrd a where
-  cmin = min
-  cmax = max
-
-instance (Applicative f, EventuallyOrd a) => EventuallyOrd (f a) where
-  cmin = liftA2 cmin
-  cmax = liftA2 cmax

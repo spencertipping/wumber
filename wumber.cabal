@@ -34,6 +34,8 @@ library
                      , text
                      , vector >= 0.12.0.3
   exposed-modules:     Wumber
+                     , Wumber.BoundingBox
+                     , Wumber.ClosedComparable
                      , Wumber.Constraint
                      , Wumber.ConstraintSolver
                      , Wumber.ConstraintSimplify

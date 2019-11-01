@@ -17,6 +17,8 @@ import Lens.Micro.TH
 import Linear.Metric
 import Linear.Vector
 
+import Wumber.BoundingBox
+import Wumber.ClosedComparable
 import Wumber.Constraint
 
 
@@ -49,12 +51,10 @@ rect_from_ends s e = Rect s (e - s)
 
 -- | Objects that can provide bounding boxes. These bounding boxes should always
 --   be proper.
-class HasBoundingBox a v | a -> v where bounds :: a -> Rect v
+class HasBoundingBox a v | a -> v where bounds :: a -> BoundingBox v
 
-instance (EventuallyOrd a, Num a) => HasBoundingBox (Rect a) a where
-  bounds r = rect_from_ends (cmin s e) (cmax s e)
-    where s = r^.rstart
-          e = r^.rend
+instance (ClosedComparable a, Num a, Bounded a) => HasBoundingBox (Rect a) a where
+  bounds r = of_points [r^.rstart, r^.rend]
 
 
 -- | An N-dimensional line defined by start and displacement vectors. Lines
@@ -73,10 +73,8 @@ llen :: (Metric f, Floating a) => Lens (Line (f a)) (Line (f a)) a a
 llen = lens g s where g (Line _ d)    = norm d
                       s (Line s d) l' = Line s $ d ^* (l' / norm d)
 
-instance (EventuallyOrd a, Num a) => HasBoundingBox (Line a) a where
-  bounds l = rect_from_ends (cmin s e) (cmax s e)
-    where s = l^.lstart
-          e = l^.lend
+instance (ClosedComparable a, Num a, Bounded a) => HasBoundingBox (Line a) a where
+  bounds l = of_points [l^.lstart, l^.lend]
 
 
 -- | Measure or constrain the cosine of the angle between A and C, relative to a

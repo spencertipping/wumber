@@ -1,5 +1,4 @@
 # Development frontier
-+ **Researched:** Dual contouring
 + **Possible but not yet worthwhile:** JIT for F-rep (SSE4, not AVX)
   + Complicated by operations that aren't implemented in hardware
   + Algorithm improvements first
