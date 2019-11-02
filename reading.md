@@ -18,6 +18,7 @@
 
 ## General solid modeling
 + [Wikipedia/solid modeling](https://en.wikipedia.org/wiki/Solid_modeling)
++ [StackOverflow: kdtrees vs octrees](https://cstheory.stackexchange.com/questions/8470/why-would-one-ever-use-an-octree-over-a-kd-tree)
 
 
 ## Dealing with isosurfaces

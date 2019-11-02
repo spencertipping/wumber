@@ -1,42 +1,72 @@
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 
--- NOTE
--- This code is inspired heavily by Matt Keeter's implementation at
--- https://www.mattkeeter.com/projects/contours/. I've extended it to 3D, but
--- otherwise most of the design is the same.
-
 module Wumber.DualContour where
 
-import Numeric.LinearAlgebra (linearSolveSVD)
+import Control.Applicative
 import Lens.Micro
 import Lens.Micro.TH
+import Linear.Metric
 import Linear.V3
+import Linear.Vector
+import Numeric.LinearAlgebra
 
 import Wumber.BoundingBox
 
 
-type IsoFn = V3 Double -> Double
+type IsoFn a   = a -> Double
+type ErrorFn a = IsoFn a -> BoundingBox a -> Error
+type Error     = Double
+type Basis a   = [a]
+
+
+data Tree a = Bisect a (Tree a) (Tree a)
+            | Inside a
+            | Outside a
+            | Boundary a
+  deriving (Show, Eq, Functor, Foldable)
+
+
+corners :: Basis a -> BoundingBox a -> [a]
+corners _ _ = []
+
+
+bisect :: (Metric v, Fractional (v a), Fractional a)
+       => v a -> BoundingBox (v a) -> (BoundingBox (v a), BoundingBox (v a))
+bisect a (BB l u) = (BB l (l + mp/2 + mo), BB (l + mp/2) u)
+  where d  = u - l
+        mp = a `project` d
+        mo = d - mp
 
 
 -- TODO
--- Generalize this across dimensionality so we can reuse the logic for 2D isos.
--- Haskell should give us a fairly straightforward way to do this.
+-- Add the vertex locator logic to this function; that way we minimize function
+-- re-evaluations.
 
-data Tree a = Root { _txyz :: Tree a, _txyZ :: Tree a,
-                     _txYz :: Tree a, _txYZ :: Tree a,
-                     _tXyz :: Tree a, _tXyZ :: Tree a,
-                     _tXYz :: Tree a, _tXYZ :: Tree a }
-            | Empty
-            | Full
-            | Leaf a
-  deriving (Show, Eq)
+build3d :: (Metric v, Fractional (v a), Fractional a)
+        => IsoFn (v a) -> Basis (v a) -> BoundingBox (v a)
+        -> ErrorFn (v a) -> Error -> Tree (BoundingBox (v a))
+build3d f basis b ef e = go bvs b
+  where bvs = cycle basis
+        go (v:bvs') b
+          | ef f b > e          = Bisect b (go bvs' b1) (go bvs' b2)
+          | all ((>  0) . f) cs = Inside b
+          | all ((<= 0) . f) cs = Outside b
+          | otherwise           = Boundary b
+          where (b1, b2) = bisect v b
+                cs       = corners basis b
 
-makeLenses ''Tree
 
 
+
+
+{-
 build_tree :: BB3D -> Int -> Tree BB3D
 build_tree b 0 = Leaf b
 build_tree (BB (V3 xl yl zl) (V3 xu yu zu)) i =
@@ -77,3 +107,4 @@ gradient i (V3 x y z) = V3 (gx/δ) (gy/δ) (gz/δ)
   where gx = i (V3 (x+δ) y z) - i (V3 (x-δ) y z)
         gy = i (V3 x (y+δ) z) - i (V3 x (y-δ) z)
         gz = i (V3 x y (z+δ)) - i (V3 x y (z-δ))
+-}
