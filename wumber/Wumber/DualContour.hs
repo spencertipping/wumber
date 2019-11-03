@@ -118,7 +118,7 @@ build f b sf = go b (cycle basis)
 surface_vertex :: (Metric f, Foldable f, FromStorableVector (f R))
                => BoundingBox (f R) -> [f R] -> [f R] -> f R
 surface_vertex b s v = from_storable_vector x
-  where m = LA.fromLists $ map toList v
+  where m = LA.fromRows $ map (LA.fromList . toList) v
         y = LA.col $ zipWith dot s v
         x = head $ LA.toColumns $ LA.linearSolveSVD m y
 
@@ -126,6 +126,8 @@ surface_vertex b s v = from_storable_vector x
 -- | Things that can be converted from the storable vectors used by
 --   'Numeric.LinearAlgebra'. I'm using this because I couldn't find a way to
 --   convert storable vectors back to things like 'V2' or 'V3'.
+--
+--   If anyone knows of a better way to solve this problem, please let me know.
 class FromStorableVector a where from_storable_vector :: LA.Vector R -> a
 
 instance FromStorableVector (V3 R) where
