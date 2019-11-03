@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor #-}
@@ -21,11 +22,13 @@ import Data.Maybe (isJust, fromJust)
 import Data.Traversable (traverse)
 import Lens.Micro.TH (makeLenses)
 import Linear.Matrix (identity)
-import Linear.Metric (Metric, project)
-import Linear.V2 (V2)
-import Linear.V3 (V3)
+import Linear.Metric (Metric, project, dot)
+import Linear.V2 (V2(..))
+import Linear.V3 (V3(..))
 import Linear.Vector (Additive, lerp, (^*))
-import Numeric.LinearAlgebra (linearSolveSVD)
+import qualified Linear.V as V
+import qualified Numeric.LinearAlgebra as LA
+import Numeric.LinearAlgebra ((!))
 
 import Wumber.BoundingBox
 
@@ -71,7 +74,8 @@ t_corners = t_meta . tm_corners
 
 
 -- | Constructs a tree whose structure is determined by the 'SplitFn'.
-build :: (Metric v, Traversable v, Applicative v, Fractional (v R), MonadZip v)
+build :: (Metric v, Traversable v, Applicative v, Fractional (v R), MonadZip v,
+          FromStorableVector (v R))
       => IsoFn (v R) -> BoundingBox (v R) -> SplitFn (v R) -> Tree (v R)
 
 build f b sf = go b (cycle basis)
@@ -79,7 +83,7 @@ build f b sf = go b (cycle basis)
           | isJust split   = Bisect tm (go b1 vs) (go b2 vs)
           | all (>  0) cfs = Inside tm
           | all (<= 0) cfs = Outside tm
-          | otherwise      = Surface tm $ surface_vertex surface normals
+          | otherwise      = Surface tm $ surface_vertex b surface normals
 
           where split    = sf f tm v
                 tm       = TM b cfs
@@ -90,9 +94,45 @@ build f b sf = go b (cycle basis)
                 normals  = map (gradient f) surface
 
 
--- | Locates the vertex within a 'Surface' cell.
-surface_vertex :: [f R] -> [f R] -> f R
-surface_vertex i n = head i
+-- | Locates the vertex within a 'Surface' cell. We do this by minimizing an
+--   overspecified set of linear equations describing the distance between each
+--   normal plane and the vertex in question.
+--
+--   If this function is called from 'build', then we're guaranteed to have the
+--   vertex at least be fully specified. We know this because any edge that
+--   crosses the surface will have a vertex that produces /n/ surface
+--   intersections, where /n/ is the number of dimensions. So we don't need to
+--   do any checking here, nor do we have any degenerate output cases.
+--
+--   The linear system is built from dot products: if we have a surface point
+--   /s/ and a normal vector /v/, then we want to choose /x/ such that
+--   '(s - x) · v == 0'. Rewriting in scalar terms (for instance, in three
+--   dimensions), we get this for each equation:
+--
+--   @
+--   xx·vx + xy·vy + xz·vz = sx·vx + sy·vy + sz·vz
+--   @
+--
+--   The right-hand side collapses to a constant value.
+
+surface_vertex :: (Metric f, Foldable f, FromStorableVector (f R))
+               => BoundingBox (f R) -> [f R] -> [f R] -> f R
+surface_vertex b s v = from_storable_vector x
+  where m = LA.fromLists $ map toList v
+        y = LA.col $ zipWith dot s v
+        x = head $ LA.toColumns $ LA.linearSolveSVD m y
+
+
+-- | Things that can be converted from the storable vectors used by
+--   'Numeric.LinearAlgebra'. I'm using this because I couldn't find a way to
+--   convert storable vectors back to things like 'V2' or 'V3'.
+class FromStorableVector a where from_storable_vector :: LA.Vector R -> a
+
+instance FromStorableVector (V3 R) where
+  from_storable_vector v = V3 (v!0) (v!1) (v!2)
+
+instance FromStorableVector (V2 R) where
+  from_storable_vector v = V2 (v!0) (v!1)
 
 
 -- | Finds the surface point of an 'IsoFn' along a bounded vector using Newton's
