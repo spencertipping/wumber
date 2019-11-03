@@ -1,110 +1,96 @@
+{-# LANGUAGE DeriveTraversable #-}
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 
 module Wumber.DualContour where
 
 import Control.Applicative
+import Control.Monad.Zip (MonadZip, mzip)
+import Data.Bifoldable (biList)
+import Data.Foldable (toList)
+import Data.Traversable (traverse)
 import Lens.Micro
 import Lens.Micro.TH
+import Linear.Matrix
 import Linear.Metric
+import Linear.V2
 import Linear.V3
 import Linear.Vector
-import Numeric.LinearAlgebra
+import Numeric.LinearAlgebra (linearSolveSVD)
 
 import Wumber.BoundingBox
 
 
 type IsoFn a   = a -> Double
-type ErrorFn a = IsoFn a -> BoundingBox a -> Error
-type Error     = Double
+type SplitFn a = IsoFn a -> BoundingBox a -> a -> [Double] -> Bool
 type Basis a   = [a]
 
 
-data Tree a = Bisect a (Tree a) (Tree a)
-            | Inside a
-            | Outside a
-            | Boundary a
-  deriving (Show, Eq, Functor, Foldable)
+-- | A bounding volume hierarchy with one-dimensional bisections. If dual
+--   contouring is used to find the surface of an object then bisections will be
+--   densest around the boundary.
+data Tree a = Bisect  { _t_meta  :: !(TreeMeta a),
+                        _t_left  :: Tree a,
+                        _t_right :: Tree a }
+            | Inside  { _t_meta :: !(TreeMeta a) }
+            | Outside { _t_meta :: !(TreeMeta a) }
+            | Surface { _t_meta          :: !(TreeMeta a),
+                        _t_vertex        :: a,
+                        _t_intersections :: [a],
+                        _t_normals       :: [a] }
+  deriving (Show, Eq)
+
+-- | Metadata stored on every tree element. We store this because we had to
+--   compute it when we built the tree.
+data TreeMeta a = TM { _tm_bound   :: !(BoundingBox a),
+                       _tm_corners :: ![Double] }
+  deriving (Show, Eq)
+
+makeLenses ''Tree
+makeLenses ''TreeMeta
 
 
-corners :: Basis a -> BoundingBox a -> [a]
-corners _ _ = []
+-- | Constructs a tree for the given isofunction, guided by the output of the
+--   'SplitFn'. 
+build :: (Metric v, Fractional a, Traversable v, Applicative v,
+          Fractional (v a), MonadZip v)
+      => IsoFn (v a) -> BoundingBox (v a) -> SplitFn (v a) -> Tree (v a)
+
+build f b sf = go bvs b
+  where bvs = cycle basis
+        go (v:bvs') b
+          | sf f b v cs   = Bisect tm (go bvs' b1) (go bvs' b2)
+          | all (>  0) cs = Inside tm
+          | all (<= 0) cs = Outside tm
+          | otherwise     = Surface tm v [] []
+          where tm       = TM b cs
+                (b1, b2) = bisect v b
+                basis    = toList identity
+                cs       = map f $ corners b
 
 
+-- | Returns all 2ⁿ corners of a bounding box of dimension /n/.
+--
+--   NOTE to anyone reading this wondering what's up with all the class
+--   qualifiers: all of them amount to stuff implemented by 'V2', 'V3', etc, but
+--   I want to leave the types general across dimensionality. There's probably a
+--   better way to specify these things.
+corners :: (Traversable v, MonadZip v) => BoundingBox (v a) -> [v a]
+corners (BB l u) = traverse biList $ l `mzip` u
+
+
+-- | Bisect a bounding box along the specified axis vector. Your warranty is
+--   void if you specify a vector that isn't axis-aligned.
 bisect :: (Metric v, Fractional (v a), Fractional a)
        => v a -> BoundingBox (v a) -> (BoundingBox (v a), BoundingBox (v a))
 bisect a (BB l u) = (BB l (l + mp/2 + mo), BB (l + mp/2) u)
   where d  = u - l
         mp = a `project` d
         mo = d - mp
-
-
--- TODO
--- Add the vertex locator logic to this function; that way we minimize function
--- re-evaluations.
-
-build3d :: (Metric v, Fractional (v a), Fractional a)
-        => IsoFn (v a) -> Basis (v a) -> BoundingBox (v a)
-        -> ErrorFn (v a) -> Error -> Tree (BoundingBox (v a))
-build3d f basis b ef e = go bvs b
-  where bvs = cycle basis
-        go (v:bvs') b
-          | ef f b > e          = Bisect b (go bvs' b1) (go bvs' b2)
-          | all ((>  0) . f) cs = Inside b
-          | all ((<= 0) . f) cs = Outside b
-          | otherwise           = Boundary b
-          where (b1, b2) = bisect v b
-                cs       = corners basis b
-
-
-
-
-
-{-
-build_tree :: BB3D -> Int -> Tree BB3D
-build_tree b 0 = Leaf b
-build_tree (BB (V3 xl yl zl) (V3 xu yu zu)) i =
-  Root (build_tree (BB (V3 xl yl zl) (V3 xm ym zm)) (i-1))
-       (build_tree (BB (V3 xl yl zm) (V3 xm ym zu)) (i-1))
-       (build_tree (BB (V3 xl ym zl) (V3 xm yu zm)) (i-1))
-       (build_tree (BB (V3 xl ym zm) (V3 xm yu zu)) (i-1))
-       (build_tree (BB (V3 xm yl zl) (V3 xu ym zm)) (i-1))
-       (build_tree (BB (V3 xm yl zm) (V3 xu ym zu)) (i-1))
-       (build_tree (BB (V3 xm ym zl) (V3 xu yu zm)) (i-1))
-       (build_tree (BB (V3 xm ym zm) (V3 xu yu zu)) (i-1))
-  where xm = (xl + xu) / 2
-        ym = (yl + yu) / 2
-        zm = (zl + zu) / 2
-
-
-collapse :: IsoFn -> Tree BB3D -> Tree BB3D
-collapse i l@(Leaf (BB (V3 xl yl zl) (V3 xu yu zu)))
-  | all (<= 0) corners = Empty
-  | all (>  0) corners = Full
-  | otherwise          = l
-  where corners = map i [V3 x y z | x <- [xl, xu], y <- [yl, yu], z <- [zl, zu]]
-
-collapse i (Root a b c d e f g h)
-  | all (== Empty) s' = Empty
-  | all (== Full)  s' = Full
-  | otherwise         = let [a', b', c', d', e', f', g', h'] = s' in
-                          Root a' b' c' d' e' f' g' h'
-  where s' = map (collapse i) [a, b, c, d, e, f, g, h]
-
-collapse _ t = t
-
-
-δ = 2**(-12)
-
-gradient :: IsoFn -> V3 Double -> V3 Double
-gradient i (V3 x y z) = V3 (gx/δ) (gy/δ) (gz/δ)
-  where gx = i (V3 (x+δ) y z) - i (V3 (x-δ) y z)
-        gy = i (V3 x (y+δ) z) - i (V3 x (y-δ) z)
-        gz = i (V3 x y (z+δ)) - i (V3 x y (z-δ))
--}
