@@ -21,7 +21,7 @@ import Wumber.ClosedComparable
 
 -- | An axis-aligned bounding box specified by two vectors. Each coordinate of
 --   '_bmin' is no larger than the corresponding coordinate in '_bmax'.
-data BoundingBox a = BB { _bmin :: a, _bmax :: a }
+data BoundingBox a = BB { _bmin :: !a, _bmax :: !a }
   deriving (Show, Eq, Ord, Functor)
 
 makeLenses ''BoundingBox

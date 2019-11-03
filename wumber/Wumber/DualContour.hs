@@ -15,6 +15,7 @@ module Wumber.DualContour where
 
 import Control.Monad.Zip (MonadZip, mzip)
 import Data.Bifoldable (biList)
+import Data.Bits
 import Data.Foldable (toList)
 import Data.Maybe (isJust, fromJust)
 import Data.Traversable (traverse)
@@ -23,7 +24,7 @@ import Linear.Matrix (identity)
 import Linear.Metric (Metric, project)
 import Linear.V2 (V2)
 import Linear.V3 (V3)
-import Linear.Vector (Additive, lerp)
+import Linear.Vector (Additive, lerp, (^*))
 import Numeric.LinearAlgebra (linearSolveSVD)
 
 import Wumber.BoundingBox
@@ -61,7 +62,7 @@ data Tree a = Bisect  { _t_meta  :: !(TreeMeta a),
 -- | Metadata stored on every tree element. We store this because we had to
 --   compute it when we built the tree.
 data TreeMeta a = TM { _tm_bound   :: !(BoundingBox a),
-                       _tm_corners :: ![Double] }
+                       _tm_corners :: ![R] }
   deriving (Show, Eq)
 
 makeLenses ''Tree
@@ -95,14 +96,14 @@ build f b sf = go b (cycle basis)
 --   NOTE: arguments to 'lerp' are a little counterintuitive: 'lerp 0 a b == b'
 --   and 'lerp 1 a b == a'.
 surface_point :: Additive f => IsoFn (f R) -> f R -> f R -> f R
-surface_point f a b = lerp (go 0.5) b a
-  where f'   = if f a > f b
-               then \x -> - (f (lerp x b a))
-               else \x -> f (lerp x b a)
-        go x = let x' = newton_next f' x in
-                 if | x' < 0 || x' > 1  -> bisect_solve f' 0 1
-                    | abs (f' x') < δ 1 -> x'
-                    | otherwise         -> go x'
+surface_point f a b = lerp (newton 0.5) b a
+  where f'       = if f a > f b
+                   then \x -> - (f (lerp x b a))
+                   else \x -> f (lerp x b a)
+        newton x = let x' = newton_next f' x in
+                     if | x' < 0 || x' > 1  -> bisect_solve f' 0 1
+                        | abs (f' x') < δ 1 -> x'
+                        | otherwise         -> newton x'
 
 
 -- | Runs a single iteration of Newton's method on the given function.
@@ -129,15 +130,31 @@ bisect_solve f l u
 --   halfway into the mantissa, which for doubles is about 26 bits.
 --
 --   Deltas are always positive.
+--
+--   NOTE: we want to fix these types to 'Double' instead of using 'R'. That way
+--   the code will break if you change 'R', which is correct -- the delta would
+--   need to be updated.
+
 δ :: Double -> Double
 δ x = max 1 (abs x) * 2**(-26)
+
+
+-- | Returns the /n/-dimensional gradient vector of the isofunction at a given
+--   point.
+gradient :: (Traversable f, Applicative f, Num (f R))
+         => IsoFn (f R) -> f R -> f R
+gradient f v = sum [diff b | b <- basis]
+  where δx     = δ 1            -- NOTE: suboptimal (should use vector coords)
+        diff b = b ^* ((f (v + b^*δx) - f (v - b^*δx)) / (2*δx))
+{-# SPECIALIZE INLINE gradient :: IsoFn (V3 R) -> V3 R -> V3 R #-}
+{-# SPECIALIZE INLINE gradient :: IsoFn (V2 R) -> V2 R -> V2 R #-}
 
 
 -- | Returns a set of basis vectors for the given vector space.
 basis :: (Num a, Traversable t, Applicative t) => [t a]
 basis = toList identity
-{-# SPECIALIZE INLINE basis :: [V3 Double] #-}
-{-# SPECIALIZE INLINE basis :: [V2 Double] #-}
+{-# SPECIALIZE INLINE basis :: [V3 R] #-}
+{-# SPECIALIZE INLINE basis :: [V2 R] #-}
 
 
 -- | Returns all 2ⁿ corners of a bounding box of dimension /n/.
@@ -148,15 +165,31 @@ basis = toList identity
 --   better way to specify these things.
 corners :: (Traversable v, MonadZip v) => BoundingBox (v a) -> [v a]
 corners (BB l u) = traverse biList $ l `mzip` u
-{-# SPECIALIZE INLINE corners :: BoundingBox (V3 Double) -> [V3 Double] #-}
-{-# SPECIALIZE INLINE corners :: BoundingBox (V2 Double) -> [V2 Double] #-}
+{-# SPECIALIZE INLINE corners :: BoundingBox (V3 R) -> [V3 R] #-}
+{-# SPECIALIZE INLINE corners :: BoundingBox (V2 R) -> [V2 R] #-}
 
 
--- | Returns all axis-aligned edges of a bounding box. Mathematically, this is
---   the set of all pairs of corners that differ along exactly one axis.
+-- | Returns all axis-aligned edges of a bounding box that cross a surface
+--   boundary. Mathematically, this is the set of all pairs of corners that
+--   differ along exactly one axis, and whose function values differ in sign.
+crossing_edges :: Foldable f => [f a] -> [R] -> [(f a, f a)]
+crossing_edges cs xs = map pair $ filter crosses $ edge_pairs (length $ head cs)
+  where crosses (i, j) = signum (xs !! i) /= signum (xs !! j)
+        pair    (i, j) = (cs !! i, cs !! j)
+{-# INLINE crossing_edges #-}
 
--- TODO: how to make this efficient, and how to consider the list of corner
--- isovalues?
+
+-- | /n/-dimensional cubes have n·2ⁿ⁻¹ edges: each vertex has /n/ edges
+--   connected to it, there are 2ⁿ vertices, and each edge is covered twice
+--   (once by each of its endpoint vertices). Our corners are always
+--   consistently ordered, so we can find adjacent points by using list offsets.
+--   In our case, those offsets are simple: they're the bit-xor of successive
+--   powers of two.
+edge_pairs :: Int -> [(Int, Int)]
+edge_pairs n = [(i, i `xor` shiftL 1 x) | i <- [0..(1 `shiftL` (n-1))],
+                                          x <- [0..(n-1)],
+                                          i .&. shiftL 1 x == 0]
+{-# INLINE edge_pairs #-}
 
 
 -- | Bisect a bounding box along the specified axis vector. Your warranty is
