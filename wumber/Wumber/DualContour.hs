@@ -15,7 +15,7 @@ module Wumber.DualContour where
 
 import Control.Monad.Zip (MonadZip, mzip)
 import Data.Bifoldable (biList)
-import Data.Bits
+import Data.Bits (xor, shiftL, (.&.))
 import Data.Foldable (toList)
 import Data.Maybe (isJust, fromJust)
 import Data.Traversable (traverse)
@@ -53,10 +53,7 @@ data Tree a = Bisect  { _t_meta  :: !(TreeMeta a),
                         _t_right :: Tree a }
             | Inside  { _t_meta :: !(TreeMeta a) }
             | Outside { _t_meta :: !(TreeMeta a) }
-            | Surface { _t_meta          :: !(TreeMeta a),
-                        _t_vertex        :: a,
-                        _t_intersections :: [a],
-                        _t_normals       :: [a] }
+            | Surface { _t_meta :: !(TreeMeta a), _t_vertex :: a }
   deriving (Show, Eq)
 
 -- | Metadata stored on every tree element. We store this because we had to
@@ -74,20 +71,28 @@ t_corners = t_meta . tm_corners
 
 
 -- | Constructs a tree whose structure is determined by the 'SplitFn'.
-build :: (Metric v, Fractional a, Traversable v, Applicative v,
-          Fractional (v a), MonadZip v)
-      => IsoFn (v a) -> BoundingBox (v a) -> SplitFn (v a) -> Tree (v a)
+build :: (Metric v, Traversable v, Applicative v, Fractional (v R), MonadZip v)
+      => IsoFn (v R) -> BoundingBox (v R) -> SplitFn (v R) -> Tree (v R)
 
 build f b sf = go b (cycle basis)
   where go b (v:vs)
-          | isJust split  = Bisect tm (go b1 vs) (go b2 vs)
-          | all (>  0) cs = Inside tm
-          | all (<= 0) cs = Outside tm
-          | otherwise     = Surface tm v [] []
+          | isJust split   = Bisect tm (go b1 vs) (go b2 vs)
+          | all (>  0) cfs = Inside tm
+          | all (<= 0) cfs = Outside tm
+          | otherwise      = Surface tm $ surface_vertex surface normals
+
           where split    = sf f tm v
-                tm       = TM b cs
+                tm       = TM b cfs
                 (b1, b2) = bisect (fromJust split) b
-                cs       = map f $ corners b
+                cs       = corners b
+                cfs      = map f cs
+                surface  = map (surface_point f) $ crossing_edges cs cfs
+                normals  = map (gradient f) surface
+
+
+-- | Locates the vertex within a 'Surface' cell.
+surface_vertex :: [f R] -> [f R] -> f R
+surface_vertex i n = head i
 
 
 -- | Finds the surface point of an 'IsoFn' along a bounded vector using Newton's
@@ -95,8 +100,8 @@ build f b sf = go b (cycle basis)
 --
 --   NOTE: arguments to 'lerp' are a little counterintuitive: 'lerp 0 a b == b'
 --   and 'lerp 1 a b == a'.
-surface_point :: Additive f => IsoFn (f R) -> f R -> f R -> f R
-surface_point f a b = lerp (newton 0.5) b a
+surface_point :: Additive f => IsoFn (f R) -> (f R, f R) -> f R
+surface_point f (a, b) = lerp (newton 0.5) b a
   where f'       = if f a > f b
                    then \x -> - (f (lerp x b a))
                    else \x -> f (lerp x b a)
@@ -105,24 +110,16 @@ surface_point f a b = lerp (newton 0.5) b a
                         | abs (f' x') < δ 1 -> x'
                         | otherwise         -> newton x'
 
+        newton_next f x = x - y*δf
+          where y  = f x
+                δx = δ x
+                δf = f (x + δx) - f (x - δx) / (2 * δx)
 
--- | Runs a single iteration of Newton's method on the given function.
-newton_next :: (R -> R) -> R -> R
-newton_next f x = x - y*δf
-  where y  = f x
-        δx = δ x
-        δf = f (x + δx) - f (x - δx) / (2 * δx)
-
-
--- | Solves for a zero point by bisecting the function. We do this when Newton's
---   method fails. 'f' should be an /increasing/ function; if it isn't, compose
---   'negate' onto it before using this solver.
-bisect_solve :: (R -> R) -> R -> R -> R
-bisect_solve f l u
-  | u - l < δ m = m
-  | f m > 0     = bisect_solve f l m
-  | otherwise   = bisect_solve f m u
-  where m = (l + u) / 2
+        bisect_solve f l u
+          | u - l < δ m = m
+          | f m > 0     = bisect_solve f l m
+          | otherwise   = bisect_solve f m u
+          where m = (l + u) / 2
 
 
 -- | Calculates an appropriate numerical delta for the given value by
