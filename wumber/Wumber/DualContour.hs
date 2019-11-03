@@ -11,18 +11,14 @@
 
 module Wumber.DualContour where
 
-import Control.Applicative
 import Control.Monad.Zip (MonadZip, mzip)
 import Data.Bifoldable (biList)
 import Data.Foldable (toList)
 import Data.Traversable (traverse)
 import Lens.Micro
-import Lens.Micro.TH
+import Lens.Micro.TH (makeLenses)
 import Linear.Matrix
 import Linear.Metric
-import Linear.V2
-import Linear.V3
-import Linear.Vector
 import Numeric.LinearAlgebra (linearSolveSVD)
 
 import Wumber.BoundingBox
@@ -30,7 +26,6 @@ import Wumber.BoundingBox
 
 type IsoFn a   = a -> Double
 type SplitFn a = IsoFn a -> BoundingBox a -> a -> [Double] -> Bool
-type Basis a   = [a]
 
 
 -- | A bounding volume hierarchy with one-dimensional bisections. If dual
@@ -57,22 +52,19 @@ makeLenses ''Tree
 makeLenses ''TreeMeta
 
 
--- | Constructs a tree for the given isofunction, guided by the output of the
---   'SplitFn'. 
+-- | Constructs a tree whose structure is determined by the 'SplitFn'.
 build :: (Metric v, Fractional a, Traversable v, Applicative v,
           Fractional (v a), MonadZip v)
       => IsoFn (v a) -> BoundingBox (v a) -> SplitFn (v a) -> Tree (v a)
 
-build f b sf = go bvs b
-  where bvs = cycle basis
-        go (v:bvs') b
-          | sf f b v cs   = Bisect tm (go bvs' b1) (go bvs' b2)
+build f b sf = go b (cycle (toList identity))
+  where go b (v:vs)
+          | sf f b v cs   = Bisect tm (go b1 vs) (go b2 vs)
           | all (>  0) cs = Inside tm
           | all (<= 0) cs = Outside tm
           | otherwise     = Surface tm v [] []
           where tm       = TM b cs
                 (b1, b2) = bisect v b
-                basis    = toList identity
                 cs       = map f $ corners b
 
 
