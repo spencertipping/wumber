@@ -5,6 +5,7 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
@@ -28,7 +29,9 @@ import Numeric.LinearAlgebra (linearSolveSVD)
 import Wumber.BoundingBox
 
 
-type IsoFn a = a -> Double
+type R       = Double
+type IsoFn a = a -> R
+
 
 -- | Determines whether, and if so, how, to split the specified bounding box.
 --   Arguments to 'SplitFn' are 'iso', 'tree_meta', and 'default_split_axis'. To
@@ -87,13 +90,23 @@ build f b sf = go b (cycle basis)
 
 
 -- | Finds the surface point of an 'IsoFn' along a bounded vector using Newton's
---   method.
-surface_point :: (Additive f, Fractional a) => IsoFn (f a) -> f a -> f a -> f a
-surface_point f a b = a
+--   method. If that diverges then we fail over to bisection.
+--
+--   NOTE: arguments to 'lerp' are a little counterintuitive: 'lerp 0 a b == b'
+--   and 'lerp 1 a b == a'.
+surface_point :: Additive f => IsoFn (f R) -> f R -> f R -> f R
+surface_point f a b = lerp (go 0.5) b a
+  where f'   = if f a > f b
+               then \x -> - (f (lerp x b a))
+               else \x -> f (lerp x b a)
+        go x = let x' = newton_next f' x in
+                 if | x' < 0 || x' > 1  -> bisect_solve f' 0 1
+                    | abs (f' x') < δ 1 -> x'
+                    | otherwise         -> go x'
 
 
 -- | Runs a single iteration of Newton's method on the given function.
-newton_next :: (Double -> Double) -> Double -> Double
+newton_next :: (R -> R) -> R -> R
 newton_next f x = x - y*δf
   where y  = f x
         δx = δ x
@@ -103,7 +116,7 @@ newton_next f x = x - y*δf
 -- | Solves for a zero point by bisecting the function. We do this when Newton's
 --   method fails. 'f' should be an /increasing/ function; if it isn't, compose
 --   'negate' onto it before using this solver.
-bisect_solve :: (Double -> Double) -> Double -> Double -> Double
+bisect_solve :: (R -> R) -> R -> R -> R
 bisect_solve f l u
   | u - l < δ m = m
   | f m > 0     = bisect_solve f l m
@@ -137,6 +150,13 @@ corners :: (Traversable v, MonadZip v) => BoundingBox (v a) -> [v a]
 corners (BB l u) = traverse biList $ l `mzip` u
 {-# SPECIALIZE INLINE corners :: BoundingBox (V3 Double) -> [V3 Double] #-}
 {-# SPECIALIZE INLINE corners :: BoundingBox (V2 Double) -> [V2 Double] #-}
+
+
+-- | Returns all axis-aligned edges of a bounding box. Mathematically, this is
+--   the set of all pairs of corners that differ along exactly one axis.
+
+-- TODO: how to make this efficient, and how to consider the list of corner
+-- isovalues?
 
 
 -- | Bisect a bounding box along the specified axis vector. Your warranty is
