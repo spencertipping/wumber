@@ -39,6 +39,7 @@ library
                      , Wumber.Constraint
                      , Wumber.ConstraintSolver
                      , Wumber.ConstraintSimplify
+                     , Wumber.DualContour
                      , Wumber.GeometricConstraints
                      , Wumber.Cursor
                      , Wumber.Element

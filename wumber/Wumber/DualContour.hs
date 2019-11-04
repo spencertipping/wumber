@@ -34,6 +34,8 @@ import qualified Numeric.LinearAlgebra as LA
 import Wumber.BoundingBox
 import Wumber.Element
 
+import Debug.Trace
+
 
 -- Isofunctions for testing
 sphere :: V3 R -> IsoFn (V3 R)
@@ -96,11 +98,11 @@ t_corners = t_meta . tm_corners
 -- | Traces an iso element to the specified resolution and returns an element to
 --   represent it.
 iso_contour :: IsoFn (V3 R) -> BB3D -> R -> Element
-iso_contour f b r = lines $ outline t
-  where lines           = multi_of . map (\(v1, v2) -> shape_of identity [v1, v2])
-        sf _ (TM b _) _ = any (>= r) $ size b
+iso_contour f b r = trace (show (length o)) $ lines o
+  where o               = outline t
         t               = build f b sf
-
+        lines           = multi_of . map (\(v1, v2) -> shape_of identity [v1, v2])
+        sf _ (TM b _) _ = any (>= r) $ size b
 
 -- | Constructs a tree whose structure is determined by the 'SplitFn'.
 build :: (Metric v, Traversable v, Applicative v, Fractional (v R), MonadZip v,
@@ -175,9 +177,7 @@ outline' a l r
         -- If a' == a, then we're in a one-dimensional system and don't have any
         -- crossings. Otherwise l1 and l2 are connected along axis 'a', as are
         -- r1 and r2.
-        if a' /= a
-        then outline' a l1 l2 ++ outline' a r1 r2
-        else []
+        outline' a l1 l2 ++ outline' a r1 r2
 
       -- Inside/outside aren't connected to anything.
       _ -> []
