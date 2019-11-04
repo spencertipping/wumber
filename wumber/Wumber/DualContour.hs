@@ -51,7 +51,13 @@ type SplitFn a = IsoFn a -> TreeMeta a -> a -> Maybe a
 -- | A bounding volume hierarchy with one-dimensional bisections. If dual
 --   contouring is used to find the surface of an object then bisections will be
 --   densest around the boundary.
+--
+--   NOTE: each 'Bisect' node stores its axis, and the "right" side will always
+--   dot higher along the axis than the "left" side. This invariant is important
+--   for meshing, which happens in the 'outline' function.
+
 data Tree a = Bisect  { _t_meta  :: !(TreeMeta a),
+                        _t_axis  :: a,
                         _t_left  :: Tree a,
                         _t_right :: Tree a }
             | Inside  { _t_meta :: !(TreeMeta a) }
@@ -80,7 +86,7 @@ build :: (Metric v, Traversable v, Applicative v, Fractional (v R), MonadZip v,
 
 build f b sf = go b (cycle basis)
   where go b (v:vs)
-          | isJust split   = Bisect tm (go b1 vs) (go b2 vs)
+          | isJust split   = Bisect tm v (go b1 vs) (go b2 vs)
           | all (>  0) cfs = Inside tm
           | all (<= 0) cfs = Outside tm
           | otherwise      = Surface tm $ surface_vertex b surface normals
@@ -92,6 +98,16 @@ build f b sf = go b (cycle basis)
                 cfs      = map f cs
                 surface  = map (surface_point f) $ crossing_edges cs cfs
                 normals  = map (gradient f) surface
+
+
+-- | Traces the surface of an isofn with lines. The idea here is to connect
+--   vertices within bounding boxes that are adjacent to where we are. I'm using
+--   an algorithm similar to the one by Matt Keeter in his blog post:
+--
+--   https://www.mattkeeter.com/projects/contours/
+
+outline :: Tree (v R) -> [(v R, v R)]
+outline t = []
 
 
 -- | Locates the vertex within a 'Surface' cell. We do this by minimizing an
@@ -185,6 +201,7 @@ gradient :: (Traversable f, Applicative f, Num (f R))
 gradient f v = sum [diff b | b <- basis]
   where δx     = δ 1            -- NOTE: suboptimal (should use vector coords)
         diff b = b ^* ((f (v + b^*δx) - f (v - b^*δx)) / (2*δx))
+
 {-# SPECIALIZE INLINE gradient :: IsoFn (V3 R) -> V3 R -> V3 R #-}
 {-# SPECIALIZE INLINE gradient :: IsoFn (V2 R) -> V2 R -> V2 R #-}
 
@@ -192,6 +209,7 @@ gradient f v = sum [diff b | b <- basis]
 -- | Returns a set of basis vectors for the given vector space.
 basis :: (Num a, Traversable t, Applicative t) => [t a]
 basis = toList identity
+
 {-# SPECIALIZE INLINE basis :: [V3 R] #-}
 {-# SPECIALIZE INLINE basis :: [V2 R] #-}
 
@@ -204,6 +222,7 @@ basis = toList identity
 --   better way to specify these things.
 corners :: (Traversable v, MonadZip v) => BoundingBox (v a) -> [v a]
 corners (BB l u) = traverse biList $ l `mzip` u
+
 {-# SPECIALIZE INLINE corners :: BoundingBox (V3 R) -> [V3 R] #-}
 {-# SPECIALIZE INLINE corners :: BoundingBox (V2 R) -> [V2 R] #-}
 
@@ -215,6 +234,7 @@ crossing_edges :: Foldable f => [f a] -> [R] -> [(f a, f a)]
 crossing_edges cs xs = map pair $ filter crosses $ edge_pairs (length $ head cs)
   where crosses (i, j) = signum (xs !! i) /= signum (xs !! j)
         pair    (i, j) = (cs !! i, cs !! j)
+
 {-# INLINE crossing_edges #-}
 
 

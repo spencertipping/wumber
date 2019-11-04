@@ -63,6 +63,7 @@ intersects a b = exists $ intersect a b
 -- | Returns 'True' if this bounding box contains any points.
 exists :: (Foldable f, Applicative f, Ord a) => BoundingBox (f a) -> Bool
 exists b@(BB a _) = inside b a
+
 {-# SPECIALIZE INLINE exists :: BB3D -> Bool #-}
 {-# SPECIALIZE INLINE exists :: BB2D -> Bool #-}
 
@@ -71,6 +72,7 @@ exists b@(BB a _) = inside b a
 of_points :: (Foldable f, Bounded a, ClosedComparable a) => f a -> BoundingBox a
 of_points ps = BB l u where l = foldl' lower maxBound ps
                             u = foldl' upper minBound ps
+
 {-# SPECIALIZE INLINE of_points :: [V3 Double] -> BB3D #-}
 {-# SPECIALIZE INLINE of_points :: [V2 Double] -> BB2D #-}
 
@@ -80,6 +82,7 @@ inside :: (Foldable f, Applicative f, Ord a) => BoundingBox (f a) -> f a -> Bool
 inside (BB a b) x = all id $ liftA2 (&&) lower upper
   where lower = liftA2 (<=) a x
         upper = liftA2 (<=) x b
+
 {-# SPECIALIZE INLINE inside :: BB3D -> V3 Double -> Bool #-}
 {-# SPECIALIZE INLINE inside :: BB2D -> V2 Double -> Bool #-}
 
