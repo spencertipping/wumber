@@ -38,15 +38,9 @@ type R       = Double
 type IsoFn a = a -> R
 
 
--- | Determines whether, and if so, how, to split the specified bounding box.
---   Arguments to 'SplitFn' are 'iso', 'tree_meta', and 'default_split_axis'. To
---   split the bounding box, return 'Just split_axis'; otherwise, return
---   'Nothing'.
---
---   'default_split_axis' will cycle through the basis vectors of your vector
---   space. Returning 'Just default_split_axis' will guarantee that your
---   bisections have reasonable proportions.
-type SplitFn a = IsoFn a -> TreeMeta a -> a -> Maybe a
+-- | Determines whether to split the specified bounding box. Arguments to
+--   'SplitFn' are 'iso', 'tree_meta', and 'default_split_axis'.
+type SplitFn a = IsoFn a -> TreeMeta a -> a -> Bool
 
 
 -- | A bounding volume hierarchy with one-dimensional bisections. If dual
@@ -57,7 +51,9 @@ type SplitFn a = IsoFn a -> TreeMeta a -> a -> Maybe a
 --   dot higher along the axis than the "left" side. This invariant is important
 --   for meshing, which happens in the 'outline' function.
 --
---   NOTE: '_t_axis' must always be a unit vector, and should come from 'basis'.
+--   NOTE: '_t_axis' must always be a unit basis vector; that is, exactly one
+--   component should be 1 and the others should be 0. If this isn't true,
+--   'outline' will fail unpredictably.
 
 data Tree a = Bisect  { _t_meta  :: !(TreeMeta a),
                         _t_axis  :: a,
@@ -89,14 +85,13 @@ build :: (Metric v, Traversable v, Applicative v, Fractional (v R), MonadZip v,
 
 build f b sf = go b (cycle basis)
   where go b (v:vs)
-          | isJust split   = Bisect tm v (go b1 vs) (go b2 vs)
+          | sf f tm v      = Bisect tm v (go b1 vs) (go b2 vs)
           | all (>  0) cfs = Inside tm
           | all (<= 0) cfs = Outside tm
           | otherwise      = Surface tm $ surface_vertex b surface normals
 
-          where split    = sf f tm v
-                tm       = TM b cfs
-                (b1, b2) = bisect (fromJust split) b
+          where tm       = TM b cfs
+                (b1, b2) = bisect v b
                 cs       = corners b
                 cfs      = map f cs
                 surface  = map (surface_point f) $ crossing_edges cs cfs
@@ -127,13 +122,47 @@ build f b sf = go b (cycle basis)
 --   will cause defects in surfaces that are positioned at 45° and perfectly
 --   aligned with the bounding structure.
 
-outline :: (Foldable v, Num (v R)) => Tree (v R) -> [(v R, v R)]
-outline (Bisect (TM b cs) a l r) = []
+outline :: (Foldable v, Eq (v R), Num (v R)) => Tree (v R) -> [(v R, v R)]
+outline (Bisect _ a l r) = outline' a l r
+outline _                = []
 
-outline _ = []
+outline' :: (Foldable v, Eq (v R), Num (v R))
+         => v R -> Tree (v R) -> Tree (v R) -> [(v R, v R)]
+outline' a l r
+  | any (> 1) a = []
+  | otherwise   = case (l, r) of
+      (Surface _ v1, Surface _ v2) -> [(v1, v2)]
+
+      (Surface _ _,  Bisect _ a' l' r') ->
+        outline' a l l' ++ outline' (a + a') l r'
+
+      (Bisect _ a' l' r', Surface _ _) ->
+        outline' (a + a') l' r ++ outline' a r' r
+
+      -- The complicated case: connect within each bisection (easy), then find
+      -- cells that bridge bisections and have nontrivial intersections. We know
+      -- up front that the bisections share a bounding surface along axis 'a',
+      -- and that left and right are ordered along that axis.
+      (Bisect _ a' l1 r1, Bisect _ _ l2 r2) ->
+        -- Adjacent because they share a Bisect node
+        outline' a' l1 r1 ++
+        outline' a' l2 r2 ++
+
+        -- If a' == a, then we're in a one-dimensional system and don't have any
+        -- crossings. Otherwise l1 and l2 are connected along axis 'a', as are
+        -- r1 and r2.
+        if a' /= a
+        then outline' a l1 l2 ++ outline' a r1 r2
+        else []
+
+      -- Inside/outside aren't connected to anything.
+      _ -> []
 
 {-# SPECIALIZE outline :: Tree (V3 R) -> [(V3 R, V3 R)] #-}
 {-# SPECIALIZE outline :: Tree (V2 R) -> [(V2 R, V2 R)] #-}
+
+{-# SPECIALIZE outline' :: V3 R -> Tree (V3 R) -> Tree (V3 R) -> [(V3 R, V3 R)] #-}
+{-# SPECIALIZE outline' :: V2 R -> Tree (V2 R) -> Tree (V2 R) -> [(V2 R, V2 R)] #-}
 
 
 -- | Locates the vertex within a 'Surface' cell. We do this by minimizing an
