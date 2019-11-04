@@ -2,8 +2,8 @@ module Wumber (
   module Wumber.BoundingBox,
   module Wumber.ClosedComparable,
   module Wumber.Cursor,
+  module Wumber.DualContour,
   module Wumber.Element,
-  module Wumber.Iso,
   module Wumber.Sketch,
   runWumber,
   f2d, d2f, fi,
@@ -16,8 +16,8 @@ import GHC.Float
 import Wumber.BoundingBox
 import Wumber.ClosedComparable
 import Wumber.Cursor
+import Wumber.DualContour
 import Wumber.Element
-import Wumber.Iso
 import Wumber.Sketch
 
 

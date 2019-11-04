@@ -22,7 +22,7 @@ import Data.Maybe            (isJust, fromJust)
 import Data.Traversable      (traverse)
 import Lens.Micro.TH         (makeLenses)
 import Linear.Matrix         (identity)
-import Linear.Metric         (Metric, project, dot)
+import Linear.Metric         (Metric, project, dot, distance)
 import Linear.V2             (V2(..))
 import Linear.V3             (V3(..))
 import Linear.Vector         (Additive, lerp, (^*))
@@ -32,6 +32,21 @@ import qualified Linear.V as V
 import qualified Numeric.LinearAlgebra as LA
 
 import Wumber.BoundingBox
+import Wumber.Element
+
+
+-- Isofunctions for testing
+sphere :: V3 R -> IsoFn (V3 R)
+sphere l v = 1 - distance v l
+
+cube :: BB3D -> IsoFn (V3 R)
+cube (BB (V3 x1 y1 z1) (V3 x2 y2 z2)) (V3 x y z) =
+  foldl1 min [ x - x1, x2 - x, y - y1, y2 - y, z - z1, z2 - z ]
+
+
+iunion     f g v = max (f v) (g v)
+iintersect f g v = min (f v) (g v)
+inegate    f v   = negate (f v)
 
 
 type R       = Double
@@ -76,6 +91,15 @@ makeLenses ''TreeMeta
 -- Shortcut lenses
 t_bound   = t_meta . tm_bound
 t_corners = t_meta . tm_corners
+
+
+-- | Traces an iso element to the specified resolution and returns an element to
+--   represent it.
+iso_contour :: IsoFn (V3 R) -> BB3D -> R -> Element
+iso_contour f b r = lines $ outline t
+  where lines           = multi_of . map (\(v1, v2) -> shape_of identity [v1, v2])
+        sf _ (TM b _) _ = any (>= r) $ size b
+        t               = build f b sf
 
 
 -- | Constructs a tree whose structure is determined by the 'SplitFn'.

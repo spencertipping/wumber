@@ -54,6 +54,11 @@ singleton :: a -> BoundingBox a
 singleton = pure
 
 
+-- | The size of this bounding box, as a vector.
+size :: Num a => BoundingBox a -> a
+size (BB l u) = u - l
+
+
 -- | Determine whether two bounding boxes intersect.
 intersects :: (Applicative f, Foldable f, Ord a, ClosedComparable a)
            => BoundingBox (f a) -> BoundingBox (f a) -> Bool
