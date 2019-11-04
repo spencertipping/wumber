@@ -14,21 +14,22 @@
 
 module Wumber.DualContour where
 
-import Control.Monad.Zip (MonadZip, mzip)
-import Data.Bifoldable (biList)
-import Data.Bits (xor, shiftL, (.&.))
-import Data.Foldable (toList)
-import Data.Maybe (isJust, fromJust)
-import Data.Traversable (traverse)
-import Lens.Micro.TH (makeLenses)
-import Linear.Matrix (identity)
-import Linear.Metric (Metric, project, dot)
-import Linear.V2 (V2(..))
-import Linear.V3 (V3(..))
-import Linear.Vector (Additive, lerp, (^*))
+import Control.Monad.Zip     (MonadZip, mzip)
+import Data.Bifoldable       (biList)
+import Data.Bits             (xor, shiftL, (.&.))
+import Data.Foldable         (toList)
+import Data.Maybe            (isJust, fromJust)
+import Data.Traversable      (traverse)
+import Lens.Micro.TH         (makeLenses)
+import Linear.Matrix         (identity)
+import Linear.Metric         (Metric, project, dot)
+import Linear.V2             (V2(..))
+import Linear.V3             (V3(..))
+import Linear.Vector         (Additive, lerp, (^*))
+import Numeric.LinearAlgebra ((!))
+
 import qualified Linear.V as V
 import qualified Numeric.LinearAlgebra as LA
-import Numeric.LinearAlgebra ((!))
 
 import Wumber.BoundingBox
 
@@ -55,6 +56,8 @@ type SplitFn a = IsoFn a -> TreeMeta a -> a -> Maybe a
 --   NOTE: each 'Bisect' node stores its axis, and the "right" side will always
 --   dot higher along the axis than the "left" side. This invariant is important
 --   for meshing, which happens in the 'outline' function.
+--
+--   NOTE: '_t_axis' must always be a unit vector, and should come from 'basis'.
 
 data Tree a = Bisect  { _t_meta  :: !(TreeMeta a),
                         _t_axis  :: a,
@@ -99,15 +102,38 @@ build f b sf = go b (cycle basis)
                 surface  = map (surface_point f) $ crossing_edges cs cfs
                 normals  = map (gradient f) surface
 
+{-# SPECIALIZE build :: IsoFn (V3 R) -> BB3D -> SplitFn (V3 R) -> Tree (V3 R) #-}
+{-# SPECIALIZE build :: IsoFn (V2 R) -> BB2D -> SplitFn (V2 R) -> Tree (V2 R) #-}
+
 
 -- | Traces the surface of an isofn with lines. The idea here is to connect
 --   vertices within bounding boxes that are adjacent to where we are. I'm using
 --   an algorithm similar to the one by Matt Keeter in his blog post:
 --
 --   https://www.mattkeeter.com/projects/contours/
+--
+--   Our bookkeeping is a little different because we don't have a
+--   statically-known number of dimensions to work with. That means instead of
+--   having directional sub-functions, we need to generalize to geometric
+--   properties.
+--
+--   It turns out this isn't very difficult. The basic premise is that if we
+--   have a surface cell, we can connect it to any other surface cell that
+--   intersects its bounding box. We can find the set of intersecting cells
+--   quickly using the tree structure.
+--
+--   For simplicity and performance, we don't handle cases with degenerate
+--   intersections, e.g. a corner point shared between rectangles or cubes. This
+--   will cause defects in surfaces that are positioned at 45° and perfectly
+--   aligned with the bounding structure.
 
-outline :: Tree (v R) -> [(v R, v R)]
-outline t = []
+outline :: (Foldable v, Num (v R)) => Tree (v R) -> [(v R, v R)]
+outline (Bisect (TM b cs) a l r) = []
+
+outline _ = []
+
+{-# SPECIALIZE outline :: Tree (V3 R) -> [(V3 R, V3 R)] #-}
+{-# SPECIALIZE outline :: Tree (V2 R) -> [(V2 R, V2 R)] #-}
 
 
 -- | Locates the vertex within a 'Surface' cell. We do this by minimizing an
