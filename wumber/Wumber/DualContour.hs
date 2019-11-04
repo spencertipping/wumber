@@ -144,23 +144,23 @@ instance FromStorableVector (V2 R) where
 --   and 'lerp 1 a b == a'.
 surface_point :: Additive f => IsoFn (f R) -> (f R, f R) -> f R
 surface_point f (a, b) = lerp (newton 0.5) b a
-  where f'       = if f a > f b
-                   then \x -> - (f (lerp x b a))
-                   else \x -> f (lerp x b a)
-        newton x = let x' = newton_next f' x in
-                     if | x' < 0 || x' > 1  -> bisect_solve f' 0 1
+  where f' = if f a > f b
+             then \x -> - (f (lerp x b a))
+             else \x -> f (lerp x b a)
+        newton x = let x' = newton_next x in
+                     if | x' < 0 || x' > 1  -> bisect_solve 0 1
                         | abs (f' x') < δ 1 -> x'
                         | otherwise         -> newton x'
 
-        newton_next f x = x - y*δf
-          where y  = f x
+        newton_next x = x - y*δf
+          where y  = f' x
                 δx = δ x
-                δf = f (x + δx) - f (x - δx) / (2 * δx)
+                δf = f' (x + δx) - f' (x - δx) / (2 * δx)
 
-        bisect_solve f l u
+        bisect_solve l u
           | u - l < δ m = m
-          | f m > 0     = bisect_solve f l m
-          | otherwise   = bisect_solve f m u
+          | f' m > 0    = bisect_solve l m
+          | otherwise   = bisect_solve m u
           where m = (l + u) / 2
 
 
