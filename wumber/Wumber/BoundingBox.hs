@@ -58,6 +58,14 @@ singleton = pure
 size :: Num a => BoundingBox a -> a
 size (BB l u) = u - l
 
+{-# SPECIALIZE INLINE size :: BB3D -> V3 Double #-}
+{-# SPECIALIZE INLINE size :: BB2D -> V2 Double #-}
+
+
+-- | Clips a point into the box.
+clip :: ClosedComparable a => BoundingBox a -> a -> a
+clip (BB l u) x = upper l (lower u x)
+
 
 -- | Determine whether two bounding boxes intersect.
 intersects :: (Applicative f, Foldable f, Ord a, ClosedComparable a)

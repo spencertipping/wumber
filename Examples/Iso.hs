@@ -35,7 +35,7 @@ main = do
   -- tell [i]
   -- tell [iso_scan 30 model]
 
-  tell [iso_contour model (BB (-1) 1) 0.25]
+  tell $ iso_contour model (BB (-2) 2) 0.5 0.25
 
   where model v = scs v -- + cubes v * (-0.8)
 

@@ -94,15 +94,23 @@ makeLenses ''TreeMeta
 t_bound   = t_meta . tm_bound
 t_corners = t_meta . tm_corners
 
+t_size :: Tree a -> Int
+t_size (Bisect _ _ l r) = 1 + t_size l + t_size r
+t_size _                = 1
 
--- | Traces an iso element to the specified resolution and returns an element to
---   represent it.
-iso_contour :: IsoFn (V3 R) -> BB3D -> R -> Element
-iso_contour f b r = trace (show (length o)) $ lines o
-  where o               = outline t
-        t               = build f b sf
-        lines           = multi_of . map (\(v1, v2) -> shape_of identity [v1, v2])
-        sf _ (TM b _) _ = any (>= r) $ size b
+
+-- | Traces an iso element to the specified non-surface and surface resolutions
+--   and returns a list of 'Element's to contour it.
+iso_contour :: IsoFn (V3 R) -> BB3D -> R -> R -> [Element]
+iso_contour f b rn rs = trace (show (length o)) $ lines o
+  where t     = build f b sf
+        o     = trace (show (t_size t)) $ outline t
+        lines = map (\(v1, v2) -> shape_of identity [v1, v2])
+
+        sf _ (TM b (v:vs)) _
+          | any ((/= signum v) . signum) vs = any (> rs) $ size b
+          | otherwise                       = any (> rn) $ size b
+
 
 -- | Constructs a tree whose structure is determined by the 'SplitFn'.
 build :: (Metric v, Traversable v, Applicative v, Fractional (v R), MonadZip v,
@@ -111,10 +119,10 @@ build :: (Metric v, Traversable v, Applicative v, Fractional (v R), MonadZip v,
 
 build f b sf = go b (cycle basis)
   where go b (v:vs)
-          | sf f tm v      = Bisect tm v (go b1 vs) (go b2 vs)
-          | all (>  0) cfs = Inside tm
-          | all (<= 0) cfs = Outside tm
-          | otherwise      = Surface tm $ surface_vertex b surface normals
+          | sf f tm v     = Bisect tm v (go b1 vs) (go b2 vs)
+          | all (> 0) cfs = Inside tm
+          | all (< 0) cfs = Outside tm
+          | otherwise     = Surface tm $ surface_vertex b surface normals
 
           where tm       = TM b cfs
                 (b1, b2) = bisect v b
@@ -210,9 +218,9 @@ outline' a l r
 --
 --   The right-hand side collapses to a constant value.
 
-surface_vertex :: (Metric f, Foldable f, FromStorableVector (f R))
+surface_vertex :: (Metric f, Foldable f, FromStorableVector (f R), Applicative f)
                => BoundingBox (f R) -> [f R] -> [f R] -> f R
-surface_vertex b s v = from_storable_vector x
+surface_vertex b s v = b `clip` from_storable_vector x
   where m = LA.fromRows $ map (LA.fromList . toList) v
         y = LA.col $ zipWith dot s v
         x = head $ LA.toColumns $ LA.linearSolveSVD m y
