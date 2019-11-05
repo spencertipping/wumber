@@ -88,8 +88,11 @@ screen_size v (BB vmin vmax) = foldl1 max [ LM.distance v0 v1,
 -- manufacturing instructions, break stuff down into steps?
 
 render :: View -> Element -> Picture
+{-
 render v e | screen_size v (bb_of e) > _vlod v = render' v e
            | otherwise                         = Blank
+-}
+render = render'
 
 render' :: View -> Element -> Picture
 render' v (Multi bb es) = pictures $ map (render v) es
