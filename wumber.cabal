@@ -43,7 +43,6 @@ library
                      , Wumber.GeometricConstraints
                      , Wumber.Cursor
                      , Wumber.Element
-                     , Wumber.Iso
                      , Wumber.Sketch
 
 

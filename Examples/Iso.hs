@@ -45,12 +45,7 @@ inegate    f v   = negate (f v)
 main :: Wumber ()
 main = do
   zoom 0.01
-  -- i <- liftIO $ iso_element 50000 model
-  -- i <- liftIO $ iso_crawler 200 0.1 model
-  -- tell [i]
-  -- tell [iso_scan 30 model]
-
-  tell $ iso_contour model (BB (-2) 2) 8 18 0.1
+  tell $ iso_contour model (BB (-2) 2) 8 18 0.001
 
   where model v = scs v -- + cubes v * (-0.2)
 
