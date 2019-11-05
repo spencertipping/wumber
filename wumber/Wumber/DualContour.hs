@@ -146,6 +146,9 @@ trace_cells t                = map pair $ edge_pairs (length l)
         cs          = corners b
         pair (i, j) = (cs !! i, cs !! j)
 
+{-# SPECIALIZE trace_cells :: Tree (V3 R) -> [(V3 R, V3 R)] #-}
+{-# SPECIALIZE trace_cells :: Tree (V2 R) -> [(V2 R, V2 R)] #-}
+
 
 -- | Traces the surface of an iso-function with lines. To do this, we draw a
 --   line between every pair of 'Surface' cells that share a boundary. The
