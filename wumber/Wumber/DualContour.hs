@@ -37,22 +37,6 @@ import qualified Numeric.LinearAlgebra as LA
 import Wumber.BoundingBox
 import Wumber.Element
 
-import Debug.Trace
-
-
--- Isofunctions for testing
-sphere :: V3 R -> IsoFn (V3 R)
-sphere l v = 1 - distance v l
-
-cube :: BB3D -> IsoFn (V3 R)
-cube (BB (V3 x1 y1 z1) (V3 x2 y2 z2)) (V3 x y z) =
-  foldl1 min [ x - x1, x2 - x, y - y1, y2 - y, z - z1, z2 - z ]
-
-
-iunion     f g v = max (f v) (g v)
-iintersect f g v = min (f v) (g v)
-inegate    f v   = negate (f v)
-
 
 type R       = Double
 type IsoFn a = a -> R
@@ -105,9 +89,9 @@ t_size _                = 1
 -- | Traces an iso element to the specified non-surface and surface resolutions
 --   and returns a list of 'Element's to contour it.
 iso_contour :: IsoFn (V3 R) -> BB3D -> Int -> Int -> R -> [Element]
-iso_contour f b minn maxn bias = trace (show (length o)) $ lines o
+iso_contour f b minn maxn bias = lines o
   where t     = build f b sf bias
-        o     = trace (show (t_size t)) $ trace_surface t
+        o     = trace_surface t
         lines = map (\(v1, v2) -> shape_of identity [v1, v2])
 
         sf _ n (TM b (v:vs)) _
