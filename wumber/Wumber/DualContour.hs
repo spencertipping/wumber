@@ -19,15 +19,18 @@ import Data.Bifoldable       (biList)
 import Data.Bits             (xor, shiftL, (.&.))
 import Data.Foldable         (toList)
 import Data.Maybe            (isJust, fromJust)
+import Data.Set              (Set)
 import Data.Traversable      (traverse)
+import Lens.Micro            ((^.))
 import Lens.Micro.TH         (makeLenses)
-import Linear.Matrix         (identity)
+import Linear.Matrix         (identity, (!!*))
 import Linear.Metric         (Metric, project, dot, distance)
 import Linear.V2             (V2(..))
 import Linear.V3             (V3(..))
 import Linear.Vector         (Additive, lerp, (^*))
 import Numeric.LinearAlgebra ((!))
 
+import qualified Data.Set as S
 import qualified Linear.V as V
 import qualified Numeric.LinearAlgebra as LA
 
@@ -56,8 +59,8 @@ type IsoFn a = a -> R
 
 
 -- | Determines whether to split the specified bounding box. Arguments to
---   'SplitFn' are 'iso', 'tree_meta', and 'default_split_axis'.
-type SplitFn a = IsoFn a -> TreeMeta a -> a -> Bool
+--   'SplitFn' are 'iso', 'n_splits', 'tree_meta', and 'default_split_axis'.
+type SplitFn a = IsoFn a -> Int -> TreeMeta a -> a -> Bool
 
 
 -- | A bounding volume hierarchy with one-dimensional bisections. If dual
@@ -101,25 +104,25 @@ t_size _                = 1
 
 -- | Traces an iso element to the specified non-surface and surface resolutions
 --   and returns a list of 'Element's to contour it.
-iso_contour :: IsoFn (V3 R) -> BB3D -> R -> R -> [Element]
-iso_contour f b rn rs = trace (show (length o)) $ lines o
+iso_contour :: IsoFn (V3 R) -> BB3D -> Int -> Int -> [Element]
+iso_contour f b minn maxn = trace (show (length o)) $ lines o
   where t     = build f b sf
-        o     = trace (show (t_size t)) $ outline t
+        o     = trace (show (t_size t)) $ trace_surface t
         lines = map (\(v1, v2) -> shape_of identity [v1, v2])
 
-        sf _ (TM b (v:vs)) _
-          | any ((/= signum v) . signum) vs = any (> rs) $ size b
-          | otherwise                       = any (> rn) $ size b
+        sf _ n (TM b (v:vs)) _
+          | any ((/= signum v) . signum) vs = n < maxn
+          | otherwise                       = n < minn
 
 
 -- | Constructs a tree whose structure is determined by the 'SplitFn'.
 build :: (Metric v, Traversable v, Applicative v, Fractional (v R), MonadZip v,
-          FromStorableVector (v R))
+          StorableVector (v R))
       => IsoFn (v R) -> BoundingBox (v R) -> SplitFn (v R) -> Tree (v R)
 
-build f b sf = go b (cycle basis)
-  where go b (v:vs)
-          | sf f tm v     = Bisect tm v (go b1 vs) (go b2 vs)
+build f b sf = go b (cycle basis) 0
+  where go b (v:vs) n
+          | sf f n tm v   = Bisect tm v (go b1 vs (n+1)) (go b2 vs (n+1))
           | all (> 0) cfs = Inside tm
           | all (< 0) cfs = Outside tm
           | otherwise     = Surface tm $ surface_vertex b surface normals
@@ -133,6 +136,49 @@ build f b sf = go b (cycle basis)
 
 {-# SPECIALIZE build :: IsoFn (V3 R) -> BB3D -> SplitFn (V3 R) -> Tree (V3 R) #-}
 {-# SPECIALIZE build :: IsoFn (V2 R) -> BB2D -> SplitFn (V2 R) -> Tree (V2 R) #-}
+
+
+-- | Shows the outline of tree cells for debugging.
+trace_cells :: (Traversable v, MonadZip v) => Tree (v R) -> [(v R, v R)]
+trace_cells (Bisect _ _ l r) = trace_cells l ++ trace_cells r
+trace_cells t                = map pair $ edge_pairs (length l)
+  where b@(BB l u)  = t ^. t_bound
+        cs          = corners b
+        pair (i, j) = (cs !! i, cs !! j)
+
+
+-- | Traces the surface of an iso-function with lines. To do this, we draw a
+--   line between every pair of 'Surface' cells that share a boundary. The
+--   intuition is similar to Matt Keeter's implementation
+--   (https://www.mattkeeter.com/projects/contours/).
+
+trace_surface :: (Applicative v, Foldable v, Ord (v R))
+              => Tree (v R) -> [(v R, v R)]
+trace_surface (Bisect _ _ l r) = S.toList $ trace_surface' l r
+trace_surface _                = []
+
+trace_surface' :: (Applicative v, Foldable v, Ord (v R))
+               => Tree (v R) -> Tree (v R) -> Set (v R, v R)
+trace_surface' l r
+  | (l^.t_bound) `collapsed_dimensions` (r^.t_bound) > 1 = S.empty
+  | otherwise = case (l, r) of
+      (Surface _ v1, Surface _ v2) -> S.singleton (v1, v2)
+      (Surface _ _, Bisect _ _ l' r') ->
+        trace_surface' l l' `S.union` trace_surface' l r'
+
+      (Bisect _ _ l' r', Surface _ _) ->
+        trace_surface' l' r `S.union` trace_surface' r' r
+
+      (Bisect _ _ l1 r1, Bisect _ _ l2 r2) ->
+        S.unions [ trace_surface' l1 r1,
+                   trace_surface' l2 r2,
+                   trace_surface' l1 l2,
+                   trace_surface' r1 r2 ]
+
+      _ -> S.empty
+
+{-# SPECIALIZE trace_surface' :: Tree (V3 R) -> Tree (V3 R) -> Set (V3 R, V3 R) #-}
+{-# SPECIALIZE trace_surface' :: Tree (V2 R) -> Tree (V2 R) -> Set (V2 R, V2 R) #-}
 
 
 -- | Traces the surface of an isofn with lines. The idea here is to connect
@@ -156,45 +202,43 @@ build f b sf = go b (cycle basis)
 --   will cause defects in surfaces that are positioned at 45° and perfectly
 --   aligned with the bounding structure.
 
-outline :: (Foldable v, Eq (v R), Num (v R)) => Tree (v R) -> [(v R, v R)]
-outline (Bisect _ a l r) = outline' a l r
+outline :: (Foldable v, Ord (v R), Num (v R)) => Tree (v R) -> [(v R, v R)]
+outline (Bisect _ a l r) = S.toList $ outline' a l r
 outline _                = []
 
-outline' :: (Foldable v, Eq (v R), Num (v R))
-         => v R -> Tree (v R) -> Tree (v R) -> [(v R, v R)]
+outline' :: (Foldable v, Ord (v R), Num (v R))
+         => v R -> Tree (v R) -> Tree (v R) -> Set (v R, v R)
 outline' a l r
-  | any (> 1) a = []
+  | any (> 1) a = S.empty
   | otherwise   = case (l, r) of
-      (Surface _ v1, Surface _ v2) -> [(v1, v2)]
+      (Surface _ v1, Surface _ v2) -> S.singleton (v1, v2)
 
       (Surface _ _,  Bisect _ a' l' r') ->
-        outline' a l l' ++ outline' (a + a') l r'
+        outline' a l l' `S.union` outline' (a + a') l r'
 
       (Bisect _ a' l' r', Surface _ _) ->
-        outline' (a + a') l' r ++ outline' a r' r
+        outline' (a + a') l' r `S.union` outline' a r' r
 
       -- The complicated case: connect within each bisection (easy), then find
       -- cells that bridge bisections and have nontrivial intersections. We know
       -- up front that the bisections share a bounding surface along axis 'a',
       -- and that left and right are ordered along that axis.
       (Bisect _ a' l1 r1, Bisect _ _ l2 r2) ->
-        -- Adjacent because they share a Bisect node
-        outline' a' l1 r1 ++
-        outline' a' l2 r2 ++
+        S.unions [
+          -- Adjacent because they share a Bisect node
+          outline' a' l1 r1,
+          outline' a' l2 r2,
 
-        -- If a' == a, then we're in a one-dimensional system and don't have any
-        -- crossings. Otherwise l1 and l2 are connected along axis 'a', as are
-        -- r1 and r2.
-        outline' a l1 l2 ++ outline' a r1 r2
+          -- If a' == a, then we're in a one-dimensional system and don't have
+          -- any crossings. Otherwise l1 and l2 are connected along axis 'a', as
+          -- are r1 and r2.
+          outline' a l1 l2, outline' a r1 r2 ]
 
       -- Inside/outside aren't connected to anything.
-      _ -> []
+      _ -> S.empty
 
-{-# SPECIALIZE outline :: Tree (V3 R) -> [(V3 R, V3 R)] #-}
-{-# SPECIALIZE outline :: Tree (V2 R) -> [(V2 R, V2 R)] #-}
-
-{-# SPECIALIZE outline' :: V3 R -> Tree (V3 R) -> Tree (V3 R) -> [(V3 R, V3 R)] #-}
-{-# SPECIALIZE outline' :: V2 R -> Tree (V2 R) -> Tree (V2 R) -> [(V2 R, V2 R)] #-}
+{-# SPECIALIZE outline' :: V3 R -> Tree (V3 R) -> Tree (V3 R) -> Set (V3 R, V3 R) #-}
+{-# SPECIALIZE outline' :: V2 R -> Tree (V2 R) -> Tree (V2 R) -> Set (V2 R, V2 R) #-}
 
 
 -- | Locates the vertex within a 'Surface' cell. We do this by minimizing an
@@ -217,13 +261,27 @@ outline' a l r
 --   @
 --
 --   The right-hand side collapses to a constant value.
+--
+--   Boris the Brave mentions that it's worthwhile to insert biasing equations
+--   to pull vertices closer to the cell centers
+--   (https://www.boristhebrave.com/2018/04/15/dual-contouring-tutorial/), as
+--   well as clipping the chosen vertices to be properly inside their cells. I
+--   do both here. A bias equation set looks like this:
+--
+--   @
+--   bias·xx = bias·centerx
+--   bias·xy = bias·centery
+--   bias·xz = bias·centerz
+--   @
 
-surface_vertex :: (Metric f, Foldable f, FromStorableVector (f R), Applicative f)
+surface_vertex :: (Metric f, Foldable f, Traversable f, StorableVector (f R),
+                   Applicative f, Fractional (f R))
                => BoundingBox (f R) -> [f R] -> [f R] -> f R
 surface_vertex b s v = b `clip` from_storable_vector x
-  where m = LA.fromRows $ map (LA.fromList . toList) v
-        y = LA.col $ zipWith dot s v
+  where m = LA.fromRows $ map to_storable_vector $ v ++ toList (identity !!* bias)
+        y = LA.col $ zipWith dot s v ++ toList (center b ^* bias)
         x = head $ LA.toColumns $ LA.linearSolveSVD m y
+        bias = 0.1
 
 
 -- | Things that can be converted from the storable vectors used by
@@ -231,13 +289,17 @@ surface_vertex b s v = b `clip` from_storable_vector x
 --   convert storable vectors back to things like 'V2' or 'V3'.
 --
 --   If anyone knows of a better way to solve this problem, please let me know.
-class FromStorableVector a where from_storable_vector :: LA.Vector R -> a
+class StorableVector a where
+  from_storable_vector :: LA.Vector R -> a
+  to_storable_vector   :: a -> LA.Vector R
 
-instance FromStorableVector (V3 R) where
+instance StorableVector (V3 R) where
   from_storable_vector v = V3 (v!0) (v!1) (v!2)
+  to_storable_vector (V3 x y z) = LA.vector [x, y, z]
 
-instance FromStorableVector (V2 R) where
+instance StorableVector (V2 R) where
   from_storable_vector v = V2 (v!0) (v!1)
+  to_storable_vector (V2 x y) = LA.vector [x, y]
 
 
 -- | Finds the surface point of an 'IsoFn' along a bounded vector using Newton's
@@ -346,3 +408,6 @@ bisect a (BB l u) = (BB l (l + mp/2 + mo), BB (l + mp/2) u)
   where d  = u - l
         mp = a `project` d
         mo = d - mp
+
+{-# SPECIALIZE bisect :: V3 R -> BB3D -> (BB3D, BB3D) #-}
+{-# SPECIALIZE bisect :: V2 R -> BB2D -> (BB2D, BB2D) #-}

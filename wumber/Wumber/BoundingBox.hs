@@ -66,11 +66,48 @@ size (BB l u) = u - l
 clip :: ClosedComparable a => BoundingBox a -> a -> a
 clip (BB l u) x = upper l (lower u x)
 
+{-# SPECIALIZE INLINE clip :: BB3D -> V3 Double -> V3 Double #-}
+{-# SPECIALIZE INLINE clip :: BB2D -> V2 Double -> V2 Double #-}
 
--- | Determine whether two bounding boxes intersect.
+
+-- | Returns the center point of this bounding box.
+center :: Fractional a => BoundingBox a -> a
+center (BB l u) = (l + u) / 2
+
+{-# SPECIALIZE INLINE center :: BB3D -> V3 Double #-}
+{-# SPECIALIZE INLINE center :: BB2D -> V2 Double #-}
+
+
+-- | Determine whether two bounding boxes intersect; i.e. whether they share any
+--   common points.
 intersects :: (Applicative f, Foldable f, Ord a, ClosedComparable a)
            => BoundingBox (f a) -> BoundingBox (f a) -> Bool
 intersects a b = exists $ intersect a b
+
+{-# SPECIALIZE INLINE intersects :: BB3D -> BB3D -> Bool #-}
+{-# SPECIALIZE INLINE intersects :: BB2D -> BB2D -> Bool #-}
+
+
+-- | Returns the number of dimension which become trivial when two bounding
+--   boxes are intersected. For example, two adjacent 3D cubes would produce a
+--   2D rectangle, so one dimension would have been trivialized.
+collapsed_dimensions :: (Applicative f, Foldable f, Ord a, ClosedComparable a)
+                     => BoundingBox (f a) -> BoundingBox (f a) -> Int
+collapsed_dimensions a@(BB l u) b =
+  length l - nontrivial_dimensions (a `intersect` b)
+
+{-# SPECIALIZE INLINE collapsed_dimensions :: BB3D -> BB3D -> Int #-}
+{-# SPECIALIZE INLINE collapsed_dimensions :: BB2D -> BB2D -> Int #-}
+
+
+-- | Returns the number of axes along which this bounding box has nonzero size.
+nontrivial_dimensions :: (Applicative f, Foldable f, Ord a)
+                      => BoundingBox (f a) -> Int
+nontrivial_dimensions (BB l u) = foldl' (\n b -> if b then n else n+1) 0 each
+  where each = liftA2 (>=) l u
+
+{-# SPECIALIZE INLINE nontrivial_dimensions :: BB3D -> Int #-}
+{-# SPECIALIZE INLINE nontrivial_dimensions :: BB2D -> Int #-}
 
 
 -- | Returns 'True' if this bounding box contains any points.
