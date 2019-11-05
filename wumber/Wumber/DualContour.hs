@@ -107,7 +107,7 @@ t_size _                = 1
 iso_contour :: IsoFn (V3 R) -> BB3D -> Int -> Int -> R -> [Element]
 iso_contour f b minn maxn bias = trace (show (length o)) $ lines o
   where t     = build f b sf bias
-        o     = trace (show (t_size t)) $ trace_surface t
+        o     = trace (show (t_size t)) $ trace_cells t
         lines = map (\(v1, v2) -> shape_of identity [v1, v2])
 
         sf _ n (TM b (v:vs)) _
@@ -150,88 +150,9 @@ trace_cells t                = map pair $ edge_pairs (length l)
 {-# SPECIALIZE trace_cells :: Tree (V2 R) -> [(V2 R, V2 R)] #-}
 
 
--- | Traces the surface of an iso-function with lines. To do this, we draw a
---   line between every pair of 'Surface' cells that share a boundary. The
---   intuition is similar to Matt Keeter's implementation
---   (https://www.mattkeeter.com/projects/contours/).
-
-trace_surface :: (Applicative v, Foldable v, Ord (v R))
-              => Tree (v R) -> [(v R, v R)]
-trace_surface (Bisect _ _ l r) = trace_surface' l r
-trace_surface _                = []
-
-trace_surface' :: (Applicative v, Foldable v, Ord (v R))
-               => Tree (v R) -> Tree (v R) -> [(v R, v R)]
-trace_surface' l r
-  | not $ intersects (l^.t_bound) (r^.t_bound) = []
-  | otherwise = case (l, r) of
-      (Surface _ v1, Surface _ v2) -> [(v1, v2)]
-      (Bisect _ _ l' r', _)        -> trace_surface' l' r ++ trace_surface' r' r
-      (_, Bisect _ _ l' r')        -> trace_surface' l l' ++ trace_surface' l r'
-      _                            -> []
-
-{-# SPECIALIZE trace_surface' :: Tree (V3 R) -> Tree (V3 R) -> [(V3 R, V3 R)] #-}
-{-# SPECIALIZE trace_surface' :: Tree (V2 R) -> Tree (V2 R) -> [(V2 R, V2 R)] #-}
-
-
--- | Traces the surface of an isofn with lines. The idea here is to connect
---   vertices within bounding boxes that are adjacent to where we are. I'm using
---   an algorithm similar to the one by Matt Keeter in his blog post:
---
---   https://www.mattkeeter.com/projects/contours/
---
---   Our bookkeeping is a little different because we don't have a
---   statically-known number of dimensions to work with. That means instead of
---   having directional sub-functions, we need to generalize to geometric
---   properties.
---
---   It turns out this isn't very difficult. The basic premise is that if we
---   have a surface cell, we can connect it to any other surface cell that
---   intersects its bounding box. We can find the set of intersecting cells
---   quickly using the tree structure.
---
---   For simplicity and performance, we don't handle cases with degenerate
---   intersections, e.g. a corner point shared between rectangles or cubes. This
---   will cause defects in surfaces that are positioned at 45° and perfectly
---   aligned with the bounding structure.
-
-outline :: (Foldable v, Ord (v R), Num (v R)) => Tree (v R) -> [(v R, v R)]
-outline (Bisect _ a l r) = S.toList $ outline' a l r
-outline _                = []
-
-outline' :: (Foldable v, Ord (v R), Num (v R))
-         => v R -> Tree (v R) -> Tree (v R) -> Set (v R, v R)
-outline' a l r
-  | any (> 1) a = S.empty
-  | otherwise   = case (l, r) of
-      (Surface _ v1, Surface _ v2) -> S.singleton (v1, v2)
-
-      (Surface _ _,  Bisect _ a' l' r') ->
-        outline' a l l' `S.union` outline' (a + a') l r'
-
-      (Bisect _ a' l' r', Surface _ _) ->
-        outline' (a + a') l' r `S.union` outline' a r' r
-
-      -- The complicated case: connect within each bisection (easy), then find
-      -- cells that bridge bisections and have nontrivial intersections. We know
-      -- up front that the bisections share a bounding surface along axis 'a',
-      -- and that left and right are ordered along that axis.
-      (Bisect _ a' l1 r1, Bisect _ _ l2 r2) ->
-        S.unions [
-          -- Adjacent because they share a Bisect node
-          outline' a' l1 r1,
-          outline' a' l2 r2,
-
-          -- If a' == a, then we're in a one-dimensional system and don't have
-          -- any crossings. Otherwise l1 and l2 are connected along axis 'a', as
-          -- are r1 and r2.
-          outline' a l1 l2, outline' a r1 r2 ]
-
-      -- Inside/outside aren't connected to anything.
-      _ -> S.empty
-
-{-# SPECIALIZE outline' :: V3 R -> Tree (V3 R) -> Tree (V3 R) -> Set (V3 R, V3 R) #-}
-{-# SPECIALIZE outline' :: V2 R -> Tree (V2 R) -> Tree (V2 R) -> Set (V2 R, V2 R) #-}
+-- TODO
+adjacent_cells :: v R -> Tree (v R) -> [(Tree (v R), Tree (v R))]
+adjacent_cells _ _ = []
 
 
 -- | Locates the vertex within a 'Surface' cell. We do this by minimizing an
