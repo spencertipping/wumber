@@ -27,7 +27,7 @@ import Wumber.BoundingBox
 data Element = Multi     !BB3D [Element]
              | Shape     !BB3D !(M44 Double) [V3 Double]
              | Replicate !BB3D !Int !(M44 Double) !(M44 Double) Element
-  deriving (Show)
+  deriving (Show, Ord, Eq)
 
 
 multi_of :: [Element] -> Element

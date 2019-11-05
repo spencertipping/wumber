@@ -79,13 +79,13 @@ data Tree a = Bisect  { _t_meta  :: !(TreeMeta a),
             | Inside  { _t_meta :: !(TreeMeta a) }
             | Outside { _t_meta :: !(TreeMeta a) }
             | Surface { _t_meta :: !(TreeMeta a), _t_vertex :: a }
-  deriving (Show, Eq)
+  deriving (Show, Ord, Eq)
 
 -- | Metadata stored on every tree element. We store this because we had to
 --   compute it when we built the tree.
 data TreeMeta a = TM { _tm_bound   :: !(BoundingBox a),
                        _tm_corners :: ![R] }
-  deriving (Show, Eq)
+  deriving (Show, Ord, Eq)
 
 makeLenses ''Tree
 makeLenses ''TreeMeta
