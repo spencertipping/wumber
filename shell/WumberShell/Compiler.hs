@@ -9,9 +9,14 @@ import qualified Data.ByteString.UTF8 as B8
 import Data.Maybe
 import Language.Haskell.Interpreter
 import System.INotify hiding (Event)
+import System.IO (stderr)
 import Text.Printf
 
 import Wumber
+
+
+eprintf :: HPrintfType r => String -> r
+eprintf = hPrintf stderr
 
 
 compiler_loop :: MVar (Maybe [Element]) -> FilePath -> IO ()
@@ -29,7 +34,7 @@ module_name p = map dotify $ take (length p - 3) p
 
 compile :: MVar (Maybe [Element]) -> FilePath -> IO ()
 compile model f = do
-  printf "\027[2J\027[1;1Hcompiling...\n"
+  eprintf "\027[2J\027[1;1Hcompiling...\n"
 
   r <- runInterpreter do
     -- TODO
@@ -48,15 +53,15 @@ compile model f = do
   case r of
     Left (WontCompile xs) -> do
       swapMVar model Nothing
-      printf "\027[2J\027[1;1H%s error\n" f
+      eprintf "\027[2J\027[1;1H%s error\n" f
       mapM_ (\case GhcError {errMsg} -> printf "%s\n" errMsg) xs
 
     Left e -> do
       swapMVar model Nothing
-      printf "\027[2J\027[1;1H%s compiler error\n" f
-      printf "%s\n" (show e)
+      eprintf "\027[2J\027[1;1H%s compiler error\n" f
+      eprintf "%s\n" (show e)
 
     Right p -> do
       m <- runWumber init_cursor p
       swapMVar model $ Just m
-      printf "\027[2J\027[1;1H%s OK\n" f
+      eprintf "\027[2J\027[1;1H%s OK\n" f

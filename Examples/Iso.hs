@@ -9,13 +9,16 @@ module Examples.Iso where
 import Control.Monad
 import Control.Monad.Identity
 import Control.Monad.RWS.Strict
+import Control.Concurrent.MVar
 import Debug.Trace
-import Graphics.Gloss
 import Linear.Metric
 import Linear.Matrix
 import Linear.V3
 import Linear.V4
 import Linear.Vector
+import System.IO (stderr)
+import System.IO.Unsafe (unsafePerformIO)
+import Text.Printf
 
 import Wumber
 
@@ -29,8 +32,12 @@ screw dθ v@(V3 x y z) = v *! rotate_z_m (dθ * z)
 
 
 -- Isofunctions for testing
+sphere_calls = unsafePerformIO $ newMVar 0
+
 sphere :: V3 R -> IsoFn (V3 R)
-sphere l v = 1 - distance v l
+sphere l v = unsafePerformIO do
+  modifyMVar_ sphere_calls (return . (+ 1))
+  return $ 1 - distance v l
 
 cube :: BB3D -> IsoFn (V3 R)
 cube (BB (V3 x1 y1 z1) (V3 x2 y2 z2)) (V3 x y z) =
@@ -44,8 +51,12 @@ inegate    f v   = negate (f v)
 
 main :: Wumber ()
 main = do
-  zoom 0.01
-  tell $ iso_contour model (BB (-2) 2) 8 18 0.001
+  unsafePerformIO do
+    modifyMVar_ sphere_calls (\_ -> return 0)
+    return $ zoom 0.01
+
+  tell $ iso_contour model (BB (-2) 2) 8 15 0.001
+  tell $ traceShow (unsafePerformIO $ readMVar sphere_calls) []
 
   where model v = scs v -- + cubes v * (-0.2)
 

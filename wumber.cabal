@@ -15,7 +15,7 @@ extra-source-files:  CHANGELOG.md, README.md
 
 -- CAD engine
 library
-  ghc-options:         -O3
+  ghc-options:         -O2
   hs-source-dirs:      wumber
   default-language:    Haskell2010
   build-depends:       array
@@ -48,7 +48,7 @@ library
 
 test-suite wumber-tests
   type:                exitcode-stdio-1.0
-  ghc-options:         -O3 -threaded -with-rtsopts=-N
+  ghc-options:         -O2 -threaded -with-rtsopts=-N
   default-language:    Haskell2010
   hs-source-dirs:      test/wumber
   main-is:             WumberTest.hs
@@ -68,7 +68,7 @@ executable wumber
                      , WumberShell.Event
                      , WumberShell.Render
                      , WumberShell.View
-  ghc-options:         -O3 -threaded -with-rtsopts=-N
+  ghc-options:         -O2 -threaded -with-rtsopts=-N -rtsopts
   default-language:    Haskell2010
   build-depends:       base >= 4.9
                      , bytestring
