@@ -104,9 +104,9 @@ t_size _                = 1
 
 -- | Traces an iso element to the specified non-surface and surface resolutions
 --   and returns a list of 'Element's to contour it.
-iso_contour :: IsoFn (V3 R) -> BB3D -> Int -> Int -> [Element]
-iso_contour f b minn maxn = trace (show (length o)) $ lines o
-  where t     = build f b sf
+iso_contour :: IsoFn (V3 R) -> BB3D -> Int -> Int -> R -> [Element]
+iso_contour f b minn maxn bias = trace (show (length o)) $ lines o
+  where t     = build f b sf bias
         o     = trace (show (t_size t)) $ trace_surface t
         lines = map (\(v1, v2) -> shape_of identity [v1, v2])
 
@@ -118,14 +118,14 @@ iso_contour f b minn maxn = trace (show (length o)) $ lines o
 -- | Constructs a tree whose structure is determined by the 'SplitFn'.
 build :: (Metric v, Traversable v, Applicative v, Fractional (v R), MonadZip v,
           StorableVector (v R))
-      => IsoFn (v R) -> BoundingBox (v R) -> SplitFn (v R) -> Tree (v R)
+      => IsoFn (v R) -> BoundingBox (v R) -> SplitFn (v R) -> R -> Tree (v R)
 
-build f b sf = go b (cycle basis) 0
+build f b sf bias = go b (cycle basis) 0
   where go b (v:vs) n
           | sf f n tm v   = Bisect tm v (go b1 vs (n+1)) (go b2 vs (n+1))
           | all (> 0) cfs = Inside tm
           | all (< 0) cfs = Outside tm
-          | otherwise     = Surface tm $ surface_vertex b surface normals
+          | otherwise     = Surface tm $ surface_vertex b surface normals bias
 
           where tm       = TM b cfs
                 (b1, b2) = bisect v b
@@ -134,8 +134,8 @@ build f b sf = go b (cycle basis) 0
                 surface  = map (surface_point f) $ crossing_edges cs cfs
                 normals  = map (gradient f) surface
 
-{-# SPECIALIZE build :: IsoFn (V3 R) -> BB3D -> SplitFn (V3 R) -> Tree (V3 R) #-}
-{-# SPECIALIZE build :: IsoFn (V2 R) -> BB2D -> SplitFn (V2 R) -> Tree (V2 R) #-}
+{-# SPECIALIZE build :: IsoFn (V3 R) -> BB3D -> SplitFn (V3 R) -> R -> Tree (V3 R) #-}
+{-# SPECIALIZE build :: IsoFn (V2 R) -> BB2D -> SplitFn (V2 R) -> R -> Tree (V2 R) #-}
 
 
 -- | Shows the outline of tree cells for debugging.
@@ -154,31 +154,21 @@ trace_cells t                = map pair $ edge_pairs (length l)
 
 trace_surface :: (Applicative v, Foldable v, Ord (v R))
               => Tree (v R) -> [(v R, v R)]
-trace_surface (Bisect _ _ l r) = S.toList $ trace_surface' l r
+trace_surface (Bisect _ _ l r) = trace_surface' l r
 trace_surface _                = []
 
 trace_surface' :: (Applicative v, Foldable v, Ord (v R))
-               => Tree (v R) -> Tree (v R) -> Set (v R, v R)
+               => Tree (v R) -> Tree (v R) -> [(v R, v R)]
 trace_surface' l r
-  | (l^.t_bound) `collapsed_dimensions` (r^.t_bound) > 1 = S.empty
+  | not $ intersects (l^.t_bound) (r^.t_bound) = []
   | otherwise = case (l, r) of
-      (Surface _ v1, Surface _ v2) -> S.singleton (v1, v2)
-      (Surface _ _, Bisect _ _ l' r') ->
-        trace_surface' l l' `S.union` trace_surface' l r'
+      (Surface _ v1, Surface _ v2) -> [(v1, v2)]
+      (Bisect _ _ l' r', _)        -> trace_surface' l' r ++ trace_surface' r' r
+      (_, Bisect _ _ l' r')        -> trace_surface' l l' ++ trace_surface' l r'
+      _                            -> []
 
-      (Bisect _ _ l' r', Surface _ _) ->
-        trace_surface' l' r `S.union` trace_surface' r' r
-
-      (Bisect _ _ l1 r1, Bisect _ _ l2 r2) ->
-        S.unions [ trace_surface' l1 r1,
-                   trace_surface' l2 r2,
-                   trace_surface' l1 l2,
-                   trace_surface' r1 r2 ]
-
-      _ -> S.empty
-
-{-# SPECIALIZE trace_surface' :: Tree (V3 R) -> Tree (V3 R) -> Set (V3 R, V3 R) #-}
-{-# SPECIALIZE trace_surface' :: Tree (V2 R) -> Tree (V2 R) -> Set (V2 R, V2 R) #-}
+{-# SPECIALIZE trace_surface' :: Tree (V3 R) -> Tree (V3 R) -> [(V3 R, V3 R)] #-}
+{-# SPECIALIZE trace_surface' :: Tree (V2 R) -> Tree (V2 R) -> [(V2 R, V2 R)] #-}
 
 
 -- | Traces the surface of an isofn with lines. The idea here is to connect
@@ -276,12 +266,11 @@ outline' a l r
 
 surface_vertex :: (Metric f, Foldable f, Traversable f, StorableVector (f R),
                    Applicative f, Fractional (f R))
-               => BoundingBox (f R) -> [f R] -> [f R] -> f R
-surface_vertex b s v = b `clip` from_storable_vector x
+               => BoundingBox (f R) -> [f R] -> [f R] -> R -> f R
+surface_vertex b s v bias = b `clip` from_storable_vector x
   where m = LA.fromRows $ map to_storable_vector $ v ++ toList (identity !!* bias)
         y = LA.col $ zipWith dot s v ++ toList (center b ^* bias)
         x = head $ LA.toColumns $ LA.linearSolveSVD m y
-        bias = 0.1
 
 
 -- | Things that can be converted from the storable vectors used by
@@ -307,11 +296,13 @@ instance StorableVector (V2 R) where
 --
 --   NOTE: arguments to 'lerp' are a little counterintuitive: 'lerp 0 a b == b'
 --   and 'lerp 1 a b == a'.
+
 surface_point :: Additive f => IsoFn (f R) -> (f R, f R) -> f R
 surface_point f (a, b) = lerp (newton 0.5) b a
   where f' = if f a > f b
              then \x -> - (f (lerp x b a))
              else \x -> f (lerp x b a)
+
         newton x = let x' = newton_next x in
                      if | x' < 0 || x' > 1  -> bisect_solve 0 1
                         | abs (f' x') < δ 1 -> x'
@@ -364,11 +355,6 @@ basis = toList identity
 
 
 -- | Returns all 2ⁿ corners of a bounding box of dimension /n/.
---
---   NOTE to anyone reading this wondering what's up with all the class
---   qualifiers: all of them amount to stuff implemented by 'V2', 'V3', etc, but
---   I want to leave the types general across dimensionality. There's probably a
---   better way to specify these things.
 corners :: (Traversable v, MonadZip v) => BoundingBox (v a) -> [v a]
 corners (BB l u) = traverse biList $ l `mzip` u
 

@@ -129,9 +129,8 @@ of_points ps = BB l u where l = foldl' lower maxBound ps
 
 -- | Point-inside-box check. Points on the boundaries are inside.
 inside :: (Foldable f, Applicative f, Ord a) => BoundingBox (f a) -> f a -> Bool
-inside (BB a b) x = all id $ liftA2 (&&) lower upper
-  where lower = liftA2 (<=) a x
-        upper = liftA2 (<=) x b
+inside (BB a b) x = and lower && and upper where lower = liftA2 (<=) a x
+                                                 upper = liftA2 (<=) x b
 
 {-# SPECIALIZE INLINE inside :: BB3D -> V3 Double -> Bool #-}
 {-# SPECIALIZE INLINE inside :: BB2D -> V2 Double -> Bool #-}
