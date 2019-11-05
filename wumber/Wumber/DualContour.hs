@@ -76,12 +76,12 @@ type SplitFn a = IsoFn a -> Int -> TreeMeta a -> a -> Bool
 --   'outline' will fail unpredictably.
 
 data Tree a = Bisect  { _t_meta  :: !(TreeMeta a),
-                        _t_axis  :: a,
+                        _t_axis  :: !a,
                         _t_left  :: Tree a,
                         _t_right :: Tree a }
             | Inside  { _t_meta :: !(TreeMeta a) }
             | Outside { _t_meta :: !(TreeMeta a) }
-            | Surface { _t_meta :: !(TreeMeta a), _t_vertex :: a }
+            | Surface { _t_meta :: !(TreeMeta a), _t_vertex :: !a }
   deriving (Show, Ord, Eq)
 
 -- | Metadata stored on every tree element. We store this because we had to
@@ -107,7 +107,7 @@ t_size _                = 1
 iso_contour :: IsoFn (V3 R) -> BB3D -> Int -> Int -> R -> [Element]
 iso_contour f b minn maxn bias = trace (show (length o)) $ lines o
   where t     = build f b sf bias
-        o     = trace (show (t_size t)) $ trace_cells t
+        o     = trace (show (t_size t)) $ trace_surface t
         lines = map (\(v1, v2) -> shape_of identity [v1, v2])
 
         sf _ n (TM b (v:vs)) _
@@ -150,9 +150,18 @@ trace_cells t                = map pair $ edge_pairs (length l)
 {-# SPECIALIZE trace_cells :: Tree (V2 R) -> [(V2 R, V2 R)] #-}
 
 
--- TODO
-adjacent_cells :: v R -> Tree (v R) -> [(Tree (v R), Tree (v R))]
-adjacent_cells _ _ = []
+trace_surface :: (Applicative v, Foldable v) => Tree (v R) -> [(v R, v R)]
+trace_surface (Bisect _ _ l r) = go l r ++ trace_surface l ++ trace_surface r
+  where go l r
+          | not (intersects (l^.t_bound) (r^.t_bound))         = []
+          | collapsed_dimensions (l^.t_bound) (r^.t_bound) > 1 = []
+          | otherwise = case (l, r) of
+              (Bisect _ _ l' r', _) -> go l' r ++ go r' r
+              (_, Bisect _ _ l' r') -> go l l' ++ go l r'
+              (Surface _ v1, Surface _ v2) -> [(v1, v2)]
+              _ -> []
+
+trace_surface _ = []
 
 
 -- | Locates the vertex within a 'Surface' cell. We do this by minimizing an
