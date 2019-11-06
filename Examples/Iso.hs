@@ -10,6 +10,9 @@ import Control.Monad
 import Control.Monad.Identity
 import Control.Monad.RWS.Strict
 import Control.Concurrent.MVar
+import Criterion
+import Criterion.Main
+import Criterion.Main.Options
 import Data.Foldable
 import Debug.Trace
 import Graphics.Gloss
@@ -37,9 +40,12 @@ screw dθ v@(V3 x y z) = v *! rotate_z_m (dθ * z)
 sphere_calls = unsafePerformIO $ newMVar 0
 
 sphere :: V3 R -> IsoFn (V3 R)
+sphere l v = 1 - distance v l
+{-
 sphere l v = unsafePerformIO do
   modifyMVar_ sphere_calls (return . (+ 1))
   return $ 1 - distance v l
+-}
 
 cube :: BB3D -> IsoFn (V3 R)
 cube (BB (V3 x1 y1 z1) (V3 x2 y2 z2)) (V3 x y z) =
@@ -53,12 +59,18 @@ inegate    f v   = negate (f v)
 
 main :: Wumber ()
 main = do
-  unsafePerformIO do
-    modifyMVar_ sphere_calls (\_ -> return 0)
-    return $ zoom 0.01
+  liftIO $ modifyMVar_ sphere_calls (\_ -> return 0)
+  zoom 0.01
 
-  tell $ iso_contour model (BB (-2) 2) 8 15 0.001
+  tell $ iso_contour model (BB (-2) 2) 8 13 0.001
   tell $ traceShow (unsafePerformIO $ readMVar sphere_calls) []
+
+  tell $ unsafePerformIO do
+    runMode (Run defaultConfig Prefix []) [
+      bench "sphere"   (nf (sphere 1)   (V3 0.5 1 0.3)),
+      bench "distance" (nf (distance 1) (V3 0.5 1 0.3 :: V3 Double))
+      ]
+    return []
 
   where model v = scs v -- + cubes v * (-0.2)
 

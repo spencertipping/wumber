@@ -86,3 +86,44 @@ At some point down the line I'd like to try making an auto-vectorizer that finds
 parallel expressions and builds an AVX pipeline to evaluate them. Processors
 only barely make this type of thing worthwhile, though -- and many don't support
 AVX.
+
+**Update:** I'm using criterion to measure `sphere` and `distance` calls in the
+iso example, loaded by hint. Here are the outputs:
+
+```
+benchmarking sphere
+time                 370.3 ns   (364.8 ns .. 377.0 ns)
+                     0.998 R²   (0.996 R² .. 0.999 R²)
+mean                 368.8 ns   (362.6 ns .. 378.9 ns)
+std dev              24.44 ns   (17.45 ns .. 39.04 ns)
+variance introduced by outliers: 79% (severely inflated)
+
+benchmarking distance
+time                 188.5 ns   (152.7 ns .. 232.7 ns)
+                     0.856 R²   (0.796 R² .. 0.996 R²)
+mean                 162.2 ns   (154.4 ns .. 188.6 ns)
+std dev              41.16 ns   (14.99 ns .. 87.96 ns)
+variance introduced by outliers: 99% (severely inflated)
+```
+
+There's _no way_ it takes this long to do the math required for this. I made a
+benchmark that compares hand-coded and vector functions:
+
+```
+benchmarking handcoded sphere
+time                 11.16 ns   (11.02 ns .. 11.29 ns)
+                     0.999 R²   (0.998 R² .. 1.000 R²)
+mean                 11.17 ns   (10.98 ns .. 11.65 ns)
+std dev              1.023 ns   (309.8 ps .. 1.918 ns)
+variance introduced by outliers: 91% (severely inflated)
+
+benchmarking vector sphere
+time                 147.2 ns   (145.7 ns .. 149.5 ns)
+                     0.998 R²   (0.997 R² .. 0.999 R²)
+mean                 148.3 ns   (146.2 ns .. 151.8 ns)
+std dev              8.930 ns   (6.462 ns .. 12.57 ns)
+variance introduced by outliers: 77% (severely inflated)
+```
+
+So it isn't interpreter overhead, it's vector library overhead -- and it's
+massive, about 15x. This easily justifies some type of JIT.

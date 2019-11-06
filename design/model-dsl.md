@@ -10,3 +10,7 @@ optimization points:
 I'm not sure whether it's possible to make an argument like "the view can only
 accommodate N lines, so we only have to do f(N) work" -- but if we can, that
 would be awesome.
+
+A modeling DSL would be targeted at the first two points above. The idea is that
+it's a declarative numerical structure that compiles quickly, has low library
+overhead, and could be compiled quickly using JIT.
