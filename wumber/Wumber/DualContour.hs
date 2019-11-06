@@ -1,18 +1,27 @@
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE DeriveTraversable #-}
-{-# LANGUAGE DeriveFoldable #-}
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 
-module Wumber.DualContour where
+module Wumber.DualContour (
+  Tree(..),
+  TreeMeta(..),
+  IsoFn,
+  SplitFn,
+
+  t_bound, t_corners, t_size,
+
+  iso_contour,
+  build,
+  trace_cells,
+  trace_surface,
+  StorableVector(..)
+) where
+
 
 import Control.Monad.Zip     (MonadZip, mzip)
 import Data.Bifoldable       (biList)
@@ -36,9 +45,10 @@ import qualified Numeric.LinearAlgebra as LA
 
 import Wumber.BoundingBox
 import Wumber.Element
+import Wumber.Numeric
 
 
-type R       = Double
+-- | An isoshape function you want to evaluate.
 type IsoFn a = a -> R
 
 
@@ -235,20 +245,6 @@ surface_point f (a, b) = lerp (newton 0.5) b a
           | f' m > 0    = bisect_solve l m
           | otherwise   = bisect_solve m u
           where m = (l + u) / 2
-
-
--- | Calculates an appropriate numerical delta for the given value by
---   considering floating point precision limits. The goal is to put the delta
---   halfway into the mantissa, which for doubles is about 26 bits.
---
---   Deltas are always positive.
---
---   NOTE: we want to fix these types to 'Double' instead of using 'R'. That way
---   the code will break if you change 'R', which is correct -- the delta would
---   need to be updated.
-
-δ :: Double -> Double
-δ x = max 1 (abs x) * 2**(-26)
 
 
 -- | Returns the /n/-dimensional gradient vector of the isofunction at a given
