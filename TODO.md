@@ -1,6 +1,7 @@
 # TODO
 ## High-level
-1. Provide an interactive shell on the terminal, linked to the view
+1. [Self-contained modeling DSL](design/model-dsl.md)
+2. Provide an interactive shell on the terminal, linked to the view
 
 
 ## CSG
