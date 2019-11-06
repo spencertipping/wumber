@@ -130,3 +130,6 @@ massive, about 15x. This easily justifies some type of JIT.
 
 **Update update:** `cube` is 75x slower interpreted than compiled (1.47μs vs
 20ns). Absolutely horrible.
+
+Foreign function call overhead is 70-80ns constant. This is negligible relative
+to the performance gains we'd likely see from JIT.
