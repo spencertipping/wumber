@@ -18,7 +18,7 @@ module Wumber.DualContour (
   iso_contour,
   build,
   trace_cells,
-  trace_surface,
+  trace_lines,
   StorableVector(..)
 ) where
 
@@ -99,9 +99,8 @@ t_size _                = 1
 -- | Traces an iso element to the specified non-surface and surface resolutions
 --   and returns a list of 'Element's to contour it.
 iso_contour :: IsoFn (V3 R) -> BB3D -> Int -> Int -> R -> [Element]
-iso_contour f b minn maxn bias = lines o
+iso_contour f b minn maxn bias = lines (trace_lines t)
   where t     = build f b sf bias
-        o     = trace_surface t
         lines = map (\(v1, v2) -> shape_of identity [v1, v2])
 
         sf _ n (TM b (v:vs)) _
@@ -144,8 +143,10 @@ trace_cells t                = map pair $ edge_pairs (length l)
 {-# SPECIALIZE trace_cells :: Tree (V2 R) -> [(V2 R, V2 R)] #-}
 
 
-trace_surface :: (Applicative v, Foldable v) => Tree (v R) -> [(v R, v R)]
-trace_surface (Bisect _ _ l r) = go l r ++ trace_surface l ++ trace_surface r
+-- | Uses dual contouring to find lines along an isosurface. The lines end up
+--   forming a closed net.
+trace_lines :: (Applicative v, Foldable v) => Tree (v R) -> [(v R, v R)]
+trace_lines (Bisect _ _ l r) = go l r ++ trace_lines l ++ trace_lines r
   where go l r
           | not (intersects (l^.t_bound) (r^.t_bound))         = []
           | collapsed_dimensions (l^.t_bound) (r^.t_bound) > 1 = []
@@ -155,7 +156,7 @@ trace_surface (Bisect _ _ l r) = go l r ++ trace_surface l ++ trace_surface r
               (Surface _ v1, Surface _ v2) -> [(v1, v2)]
               _ -> []
 
-trace_surface _ = []
+trace_lines _ = []
 
 
 -- | Locates the vertex within a 'Surface' cell. We do this by minimizing an
@@ -230,20 +231,19 @@ surface_point f (a, b) = lerp (newton 0.5) b a
              then \x -> - (f (lerp x b a))
              else \x -> f (lerp x b a)
 
-        newton x = let x' = newton_next x in
-                     if | x' < 0 || x' > 1  -> bisect_solve 0 1
-                        | abs (f' x') < δ 1 -> x'
-                        | otherwise         -> newton x'
+        newton x | x' < 0 || x' > 1  = bisect_solve 0 1
+                 | abs (f' x') < δ 1 = x'
+                 | otherwise         = newton x'
+          where x' = newton_next x
 
         newton_next x = x - y*δf
           where y  = f' x
                 δx = δ x
                 δf = f' (x + δx) - f' (x - δx) / (2 * δx)
 
-        bisect_solve l u
-          | u - l < δ m = m
-          | f' m > 0    = bisect_solve l m
-          | otherwise   = bisect_solve m u
+        bisect_solve l u | u - l < δ m = m
+                         | f' m > 0    = bisect_solve l m
+                         | otherwise   = bisect_solve m u
           where m = (l + u) / 2
 
 

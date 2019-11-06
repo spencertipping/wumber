@@ -39,13 +39,14 @@ screw dθ v@(V3 x y z) = v *! rotate_z_m (dθ * z)
 -- Isofunctions for testing
 sphere_calls = unsafePerformIO $ newMVar 0
 
+
+count_sphere_calls = True
+
 sphere :: V3 R -> IsoFn (V3 R)
-sphere l v = 1 - distance v l
-{-
-sphere l v = unsafePerformIO do
-  modifyMVar_ sphere_calls (return . (+ 1))
-  return $ 1 - distance v l
--}
+sphere l v | count_sphere_calls = unsafePerformIO do
+               modifyMVar_ sphere_calls (return . (+ 1))
+               return $ 1 - distance v l
+           | otherwise = 1 - distance v l
 
 cube :: BB3D -> IsoFn (V3 R)
 cube (BB (V3 x1 y1 z1) (V3 x2 y2 z2)) (V3 x y z) =
@@ -65,7 +66,7 @@ main = do
   tell $ iso_contour model (BB (-2) 2) 8 13 0.001
   tell $ traceShow (unsafePerformIO $ readMVar sphere_calls) []
 
-  tell $ unsafePerformIO do
+  when False $ tell $ unsafePerformIO do
     runMode (Run defaultConfig Prefix []) [
       bench "sphere"   (nf (sphere 1)      (V3 0.5 1 0.3)),
       bench "cube"     (nf (cube (BB 2 3)) (V3 0.5 1 0.3)),

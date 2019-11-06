@@ -4,6 +4,7 @@ module Wumber (
   module Wumber.Cursor,
   module Wumber.DualContour,
   module Wumber.Element,
+  module Wumber.Numeric,
   module Wumber.Sketch,
   runWumber,
   f2d, d2f, fi,
@@ -18,6 +19,7 @@ import Wumber.ClosedComparable
 import Wumber.Cursor
 import Wumber.DualContour
 import Wumber.Element
+import Wumber.Numeric
 import Wumber.Sketch
 
 
