@@ -67,8 +67,9 @@ main = do
 
   tell $ unsafePerformIO do
     runMode (Run defaultConfig Prefix []) [
-      bench "sphere"   (nf (sphere 1)   (V3 0.5 1 0.3)),
-      bench "distance" (nf (distance 1) (V3 0.5 1 0.3 :: V3 Double))
+      bench "sphere"   (nf (sphere 1)      (V3 0.5 1 0.3)),
+      bench "cube"     (nf (cube (BB 2 3)) (V3 0.5 1 0.3)),
+      bench "distance" (nf (distance 1)    (V3 0.5 1 0.3 :: V3 Double))
       ]
     return []
 

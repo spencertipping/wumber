@@ -127,3 +127,6 @@ variance introduced by outliers: 77% (severely inflated)
 
 So it isn't interpreter overhead, it's vector library overhead -- and it's
 massive, about 15x. This easily justifies some type of JIT.
+
+**Update update:** `cube` is 75x slower interpreted than compiled (1.47μs vs
+20ns). Absolutely horrible.
