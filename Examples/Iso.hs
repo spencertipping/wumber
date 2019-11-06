@@ -10,7 +10,9 @@ import Control.Monad
 import Control.Monad.Identity
 import Control.Monad.RWS.Strict
 import Control.Concurrent.MVar
+import Data.Foldable
 import Debug.Trace
+import Graphics.Gloss
 import Linear.Metric
 import Linear.Matrix
 import Linear.V3
@@ -41,7 +43,7 @@ sphere l v = unsafePerformIO do
 
 cube :: BB3D -> IsoFn (V3 R)
 cube (BB (V3 x1 y1 z1) (V3 x2 y2 z2)) (V3 x y z) =
-  foldl1 min [ x - x1, x2 - x, y - y1, y2 - y, z - z1, z2 - z ]
+  foldl' min maxBound [ x - x1, x2 - x, y - y1, y2 - y, z - z1, z2 - z ]
 
 
 iunion     f g v = max (f v) (g v)
