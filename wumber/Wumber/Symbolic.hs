@@ -12,17 +12,15 @@ module Wumber.Symbolic (
 ) where
 
 
-import Control.Applicative
-import Control.Monad
-import Control.Monad.RWS
-import Data.Foldable
-import Data.Maybe
 import Text.Printf (printf)
 
 import Wumber.ClosedComparable
 
 
--- | Symbolic math operations, plus upper/lower.
+-- | Symbolic math operations, plus upper/lower. 'N' is a backdoor into an
+--   arbitrary type that you specify. 'a' should be 'Constable'; if operands are
+--   'is_const' then the operations will happen at construction time and won't
+--   be present in the symbolic value.
 data Math a = N a
 
             | Math a :+ Math a
@@ -61,7 +59,8 @@ infixl 7 :/
 infixl 8 :**
 
 
--- | Values that can tell you whether they are constants.
+-- | Values that can tell you whether they are constants -- i.e. whether 'Math'
+--   should try to collapse them at construction-time.
 class Constable a where is_const :: a -> Bool
 
 instance Constable a => Constable (Math a) where

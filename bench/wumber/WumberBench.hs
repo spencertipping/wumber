@@ -1,12 +1,50 @@
+{-# LANGUAGE BlockArguments #-}
+
 module Main where
 
 import Control.Applicative
 import Criterion
 import Criterion.Main
+import Data.Either
 import Data.Foldable
-
+import Language.Haskell.Interpreter
 import Linear.Metric
+import Linear.V2
 import Linear.V3
+
+
+test_hint :: IO (Either InterpreterError (V2 Double))
+test_hint = runInterpreter do
+  setImports ["Prelude", "Linear.V2"]
+  interpret "V2 1 2" (as :: V2 Double)
+
+
+eitherError (Left a)  = error (show a)
+eitherError (Right a) = a
+
+
+load_linear :: IO (V3 Double)
+load_linear = eitherError <$> runInterpreter do
+  setImports ["Prelude", "Linear.Metric", "Linear.V2", "Linear.V3", "Linear.Vector"]
+  interpret "V3 1 2 3" (as :: V3 Double)
+
+
+load_wumbersym :: IO Double
+load_wumbersym = eitherError <$> runInterpreter do
+  setImports ["Prelude", "Wumber.Symbolic"]
+  interpret "eval id $ N 4 + N 5" (as :: Double)
+
+
+load_wumbersym_nop :: IO Double
+load_wumbersym_nop = eitherError <$> runInterpreter do
+  setImports ["Prelude", "Wumber.Symbolic"]
+  interpret "4 + 5" (as :: Double)
+
+
+hint_baseline :: IO Double
+hint_baseline = eitherError <$> runInterpreter do
+  setImports ["Prelude"]
+  interpret "4 + 5" (as :: Double)
 
 
 type HandcodedIsoFn = (Double, Double, Double) -> Double
@@ -56,11 +94,13 @@ app_vector_cube a b x = foldl' min (1/0) $ liftA2 min lower upper
   where lower = liftA2 (-) x a
         upper = liftA2 (-) b x
 
+-- Makes no difference:
 -- {-# SPECIALIZE app_vector_cube :: V3 Double -> V3 Double -> V3 Double -> Double #-}
 
 
 main = defaultMain
   [
+    {-
     bench "HC sphere" (nf handcoded_const_sphere                    (1, 2, 3)),
     bench "H  sphere" (nf (handcoded_sphere        2     0.5 1 2)   (1, 2, 3)),
     bench "HV sphere" (nf (handcoded_vector_sphere 2 (V3 0.5 1 2)) (V3 1 2 3)),
@@ -68,5 +108,11 @@ main = defaultMain
 
     bench "HV cube"   (nf (handcoded_vector_cube (V3 1 2 3) (V3 4 5 6)) (V3 7 8 9)),
     bench "FV cube"   (nf (fold_vector_cube      (V3 1 2 3) (V3 4 5 6)) (V3 7 8 9)),
-    bench "AV cube"   (nf (app_vector_cube       (V3 1 2 3) (V3 4 5 6)) (V3 7 8 9))
+    bench "AV cube"   (nf (app_vector_cube       (V3 1 2 3) (V3 4 5 6)) (V3 7 8 9)),
+    -}
+
+    bench "hint V3"            (nfIO load_linear),
+    bench "hint baseline"      (nfIO hint_baseline),
+    bench "hint wumbersym"     (nfIO load_wumbersym),
+    bench "hint wumbersym_nop" (nfIO load_wumbersym_nop)
   ]

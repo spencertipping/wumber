@@ -45,6 +45,7 @@ library
                      , Wumber.Element
                      , Wumber.Numeric
                      , Wumber.Sketch
+                     , Wumber.Symbolic
 
 
 test-suite wumber-tests
@@ -70,6 +71,7 @@ test-suite wumber-bench
   other-modules:
   build-depends:       base >= 4.12
                      , criterion >= 1.5.6.0
+                     , hint
                      , linear
                      , microlens >= 0.4
                      , QuickCheck
