@@ -7,7 +7,8 @@
 
 
 module Wumber.Symbolic (
-  Math(..)
+  Math(..),
+  eval
 ) where
 
 
@@ -21,20 +22,20 @@ import Text.Printf (printf)
 import Wumber.ClosedComparable
 
 
--- | Symbolic math operations, plus 'max' and 'min'.
-data Math a = Num    a
+-- | Symbolic math operations, plus upper/lower.
+data Math a = N a
 
-            | Plus   (Math a) (Math a)
-            | Negate (Math a)
-            | Times  (Math a) (Math a)
-            | Recip  (Math a)
+            | Math a :+ Math a
+            | Math a :- Math a
+            | Math a :* Math a
+            | Math a :/ Math a
+
             | Abs    (Math a)
             | Signum (Math a)
+            | Upper  (Math a) (Math a)
+            | Lower  (Math a) (Math a)
 
-            | Max    (Math a) (Math a)
-            | Min    (Math a) (Math a)
-
-            | Pow    (Math a) (Math a)
+            | Math a :** Math a
             | Sqrt   (Math a)
             | Exp    (Math a)
             | Log    (Math a)
@@ -51,54 +52,40 @@ data Math a = Num    a
             | Acosh  (Math a)
             | Atanh  (Math a)
 
-  deriving (Eq, Ord, Functor, Foldable, Traversable)
+  deriving (Eq, Functor, Foldable, Traversable)
+
+infixl 6 :+
+infixl 6 :-
+infixl 7 :*
+infixl 7 :/
+infixl 8 :**
 
 
-eval :: (Floating n, ClosedComparable n) => (a -> n) -> Math a -> n
-eval f (Num a)     = f a
-eval f (Plus a b)  = eval f a + eval f b
-eval f (Negate a)  = negate $ eval f a
-eval f (Times a b) = eval f a * eval f b
-eval f (Recip a)   = recip $ eval f a
-eval f (Abs a)     = abs $ eval f a
-eval f (Signum a)  = signum $ eval f a
-eval f (Max a b)   = eval f a `upper` eval f b
-eval f (Min a b)   = eval f a `lower` eval f b
-eval f (Pow a b)   = eval f a ** eval f b
-eval f (Sqrt a)    = sqrt $ eval f a
-eval f (Exp a)     = exp $ eval f a
-eval f (Log a)     = log $ eval f a
-eval f (Sin a)     = sin $ eval f a
-eval f (Cos a)     = cos $ eval f a
-eval f (Tan a)     = tan $ eval f a
-eval f (Asin a)    = asin $ eval f a
-eval f (Acos a)    = acos $ eval f a
-eval f (Atan a)    = atan $ eval f a
-eval f (Sinh a)    = sinh $ eval f a
-eval f (Cosh a)    = cosh $ eval f a
-eval f (Tanh a)    = tanh $ eval f a
-eval f (Asinh a)   = asinh $ eval f a
-eval f (Acosh a)   = acosh $ eval f a
-eval f (Atanh a)   = atanh $ eval f a
+-- | Values that can tell you whether they are constants.
+class Constable a where is_const :: a -> Bool
+
+instance Constable a => Constable (Math a) where
+  is_const (N a) = is_const a
+  is_const _     = False
+
+instance Constable Double where is_const _ = True
+instance Constable Float  where is_const _ = True
 
 
 instance Show a => Show (Math a) where
-  show (Num a) = show a
+  show (N a) = show a
 
-  show (Plus a (Negate b)) = printf "(%s - %s)" (show a) (show b)
-  show (Plus a b)          = printf "(%s + %s)" (show a) (show b)
-  show (Negate a)          = printf "(-%s)" (show a)
+  show (a :+ b) = printf "(%s + %s)" (show a) (show b)
+  show (a :- b) = printf "(%s - %s)" (show a) (show b)
+  show (a :* b) = printf "(%s * %s)" (show a) (show b)
+  show (a :/ b) = printf "(%s / %s)" (show a) (show b)
 
-  show (Times a (Recip b)) = printf "(%s / %s)" (show a) (show b)
-  show (Times a b)         = printf "(%s * %s)" (show a) (show b)
-  show (Recip a)           = printf "(%s⁻¹)" (show a)
+  show (Abs a)     = printf "|%s|" (show a)
+  show (Signum a)  = printf "sgn(%s)" (show a)
+  show (Upper a b) = printf "(%s upper %s)" (show a) (show b)
+  show (Lower a b) = printf "(%s lower %s)" (show a) (show b)
 
-  show (Abs a)    = printf "|%s|" (show a)
-  show (Signum a) = printf "sgn(%s)" (show a)
-  show (Max a b)  = printf "(%s max %s)" (show a) (show b)
-  show (Min a b)  = printf "(%s min %s)" (show a) (show b)
-
-  show (Pow a b) = printf "(%s ** %s)" (show a) (show b)
+  show (a :** b) = printf "(%s ** %s)" (show a) (show b)
   show (Sqrt a)  = printf "√(%s)" (show a)
   show (Exp a)   = printf "exp(%s)" (show a)
   show (Log a)   = printf "log(%s)" (show a)
@@ -116,40 +103,96 @@ instance Show a => Show (Math a) where
   show (Atanh a) = printf "tanh⁻¹(%s)" (show a)
 
 
-instance Num a => Num (Math a) where
-  fromInteger = Num . fromInteger
-  (+)         = Plus
-  negate      = Negate
-  (*)         = Times
-  abs         = Abs
-  signum      = Signum
+instance (Constable a, Num a) => Num (Math a) where
+  fromInteger  = N . fromInteger
+  N a + N b | is_const a && is_const b = N (a + b)
+  a   + b                              = a :+ b
+  N a - N b | is_const a && is_const b = N (a - b)
+  a   - b                              = a :- b
+  N a * N b | is_const a && is_const b = N (a * b)
+  a   * b                              = a :* b
+  abs (N a) | is_const a               = N (abs a)
+  abs a                                = Abs a
+  signum (N a) | is_const a            = N (signum a)
+  signum a                             = Signum a
 
-instance Fractional a => Fractional (Math a) where
-  fromRational = Num . fromRational
-  recip        = Recip
+instance (Constable a, Fractional a) => Fractional (Math a) where
+  fromRational = N . fromRational
+  N a / N b | is_const a && is_const b = N (a / b)
+  a   / b                              = a :/ b
 
-instance Floating a => Floating (Math a) where
-  pi    = Num pi
-  exp   = Exp
-  log   = Log
-  sqrt  = Sqrt
-  (**)  = Pow
-  sin   = Sin
-  cos   = Cos
-  tan   = Tan
-  asin  = Asin
-  acos  = Acos
-  atan  = Atan
-  sinh  = Sinh
-  cosh  = Cosh
-  tanh  = Tanh
-  asinh = Asinh
-  acosh = Acosh
-  atanh = Atanh
+instance (Constable a, Floating a) => Floating (Math a) where
+  N a ** N b | is_const a && is_const b = N (a ** b)
+  a   ** b                              = a :** b
 
-instance ClosedComparable (Math a) where
-  lower = Min
-  upper = Max
+  pi                       = N pi
+  exp (N a)   | is_const a = N (exp a)
+  exp a                    = Exp a
+  log (N a)   | is_const a = N (log a)
+  log a                    = Log a
+  sqrt (N a)  | is_const a = N (sqrt a)
+  sqrt a                   = Sqrt a
+
+  sin (N a)   | is_const a = N (sin a)
+  sin a                    = Sin a
+  cos (N a)   | is_const a = N (cos a)
+  cos a                    = Cos a
+  tan (N a)   | is_const a = N (tan a)
+  tan a                    = Tan a
+  asin (N a)  | is_const a = N (asin a)
+  asin a                   = Asin a
+  acos (N a)  | is_const a = N (acos a)
+  acos a                   = Acos a
+  atan (N a)  | is_const a = N (atan a)
+  atan a                   = Atan a
+  sinh (N a)  | is_const a = N (sinh a)
+  sinh a                   = Sinh a
+  cosh (N a)  | is_const a = N (cosh a)
+  cosh a                   = Cosh a
+  tanh (N a)  | is_const a = N (tanh a)
+  tanh a                   = Tanh a
+  asinh (N a) | is_const a = N (asinh a)
+  asinh a                  = Asinh a
+  acosh (N a) | is_const a = N (acosh a)
+  acosh a                  = Acosh a
+  atanh (N a) | is_const a = N (atanh a)
+  atanh a                  = Atanh a
+
+instance (Constable a, ClosedComparable a) => ClosedComparable (Math a) where
+  lower (N a) (N b) | is_const a && is_const b = N (lower a b)
+  lower a     b                                = Lower a b
+  upper (N a) (N b) | is_const a && is_const b = N (upper a b)
+  upper a     b                                = Upper a b
+
+
+-- | Evaluate a symbolic quantity using Haskell math. To do this, we need a
+--   function that handles 'N' root values.
+eval :: (Floating n, ClosedComparable n) => (a -> n) -> Math a -> n
+eval f (N a)       = f a
+eval f (a :+ b)    = eval f a + eval f b
+eval f (a :- b)    = eval f a - eval f b
+eval f (a :* b)    = eval f a * eval f b
+eval f (a :/ b)    = eval f a / eval f b
+eval f (Abs a)     = abs    $ eval f a
+eval f (Signum a)  = signum $ eval f a
+eval f (Upper a b) = eval f a `upper` eval f b
+eval f (Lower a b) = eval f a `lower` eval f b
+eval f (a :** b)   = eval f a ** eval f b
+eval f (Sqrt a)    = sqrt  $ eval f a
+eval f (Exp a)     = exp   $ eval f a
+eval f (Log a)     = log   $ eval f a
+eval f (Sin a)     = sin   $ eval f a
+eval f (Cos a)     = cos   $ eval f a
+eval f (Tan a)     = tan   $ eval f a
+eval f (Asin a)    = asin  $ eval f a
+eval f (Acos a)    = acos  $ eval f a
+eval f (Atan a)    = atan  $ eval f a
+eval f (Sinh a)    = sinh  $ eval f a
+eval f (Cosh a)    = cosh  $ eval f a
+eval f (Tanh a)    = tanh  $ eval f a
+eval f (Asinh a)   = asinh $ eval f a
+eval f (Acosh a)   = acosh $ eval f a
+eval f (Atanh a)   = atanh $ eval f a
 
 
 {-
