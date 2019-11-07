@@ -43,12 +43,6 @@ screen_size v (BB vmin vmax) = foldl1 max [ LM.distance v0 v1,
         (v3, _) = p32 v $ vmin & _z .~ vmax^._z
 
 
--- FIXME
--- We should render to something intermediate instead of Picture; Picture loses
--- Z info and doesn't provide any association, which means we can't handle mouse
--- interaction.
-
-
 -- TODO
 -- Should we have a render monad? There are some reasons we might want this; for
 -- example, we could drop Blank elements. We could also provide a more
