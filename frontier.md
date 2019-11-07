@@ -1,6 +1,7 @@
 # Development frontier
 + Constraint simplification
 + General JIT f-rep (replace CVal and IsoFn)
++ View-driven level of detail
 + FEA prototype, incl auto-meshing
   + Anisotropic material properties specified by vector fields
   + Material property vectors for F-rep solid modeling

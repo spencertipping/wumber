@@ -53,22 +53,13 @@ type IsoFn a = a -> R
 
 
 -- | Determines whether to split the specified bounding box. Arguments to
---   'SplitFn' are 'iso', 'n_splits', 'tree_meta', and 'default_split_axis'.
+--   'SplitFn' are 'iso', 'n_splits', 'tree_meta', and 'split_axis'.
 type SplitFn a = IsoFn a -> Int -> TreeMeta a -> a -> Bool
 
 
 -- | A bounding volume hierarchy with one-dimensional bisections. If dual
 --   contouring is used to find the surface of an object then bisections will be
 --   densest around the boundary.
---
---   NOTE: each 'Bisect' node stores its axis, and the "right" side will always
---   dot higher along the axis than the "left" side. This invariant is important
---   for meshing, which happens in the 'outline' function.
---
---   NOTE: '_t_axis' must always be a unit basis vector; that is, exactly one
---   component should be 1 and the others should be 0. If this isn't true,
---   'outline' will fail unpredictably.
-
 data Tree a = Bisect  { _t_meta  :: !(TreeMeta a),
                         _t_axis  :: !a,
                         _t_left  :: Tree a,
