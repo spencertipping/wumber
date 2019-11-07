@@ -6,6 +6,7 @@ module Wumber (
   module Wumber.Element,
   module Wumber.Numeric,
   module Wumber.Sketch,
+  module Wumber.Symbolic,
   runWumber,
   f2d, d2f, fi,
   tau, sincos
@@ -21,6 +22,7 @@ import Wumber.DualContour
 import Wumber.Element
 import Wumber.Numeric
 import Wumber.Sketch
+import Wumber.Symbolic
 
 
 -- Remedial Haskell functions

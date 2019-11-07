@@ -40,6 +40,11 @@ load_wumbersym_nop = eitherError <$> runInterpreter do
   setImports ["Prelude", "Wumber.Symbolic"]
   interpret "4 + 5" (as :: Double)
 
+load_wumber_all :: IO Double
+load_wumber_all = eitherError <$> runInterpreter do
+  setImports ["Prelude", "Wumber"]
+  interpret "eval id $ N 4 + N 5" (as :: Double)
+
 
 hint_baseline :: IO Double
 hint_baseline = eitherError <$> runInterpreter do
@@ -114,5 +119,6 @@ main = defaultMain
     bench "hint V3"            (nfIO load_linear),
     bench "hint baseline"      (nfIO hint_baseline),
     bench "hint wumbersym"     (nfIO load_wumbersym),
-    bench "hint wumbersym_nop" (nfIO load_wumbersym_nop)
+    bench "hint wumbersym_nop" (nfIO load_wumbersym_nop),
+    bench "hint wumber_all"    (nfIO load_wumber_all)
   ]
