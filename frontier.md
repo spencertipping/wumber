@@ -1,7 +1,6 @@
 # Development frontier
-+ **Possible but not yet worthwhile:** JIT for F-rep (SSE4, not AVX)
-  + Complicated by operations that aren't implemented in hardware
-  + Algorithm improvements first
++ Constraint simplification
++ General JIT f-rep (replace CVal and IsoFn)
 + FEA prototype, incl auto-meshing
   + Anisotropic material properties specified by vector fields
   + Material property vectors for F-rep solid modeling

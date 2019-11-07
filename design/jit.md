@@ -24,3 +24,7 @@ sense. It's more like "how can we sidecar things".
 
 `addsd` preserves high-half contents, btw, so we can have some chain divergence
 and potentially stash things into high-XMM positions.
+
+
+## Implementation strategy
+1. Depth-first, no CSE, all constants from memory
