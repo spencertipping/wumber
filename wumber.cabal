@@ -20,6 +20,7 @@ library
   default-language:    Haskell2010
   build-depends:       array
                      , base >= 4.9
+                     , bytestring
                      , containers >= 0.6.0.1
                      , deepseq >= 1.4.4.0
                      , gloss
@@ -43,6 +44,7 @@ library
                      , Wumber.GeometricConstraints
                      , Wumber.Cursor
                      , Wumber.Element
+                     , Wumber.JIT
                      , Wumber.Numeric
                      , Wumber.Sketch
                      , Wumber.Symbolic
@@ -55,10 +57,13 @@ test-suite wumber-tests
   hs-source-dirs:      test/wumber
   main-is:             WumberTest.hs
   other-modules:       WumberTest.ConstraintSolver
+                     , WumberTest.JIT
   build-depends:       base >= 4.12
+                     , bytestring
                      , linear
                      , microlens >= 0.4
                      , QuickCheck
+                     , vector
                      , wumber
 
 
@@ -106,28 +111,3 @@ executable wumber
                      , text >= 1.2.3.1
                      , utf8-string
                      , wumber
-
-
--- executable jitbench
---   hs-source-dirs:      dev/hackery
---   main-is:             JitBench.hs
---   ghc-options:         -O3 -fforce-recomp -ddump-asm -dumpdir=dumps -fllvm
---   default-language:    Haskell2010
---   build-depends:       base >= 4.9
---                      , bytestring
---                      , clock
---                      , containers >= 0.6.0.1
---                      , criterion
---                      , deepseq >= 1.4.4.0
---                      , gloss
---                      , hinotify
---                      , hint
---                      , hmatrix
---                      , linear
---                      , microlens
---                      , microlens-th
---                      , mtl
---                      , random
---                      , text >= 1.2.3.1
---                      , utf8-string
---                      , wumber

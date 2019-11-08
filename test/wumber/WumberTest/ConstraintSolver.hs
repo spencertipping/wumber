@@ -97,6 +97,15 @@ prop_v3dist vec (NonNegative d) = t do
   return v
 
 
+-- TODO
+-- This test isn't as robust as I want, nor is it very realistic. It fails every
+-- ~10k runs or so.
+--
+-- The problem is that the constraint solver depends on the initial values of
+-- the variables you give it. This is fine in practice; you can easily fix
+-- those, and it isn't very sensitive. But certain inputs will result in no
+-- solution. This test manages to find those.
+
 prop_hexagon :: V2 N -> V2 N -> V2 N -> V2 N -> V2 N -> V2 N
              -> Positive N -> Property
 prop_hexagon a b c d e f (Positive dist) = t do

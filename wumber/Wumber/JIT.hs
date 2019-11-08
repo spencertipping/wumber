@@ -4,19 +4,20 @@
 module Wumber.JIT where
 
 
-import Control.Monad
-import Data.ByteString (ByteString, pack)
+import Control.Monad           (when)
+import Data.ByteString         (ByteString, pack)
 import Data.ByteString.Builder
-import Data.ByteString.Lazy (toStrict)
-import Data.ByteString.Unsafe (unsafeUseAsCStringLen)
-import Data.Vector.Storable (Vector, empty, fromList, unsafeWith)
-import Foreign.C.Types
-import Foreign.Marshal.Utils (copyBytes)
-import Foreign.Ptr
-import Foreign.Storable
-import System.IO.Unsafe (unsafePerformIO)
-import System.Posix.Types (Fd(..), COff(..))
-import Unsafe.Coerce
+import Data.ByteString.Lazy    (toStrict)
+import Data.ByteString.Unsafe  (unsafeUseAsCStringLen)
+import Data.Vector.Storable    (Vector, empty, fromList, unsafeWith)
+import Foreign.C.Types         (CInt(..), CSize(..))
+import Foreign.Marshal.Utils   (copyBytes)
+import Foreign.Ptr             (Ptr(..), FunPtr(..), castPtr,
+                                castPtrToFunPtr, nullPtr, intPtrToPtr)
+import Foreign.Storable        (Storable)
+import System.IO.Unsafe        (unsafePerformIO)
+import System.Posix.Types      (Fd(..), COff(..))
+import Unsafe.Coerce           (unsafeCoerce)
 
 import qualified Data.ByteString as BS
 
@@ -27,43 +28,42 @@ foreign import ccall unsafe "sys/mman.h mmap"
 foreign import ccall unsafe "sys/mman.h munmap"
   munmap :: Ptr () -> CSize -> IO CInt
 
--- Just making sure this does what we expect
-foreign import ccall unsafe "math.h &sin"
-  p_sin :: FunPtr (Double -> IO Double)
-
 foreign import ccall "dynamic"
-  jit_dblfn :: FunPtr (Ptr a -> IO Double) -> Ptr a -> IO Double
+  dblfn :: FunPtr (Ptr a -> IO Double) -> Ptr a -> IO Double
 
 
-fi = fromIntegral
-
-compile :: Storable a => ByteString -> IO (FunPtr (Ptr a -> IO b))
+compile :: ByteString -> IO (Ptr ())
 compile bs = do
-  m <- mmap nullPtr (fi $ BS.length bs) 0x7 0x22 (-1) 0
+  m <- mmap nullPtr (fromIntegral $ BS.length bs) 0x7 0x22 (-1) 0
   when (m == intPtrToPtr (-1)) $ return (error "mmap failed")
   unsafeUseAsCStringLen bs \(p, l) -> copyBytes m p l
-  return $ unsafeCoerce m
+  return (castPtr m)
 
 
-with_jit_dbl :: Storable a => ByteString -> ((Vector a -> Double) -> IO b) -> IO b
-with_jit_dbl code f = do
+with_jit :: (FunPtr (a -> IO b) -> a -> IO b)
+         -> ByteString -> ((a -> IO b) -> IO c) -> IO c
+with_jit dynamic code f = do
   fn <- compile code
-  let fn' = jit_dblfn fn
-  !x <- f (\v -> unsafePerformIO $ unsafeWith v fn')
-  munmap (unsafeCoerce fn) (fi $ BS.length code)
+  let fn' = dynamic (castPtrToFunPtr fn)
+  !x <- f fn'
+  munmap fn (fromIntegral $ BS.length code)
   return x
 
 
-test_fn :: ByteString
-test_fn = toStrict $ toLazyByteString $
-  mconcat (map word8 [ 0xc8, 0x00, 0x00, 0x00,         -- enter 0 0
-                       0xf2, 0x0f, 0x10, 0x47, 0x08,   -- movsd 8(%rdi), %xmm0
-                       0xf2, 0x0f, 0x58, 0xc0,         -- addsd %xmm0, %xmm0
-                       0x48, 0xb8 ])                   -- movq %rax,
-  <> word64LE (unsafeCoerce p_sin)                     --      imm64
-  <> mconcat (map word8 [ 0xff, 0xd0,                  -- call %rax
-                          0xc9,                        -- leave
-                          0xc3 ])                      -- ret
+foreign import ccall unsafe "math.h &log"   p_log   :: FunPtr (Double -> IO Double)
+foreign import ccall unsafe "math.h &exp"   p_exp   :: FunPtr (Double -> IO Double)
+foreign import ccall unsafe "math.h &sqrt"  p_sqrt  :: FunPtr (Double -> IO Double)
+foreign import ccall unsafe "math.h &pow"   p_pow   :: FunPtr (Double -> Double -> IO Double)
 
-test :: Double -> IO Double
-test x = with_jit_dbl test_fn \f -> return $! f (fromList [100, x])
+foreign import ccall unsafe "math.h &sin"   p_sin   :: FunPtr (Double -> IO Double)
+foreign import ccall unsafe "math.h &cos"   p_cos   :: FunPtr (Double -> IO Double)
+foreign import ccall unsafe "math.h &tan"   p_tan   :: FunPtr (Double -> IO Double)
+foreign import ccall unsafe "math.h &asin"  p_asin  :: FunPtr (Double -> IO Double)
+foreign import ccall unsafe "math.h &acos"  p_acos  :: FunPtr (Double -> IO Double)
+foreign import ccall unsafe "math.h &atan"  p_atan  :: FunPtr (Double -> IO Double)
+foreign import ccall unsafe "math.h &sinh"  p_sinh  :: FunPtr (Double -> IO Double)
+foreign import ccall unsafe "math.h &cosh"  p_cosh  :: FunPtr (Double -> IO Double)
+foreign import ccall unsafe "math.h &tanh"  p_tanh  :: FunPtr (Double -> IO Double)
+foreign import ccall unsafe "math.h &asinh" p_asinh :: FunPtr (Double -> IO Double)
+foreign import ccall unsafe "math.h &acosh" p_acosh :: FunPtr (Double -> IO Double)
+foreign import ccall unsafe "math.h &atanh" p_atanh :: FunPtr (Double -> IO Double)

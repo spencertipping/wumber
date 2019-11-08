@@ -7,7 +7,7 @@
 
 
 module Wumber.Symbolic (
-  Math(..),
+  Sym(..),
   eval
 ) where
 
@@ -21,34 +21,34 @@ import Wumber.ClosedComparable
 --   arbitrary type that you specify. 'a' should be 'Constable'; if operands are
 --   'is_const' then the operations will happen at construction time and won't
 --   be present in the symbolic value.
-data Math a = N a
+data Sym a = N a
 
-            | Math a :+ Math a
-            | Math a :- Math a
-            | Math a :* Math a
-            | Math a :/ Math a
+           | Sym a :+ Sym a
+           | Sym a :- Sym a
+           | Sym a :* Sym a
+           | Sym a :/ Sym a
 
-            | Abs    (Math a)
-            | Signum (Math a)
-            | Upper  (Math a) (Math a)
-            | Lower  (Math a) (Math a)
+           | Abs    (Sym a)
+           | Signum (Sym a)
+           | Upper  (Sym a) (Sym a)
+           | Lower  (Sym a) (Sym a)
 
-            | Math a :** Math a
-            | Sqrt   (Math a)
-            | Exp    (Math a)
-            | Log    (Math a)
-            | Sin    (Math a)
-            | Cos    (Math a)
-            | Tan    (Math a)
-            | Asin   (Math a)
-            | Acos   (Math a)
-            | Atan   (Math a)
-            | Sinh   (Math a)
-            | Cosh   (Math a)
-            | Tanh   (Math a)
-            | Asinh  (Math a)
-            | Acosh  (Math a)
-            | Atanh  (Math a)
+           | Sym a :** Sym a
+           | Sqrt   (Sym a)
+           | Exp    (Sym a)
+           | Log    (Sym a)
+           | Sin    (Sym a)
+           | Cos    (Sym a)
+           | Tan    (Sym a)
+           | Asin   (Sym a)
+           | Acos   (Sym a)
+           | Atan   (Sym a)
+           | Sinh   (Sym a)
+           | Cosh   (Sym a)
+           | Tanh   (Sym a)
+           | Asinh  (Sym a)
+           | Acosh  (Sym a)
+           | Atanh  (Sym a)
 
   deriving (Eq, Functor, Foldable, Traversable)
 
@@ -59,11 +59,11 @@ infixl 7 :/
 infixl 8 :**
 
 
--- | Values that can tell you whether they are constants -- i.e. whether 'Math'
+-- | Values that can tell you whether they are constants -- i.e. whether 'Sym'
 --   should try to collapse them at construction-time.
 class Constable a where is_const :: a -> Bool
 
-instance Constable a => Constable (Math a) where
+instance Constable a => Constable (Sym a) where
   is_const (N a) = is_const a
   is_const _     = False
 
@@ -71,7 +71,7 @@ instance Constable Double where is_const _ = True
 instance Constable Float  where is_const _ = True
 
 
-instance Show a => Show (Math a) where
+instance Show a => Show (Sym a) where
   show (N a) = show a
 
   show (a :+ b) = printf "(%s + %s)" (show a) (show b)
@@ -102,7 +102,7 @@ instance Show a => Show (Math a) where
   show (Atanh a) = printf "tanh⁻¹(%s)" (show a)
 
 
-instance (Constable a, Num a) => Num (Math a) where
+instance (Constable a, Num a) => Num (Sym a) where
   fromInteger  = N . fromInteger
   N a + N b | is_const a && is_const b = N (a + b)
   a   + b                              = a :+ b
@@ -115,12 +115,12 @@ instance (Constable a, Num a) => Num (Math a) where
   signum (N a) | is_const a            = N (signum a)
   signum a                             = Signum a
 
-instance (Constable a, Fractional a) => Fractional (Math a) where
+instance (Constable a, Fractional a) => Fractional (Sym a) where
   fromRational = N . fromRational
   N a / N b | is_const a && is_const b = N (a / b)
   a   / b                              = a :/ b
 
-instance (Constable a, Floating a) => Floating (Math a) where
+instance (Constable a, Floating a) => Floating (Sym a) where
   N a ** N b | is_const a && is_const b = N (a ** b)
   a   ** b                              = a :** b
 
@@ -157,7 +157,7 @@ instance (Constable a, Floating a) => Floating (Math a) where
   atanh (N a) | is_const a = N (atanh a)
   atanh a                  = Atanh a
 
-instance (Constable a, ClosedComparable a) => ClosedComparable (Math a) where
+instance (Constable a, ClosedComparable a) => ClosedComparable (Sym a) where
   lower (N a) (N b) | is_const a && is_const b = N (lower a b)
   lower a     b                                = Lower a b
   upper (N a) (N b) | is_const a && is_const b = N (upper a b)
@@ -166,7 +166,7 @@ instance (Constable a, ClosedComparable a) => ClosedComparable (Math a) where
 
 -- | Evaluate a symbolic quantity using Haskell math. To do this, we need a
 --   function that handles 'N' root values.
-eval :: (Floating n, ClosedComparable n) => (a -> n) -> Math a -> n
+eval :: (Floating n, ClosedComparable n) => (a -> n) -> Sym a -> n
 eval f (N a)       = f a
 eval f (a :+ b)    = eval f a + eval f b
 eval f (a :- b)    = eval f a - eval f b
