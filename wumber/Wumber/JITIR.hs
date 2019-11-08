@@ -1,8 +1,9 @@
 {-# LANGUAGE BlockArguments #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
--- | Intermediate representation for JIT. 'Sym' expressions go through this
---   layer before being emitted as machine code through a JIT backend.
+-- | SSA-style intermediate representation for JITable expressions. This is the
+--   bulk of the compile step for 'Sym' trees; after this, backend modules like
+--   'AMD64Asm' take over and emit machine code.
 module Wumber.JITIR where
 
 import Wumber.JIT
