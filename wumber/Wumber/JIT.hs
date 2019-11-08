@@ -4,20 +4,19 @@
 module Wumber.JIT where
 
 
-import Control.Monad           (when)
-import Data.ByteString         (ByteString, pack)
-import Data.ByteString.Builder
-import Data.ByteString.Lazy    (toStrict)
-import Data.ByteString.Unsafe  (unsafeUseAsCStringLen)
-import Data.Vector.Storable    (Vector, empty, fromList, unsafeWith)
-import Foreign.C.Types         (CInt(..), CSize(..))
-import Foreign.Marshal.Utils   (copyBytes)
-import Foreign.Ptr             (Ptr(..), FunPtr(..), castPtr,
-                                castPtrToFunPtr, nullPtr, intPtrToPtr)
-import Foreign.Storable        (Storable)
-import System.IO.Unsafe        (unsafePerformIO)
-import System.Posix.Types      (Fd(..), COff(..))
-import Unsafe.Coerce           (unsafeCoerce)
+import Control.Monad          (when)
+import Data.ByteString        (ByteString, pack)
+import Data.ByteString.Lazy   (toStrict)
+import Data.ByteString.Unsafe (unsafeUseAsCStringLen)
+import Data.Vector.Storable   (Vector, empty, fromList, unsafeWith)
+import Foreign.C.Types        (CInt(..), CSize(..))
+import Foreign.Marshal.Utils  (copyBytes)
+import Foreign.Ptr            (Ptr(..), FunPtr(..), castPtr,
+                               castPtrToFunPtr, nullPtr, intPtrToPtr)
+import Foreign.Storable       (Storable)
+import System.IO.Unsafe       (unsafePerformIO)
+import System.Posix.Types     (Fd(..), COff(..))
+import Unsafe.Coerce          (unsafeCoerce)
 
 import qualified Data.ByteString as BS
 
@@ -28,10 +27,10 @@ foreign import ccall unsafe "sys/mman.h mmap"
 foreign import ccall unsafe "sys/mman.h munmap"
   munmap :: Ptr () -> CSize -> IO CInt
 
-foreign import ccall "dynamic"
-  dblfn :: FunPtr (Ptr a -> IO Double) -> Ptr a -> IO Double
 
-
+-- | Copies a 'ByteString' into an executable section of memory and returns a
+--   pointer to the executable version. You'll need to 'munmap' this when you're
+--   done, a process that's managed for you when you use 'with_jit'.
 compile :: ByteString -> IO (Ptr ())
 compile bs = do
   m <- mmap nullPtr (fromIntegral $ BS.length bs) 0x7 0x22 (-1) 0
@@ -40,15 +39,20 @@ compile bs = do
   return (castPtr m)
 
 
-with_jit :: (FunPtr (a -> IO b) -> a -> IO b)
-         -> ByteString -> ((a -> IO b) -> IO c) -> IO c
+-- | Compiles a machine code function using the specified calling convention
+--   ('FunPtr a -> a') and provides it to a function. 'with_jit' unmaps the
+--   compiled code after completing the IO action you return, invalidating the
+--   function pointer and freeing resources.
+with_jit :: (FunPtr a -> a) -> ByteString -> (a -> IO b) -> IO b
 with_jit dynamic code f = do
   fn <- compile code
-  let fn' = dynamic (castPtrToFunPtr fn)
-  !x <- f fn'
+  !x <- f (dynamic (castPtrToFunPtr fn))
   munmap fn (fromIntegral $ BS.length code)
   return x
 
+
+-- Math function pointers available to JIT assemblers. These are
+-- platform-independent.
 
 foreign import ccall unsafe "math.h &log"   p_log   :: FunPtr (Double -> IO Double)
 foreign import ccall unsafe "math.h &exp"   p_exp   :: FunPtr (Double -> IO Double)

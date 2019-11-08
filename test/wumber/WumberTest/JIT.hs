@@ -7,7 +7,7 @@ import Data.ByteString (ByteString)
 import Data.ByteString.Lazy (toStrict)
 import Data.ByteString.Builder
 import Data.Vector.Storable (fromList, unsafeWith)
-import Foreign.Ptr (WordPtr(..), ptrToWordPtr, castFunPtrToPtr)
+import Foreign.Ptr (Ptr(..), FunPtr(..), WordPtr(..), ptrToWordPtr, castFunPtrToPtr)
 import System.IO.Unsafe (unsafePerformIO)
 import Test.QuickCheck
 
@@ -17,6 +17,10 @@ import Wumber.JIT
 -- Test bare JIT: no assembler or anything, just the compiler and FFI.
 prop_bare_jit_works :: Double -> Bool
 prop_bare_jit_works x = sin (2 * x) == sin_2x x
+
+
+foreign import ccall "dynamic"
+  dblfn :: FunPtr (Ptr a -> IO Double) -> Ptr a -> IO Double
 
 
 sin_2x_code :: ByteString
