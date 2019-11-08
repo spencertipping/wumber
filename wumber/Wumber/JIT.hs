@@ -1,22 +1,22 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE BangPatterns #-}
 
+-- | Platform-independent JIT logic. This module has what you need to take a
+--   'ByteString' of machine code and get a callable function from it
+--   ('with_jit'). You'll need to provide the 'FunPtr (a -> IO b) -> a -> IO b'
+--   dynamic.
 module Wumber.JIT where
 
 
 import Control.Monad          (when)
-import Data.ByteString        (ByteString, pack)
-import Data.ByteString.Lazy   (toStrict)
+import Data.ByteString        (ByteString)
 import Data.ByteString.Unsafe (unsafeUseAsCStringLen)
-import Data.Vector.Storable   (Vector, empty, fromList, unsafeWith)
 import Foreign.C.Types        (CInt(..), CSize(..))
 import Foreign.Marshal.Utils  (copyBytes)
 import Foreign.Ptr            (Ptr(..), FunPtr(..), castPtr,
                                castPtrToFunPtr, nullPtr, intPtrToPtr)
 import Foreign.Storable       (Storable)
-import System.IO.Unsafe       (unsafePerformIO)
 import System.Posix.Types     (Fd(..), COff(..))
-import Unsafe.Coerce          (unsafeCoerce)
 
 import qualified Data.ByteString as BS
 
@@ -44,9 +44,9 @@ compile bs = do
 --   compiled code after completing the IO action you return, invalidating the
 --   function pointer and freeing resources.
 with_jit :: (FunPtr a -> a) -> ByteString -> (a -> IO b) -> IO b
-with_jit dynamic code f = do
+with_jit convert code f = do
   fn <- compile code
-  !x <- f (dynamic (castPtrToFunPtr fn))
+  !x <- f (convert (castPtrToFunPtr fn))
   munmap fn (fromIntegral $ BS.length code)
   return x
 
