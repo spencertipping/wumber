@@ -1,6 +1,8 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE BangPatterns #-}
 
+{-# OPTIONS_GHC -funbox-strict-fields #-}
+
 -- | Platform-independent JIT logic. This module has what you need to take a
 --   'ByteString' of machine code and get a callable function from it
 --   ('with_jit'). You'll need to provide the 'FunPtr (a -> IO b) -> a -> IO b'
@@ -23,13 +25,6 @@ import qualified Data.ByteString as BS
 import Wumber.Symbolic
 
 
-foreign import ccall unsafe "sys/mman.h mmap"
-  mmap :: Ptr () -> CSize -> CInt -> CInt -> Fd -> COff -> IO (Ptr a)
-
-foreign import ccall unsafe "sys/mman.h munmap"
-  munmap :: Ptr () -> CSize -> IO CInt
-
-
 -- | A terminal type you can use with 'Wumber.Symbolic.Sym' that JIT assemblers
 --   will know what to do with.
 --
@@ -38,9 +33,34 @@ foreign import ccall unsafe "sys/mman.h munmap"
 --
 --   'Arg' refers to a numbered argument passed in as a 'Ptr r'. On AMD64 this
 --   would be addressable as an offset from '%rdi'. 'r' must be 'Storable'.
+--
+--   'Fn1'..'Fn4' let you call back into Haskell or C from inside a JIT context.
+--   This might not be very fast, particularly if you're calling an interpreted
+--   function, but you can do it.
 
 data JITN r = Const !r
             | Arg   !Int
+            | Fn1   (FunPtr (F1 r)) (SJN r)
+            | Fn2   (FunPtr (F2 r)) (SJN r) (SJN r)
+            | Fn3   (FunPtr (F3 r)) (SJN r) (SJN r) (SJN r)
+            | Fn4   (FunPtr (F4 r)) (SJN r) (SJN r) (SJN r) (SJN r)
+
+type SJN r = Sym (JITN r)
+
+type F1 r = r -> IO r
+type F2 r = r -> r -> IO r
+type F3 r = r -> r -> r -> IO r
+type F4 r = r -> r -> r -> r -> IO r
+
+foreign import ccall "wrapper" fn1_dbl_p :: F1 Double -> IO (FunPtr (F1 Double))
+foreign import ccall "wrapper" fn2_dbl_p :: F2 Double -> IO (FunPtr (F2 Double))
+foreign import ccall "wrapper" fn3_dbl_p :: F3 Double -> IO (FunPtr (F3 Double))
+foreign import ccall "wrapper" fn4_dbl_p :: F4 Double -> IO (FunPtr (F4 Double))
+
+foreign import ccall "wrapper" fn1_float_p :: F1 Float -> IO (FunPtr (F1 Float))
+foreign import ccall "wrapper" fn2_float_p :: F2 Float -> IO (FunPtr (F2 Float))
+foreign import ccall "wrapper" fn3_float_p :: F3 Float -> IO (FunPtr (F3 Float))
+foreign import ccall "wrapper" fn4_float_p :: F4 Float -> IO (FunPtr (F4 Float))
 
 
 -- | Copies a 'ByteString' into an executable section of memory and returns a
@@ -106,6 +126,13 @@ float_mathfn Tanh   = Just p_tanhf
 float_mathfn Asinh  = Just p_asinhf
 float_mathfn Acosh  = Just p_acoshf
 float_mathfn Atanh  = Just p_atanhf
+
+
+foreign import ccall unsafe "sys/mman.h mmap"
+  mmap :: Ptr () -> CSize -> CInt -> CInt -> Fd -> COff -> IO (Ptr a)
+
+foreign import ccall unsafe "sys/mman.h munmap"
+  munmap :: Ptr () -> CSize -> IO CInt
 
 
 -- Math function pointers available to JIT assemblers. These are
