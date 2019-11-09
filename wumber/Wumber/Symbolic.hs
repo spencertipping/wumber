@@ -1,3 +1,6 @@
+{-# LANGUAGE MonoLocalBinds #-}
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE BlockArguments #-}
@@ -40,6 +43,11 @@ import Wumber.ClosedComparable
 --   arbitrary type that you specify. 'a' should be 'Constable'; if operands are
 --   'is_const' then the operations will happen at construction time and won't
 --   be present in the symbolic value.
+--
+--   NOTE: we can't implement mod/quot in terms of Haskell's numeric hierarchy;
+--   we run into all sorts of type problems if we try. The reason is that these
+--   numbers can't be converted to anything concrete -- just like things break
+--   if we try to provide 'Ord'. So we have our own constructors instead.
 data Sym a = N a
            | Sym a :+ Sym a
            | Sym a :- Sym a
@@ -128,6 +136,16 @@ math_fn Floor  = floor
 math_fn Round  = round
 
 
+-- | Values that support 'quot' and 'mod', but without using Haskell's numeric
+--   type hierarchy to do so.
+class QuotMod a where
+  (%)  :: a -> a -> a
+  (//) :: a -> a -> a
+
+infixl 7 %
+infixl 7 //
+
+
 -- | Values that can tell you whether they are constants -- i.e. whether 'Sym'
 --   should try to collapse them at construction-time.
 class Constable a where is_const :: a -> Bool
@@ -138,6 +156,10 @@ instance Constable a => Constable (Sym a) where
 
 instance Constable Double where is_const _ = True
 instance Constable Float  where is_const _ = True
+
+instance {-# OVERLAPPABLE #-} Integral a => QuotMod a where
+  (%)  = mod
+  (//) = quot
 
 
 instance Show a => Show (Sym a) where
@@ -165,23 +187,16 @@ instance (Constable a, Num a) => Num (Sym a) where
   signum (N a) | is_const a            = N (signum a)
   signum a                             = Math Signum a
 
-instance (Constable a, Integral a) => Integral (Sym a) where
-  quotRem (N a) (N b) | is_const a && is_const b = (N x, N y)
-    where (x, y) = a `quotRem` b
-  quotRem a b = (a :// b, a :% b)
-
-  toInteger (N a) | is_const a = toInteger a
-  toInteger _                  = error "can't force symbolic value to integer"
-
 instance (Constable a, Fractional a) => Fractional (Sym a) where
   fromRational = N . fromRational
   N a / N b | is_const a && is_const b = N (a / b)
   a   / b                              = a :/ b
 
-instance (Constable a, RealFrac a) => RealFrac (Sym a) where
-  properFraction (N a) | is_const a = (N x, N y)
-    where (x, y) = properFraction a
-  properFraction a = (a :// 1, a :% 1)
+instance {-# OVERLAPPABLE #-} (Constable a, QuotMod a) => QuotMod (Sym a) where
+  N a % N b  | is_const a && is_const b = N (a % b)
+  a   % b                               = a :% b
+  N a // N b | is_const a && is_const b = N (a // b)
+  a   // b                              = a :// b
 
 instance (Constable a, Floating a) => Floating (Sym a) where
   N a ** N b | is_const a && is_const b = N (a ** b)
