@@ -63,7 +63,7 @@ main = do
   liftIO $ modifyMVar_ sphere_calls (\_ -> return 0)
   zoom 0.01
 
-  tell $ iso_contour model (BB (-2) 2) 8 13 0.001
+  tell $ iso_contour model (BB (-2) 2) 8 15 0.001
   tell $ traceShow (unsafePerformIO $ readMVar sphere_calls) []
 
   when False $ tell $ unsafePerformIO do
