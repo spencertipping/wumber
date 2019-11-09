@@ -21,8 +21,10 @@
 module Wumber.Symbolic (
   Sym(..),
   MathFn(..),
+  ExpN(..),
   math_fn,
-  eval
+  eval,
+  eval_expn
 ) where
 
 
