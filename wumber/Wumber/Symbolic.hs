@@ -21,10 +21,9 @@
 module Wumber.Symbolic (
   Sym(..),
   MathFn(..),
-  ExpN(..),
+  Constable(..),
   math_fn,
   eval,
-  eval_expn
 ) where
 
 
@@ -80,25 +79,6 @@ data MathFn = Abs
   deriving (Show, Ord, Eq, Generic, Binary)
 
 
--- | A terminal type you can use with 'Sym' that JIT assemblers will know what
---   to do with. 'Const' is a constant 'Float' or 'Double' (the type is fixed
---   within each 'Sym' context). 'Arg' refers to a numbered argument passed in
---   as a 'Ptr r'. On AMD64 this would be addressable as an offset from '%rdi'.
---   'r' must be 'Storable'.
---
---   TODO: expand this to include calls back into arbitrary Haskell functions.
---   I'm hesitant to commit to this too soon because (1) it complicates JIT, and
---   (2) it breaks 'Binary' and therefore caching.
-
-data ExpN r = Const !r
-            | Arg   !Int
-  deriving (Show, Eq, Generic, Binary)
-
-instance Constable (ExpN r) where
-  is_const (Const _) = True
-  is_const (Arg _)   = False
-
-
 -- | Evaluate a symbolic quantity using Haskell math. To do this, we need a
 --   function that handles 'N' root values.
 eval :: (Floating n, ClosedComparable n) => (a -> n) -> Sym a -> n
@@ -111,12 +91,6 @@ eval f (a :** b)   = eval f a ** eval f b
 eval f (Upper a b) = eval f a `upper` eval f b
 eval f (Lower a b) = eval f a `lower` eval f b
 eval f (Math m a)  = math_fn m (eval f a)
-
-
--- | Evaluates an 'ExpN' terminal on the specified 'Vector' of input values.
-eval_expn :: (Floating n, ClosedComparable n) => Vector n -> ExpN n -> n
-eval_expn v (Const x) = x
-eval_expn v (Arg i)   = v ! i
 
 
 -- | Converts a 'MathFn' into a Haskell function that operates on some

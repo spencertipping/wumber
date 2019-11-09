@@ -60,6 +60,10 @@ data JITN r = Const !r
             | Fn4   (FunPtr (F4 r)) (SJN r) (SJN r) (SJN r) (SJN r)
   deriving (Show, Eq, Generic, Binary)
 
+instance Constable r => Constable (JITN r) where
+  is_const (Const x) = is_const x
+  is_const _         = False
+
 instance Binary (FunPtr a) where
   put x = error "can't safely serialize a FunPtr with relocatable code"
   get   = error "can't safely deserialize a FunPtr"
@@ -80,6 +84,13 @@ foreign import ccall "wrapper" fn1_float_p :: F1 Float -> IO (FunPtr (F1 Float))
 foreign import ccall "wrapper" fn2_float_p :: F2 Float -> IO (FunPtr (F2 Float))
 foreign import ccall "wrapper" fn3_float_p :: F3 Float -> IO (FunPtr (F3 Float))
 foreign import ccall "wrapper" fn4_float_p :: F4 Float -> IO (FunPtr (F4 Float))
+
+
+foreign import ccall "dynamic"
+  dblfn :: FunPtr (Ptr a -> IO Double) -> Ptr a -> IO Double
+
+foreign import ccall "dynamic"
+  floatfn :: FunPtr (Ptr a -> IO Float) -> Ptr a -> IO Float
 
 
 -- | Copies a 'ByteString' into an executable section of memory and returns a

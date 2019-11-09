@@ -19,10 +19,6 @@ prop_bare_jit_works :: Double -> Bool
 prop_bare_jit_works x = sin (2 * x) == sin_2x x
 
 
-foreign import ccall "dynamic"
-  dblfn :: FunPtr (Ptr a -> IO Double) -> Ptr a -> IO Double
-
-
 sin_2x_code :: ByteString
 sin_2x_code = toStrict $ toLazyByteString $
      mconcat (map word8 [ 0xc8, 0x00, 0x00, 0x00,       -- enter 0 0
