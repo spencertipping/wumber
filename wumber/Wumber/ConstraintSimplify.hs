@@ -46,8 +46,6 @@ remap_solution mi xs = V.toList mi `zip` VS.toList xs
 -- | Separates independent subsystems. This is the first thing we do when
 --   simplifying a set of constraints.
 partition_by_vars :: [Constraint] -> [[Constraint]]
-
--- TODO: the thing
 partition_by_vars cs = [cs]
   where pairs = cs & map \c -> ([c], S.map fst (constraint_deps c))
 

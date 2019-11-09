@@ -1,9 +1,9 @@
 # Development frontier
 + Sym/JIT
+  + **Done:** Trivial AMD64 JIT for Sym (no compile analysis/optimization)
+  + Reverse-engineer instruction latency/throughput
   + Sym -> constraint isofn?
   + Sym -> Isofn
-  + Trivial AMD64 JIT for Sym (no compile analysis/optimization)
-  + Reverse-engineer instruction latency/throughput
   + Auto-vectorization using XMM sidecars?
 + DSL
   + Finalize constraint DSL

@@ -7,8 +7,7 @@
 
 -- | Platform-independent JIT logic. This module has what you need to take a
 --   'ByteString' of machine code and get a callable function from it
---   ('with_jit'). You'll need to provide the 'FunPtr (a -> IO b) -> a -> IO b'
---   dynamic.
+--   ('with_jit').
 module Wumber.JIT where
 
 
@@ -38,38 +37,14 @@ import Wumber.Symbolic
 --
 --   'Arg' refers to a numbered argument passed in as a 'Ptr r'. On AMD64 this
 --   would be addressable as an offset from '%rdi'. 'r' must be 'Storable'.
---
---   'Fn1'..'Fn4' let you call back into Haskell or C from inside a JIT context.
---   This might not be very fast, particularly if you're calling an interpreted
---   function, but you can do it.
---
---   NOTE: 'Fn1' etc are specifically for functions that don't have a
---   representation in 'Sym' world; don't use them to call things like 'pow' or
---   'sin'. There are two problems with 'Fn's:
---
---   1. They're slower, in part because they defensively spill all FP registers
---      on x86-64. (TODO: probe them up front to figure out which XMMs we can
---      keep.)
---   2. They defeat hashing, which prevents 'Sym' outputs from being cached to
---      disk.
 
 data JITN r = Const !r
             | Arg   !Int
-            | Fn1   (FunPtr (F1 r)) (SJN r)
-            | Fn2   (FunPtr (F2 r)) (SJN r) (SJN r)
-            | Fn3   (FunPtr (F3 r)) (SJN r) (SJN r) (SJN r)
-            | Fn4   (FunPtr (F4 r)) (SJN r) (SJN r) (SJN r) (SJN r)
   deriving (Show, Eq, Generic, Binary)
 
 instance Constable r => Constable (JITN r) where
   is_const (Const x) = is_const x
   is_const _         = False
-
-instance Binary (FunPtr a) where
-  put x = error "can't safely serialize a FunPtr with relocatable code"
-  get   = error "can't safely deserialize a FunPtr"
-
-type SJN r = Sym (JITN r)
 
 type F1 r = r -> IO r
 type F2 r = r -> r -> IO r

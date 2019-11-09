@@ -36,6 +36,8 @@ library
                      , text
                      , vector >= 0.12.0.3
   exposed-modules:     Wumber
+                     , Wumber.AMD64Asm
+                     , Wumber.AMD64RE
                      , Wumber.BoundingBox
                      , Wumber.ClosedComparable
                      , Wumber.Constraint
@@ -46,6 +48,7 @@ library
                      , Wumber.Cursor
                      , Wumber.Element
                      , Wumber.JIT
+                     , Wumber.JITIR
                      , Wumber.Numeric
                      , Wumber.Sketch
                      , Wumber.Symbolic
