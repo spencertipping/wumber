@@ -19,15 +19,6 @@ import Wumber.AMD64Asm
 import Wumber.JIT
 
 
--- OK, things aren't as simple as I had hoped.
--- RDTSC unpredictably bounces between a believable number and 2x or 3x that
--- number. I suspect this has to do with CPU frequencies and/or core bouncing,
--- but I'm not sure.
---
--- I believe we can mitigate this by doing work against a consistent control
--- variable. Whatever interference is happening is low-frequency; I'll have a
--- run of 10k iterations vary by a factor of 2.
-
 assemble_lowlevel :: Asm a -> BS.ByteString
 assemble_lowlevel m = BL.toStrict (B.toLazyByteString b)
   where (_, b) = evalRWS m' () ()
@@ -36,28 +27,46 @@ assemble_lowlevel m = BL.toStrict (B.toLazyByteString b)
                     asm [0xc9, 0xc3]
 
 
-rdtsc_start :: Asm ()
-rdtsc_start = do
+-- | Serializing 'rdtsc', storing the result into all 64 bits of '%rax'. The
+--   'rdtsc' instruction uses '%edx:%eax', which is very unhelpful.
+rdtsc :: Asm ()
+rdtsc = do
   asm [0x0f, 0xae, 0xe8]                        -- lfence
   asm [0x0f, 0x31]                              -- rdtsc
   asm [0x48, 0xc1, 0xc2 .|. shiftL 4 3, 32]     -- shl %rdx, 32
   asm [0x48, 0x0b, 0xd0]                        -- or  %rax <- %rdx
-  asm [0x50]                                    -- push %rax
+
+
+rdtsc_start :: Asm ()
+rdtsc_start = rdtsc >> asm [0x50]               -- push %rax
 
 rdtsc_end :: Asm ()
 rdtsc_end = do
-  asm [0x0f, 0xae, 0xe8]                        -- lfence
-  asm [0x0f, 0x31]                              -- rdtsc
-  asm [0x48, 0xc1, 0xc2 .|. shiftL 4 3, 32]     -- shl %rdx, 32
-  asm [0x48, 0x0b, 0xd0]                        -- or  %rax <- %rdx
+  rdtsc                                         -- tsc -> %rax
   asm [0x59]                                    -- pop %rcx
   asm [0x48, 0x2b, 0xc1]                        -- sub %rax <- %rcx
+
+
+-- | Normalizes the TSC delta against a standardized amount of work. The purpose
+--   of this is to correct for clock frequency and other global performance
+--   factors. Result will be in %xmm0 as a dimensionless (but consistent)
+--   double.
+norm_tsc :: Asm ()
+norm_tsc = do
+  asm [0x50]                                    -- push %rax
+  rdtsc_start
+  rdtsc_end
+  asm [0x5e]                                    -- pop %rsi
+  asm [0xf2, 0x48, 0x0f, 0x2a, 0xc6]            -- int->dbl %rsi -> %xmm0
+  asm [0xf2, 0x48, 0x0f, 0x2a, 0xc8]            -- int->dbl %rax -> %xmm1
+  asm [0xf2, 0x0f, 0x5e, 0xc1]                  -- %xmm0 /= %xmm1
 
 
 rep n a = do
   rdtsc_start
   replicateM_ n a
   rdtsc_end
+  norm_tsc
 
 baseline = rep 0 (return ())
 
@@ -76,17 +85,21 @@ baseline = rep 0 (return ())
 -- So: add+mul capacity? Just add? Just mul? Does div eat all ports? I think
 -- these are simple "when does stuff not get faster" tests.
 
-addsd = asm [0xf2, 0x0f, 0x58, 0xc0]  -- addsd %xmm0, %xmm0
-mulsd = asm [0xf2, 0x0f, 0x59, 0xc0]  -- mulsd %xmm0, %xmm0
-divsd = asm [0xf2, 0x0f, 0x5e, 0xc0]  -- divsd %xmm0, %xmm0
+addsd   = asm [0xf2, 0x0f, 0x58, 0xc0]  -- addsd %xmm0, %xmm0
+addsd01 = asm [0xf2, 0x0f, 0x58, 0xc1]  -- addsd %xmm0, %xmm1
+mulsd   = asm [0xf2, 0x0f, 0x59, 0xc0]  -- mulsd %xmm0, %xmm0
+divsd   = asm [0xf2, 0x0f, 0x5e, 0xc0]  -- divsd %xmm0, %xmm0
 
 
-foreign import ccall "dynamic" ifn :: FunPtr (IO Int) -> IO Int
+foreign import ccall "dynamic" dfn :: FunPtr (IO Double) -> IO Double
 
-tsc_fn asm n = with_jit ifn (assemble_lowlevel asm) \f -> do
-  let each !s _ = do !v <- f
-                     if v > 0
-                       then return $! min s v
-                       else return s
+tsc_fn asm n = with_jit dfn (assemble_lowlevel asm) \f -> do
+  let each !s _ = (+ s) <$> max 0 <$> f
   f
-  foldM each maxBound [1..n]
+  t <- foldM each 0 [1..n]
+  return $ t / fromIntegral n
+
+tsc_fn_med asm n = with_jit dfn (assemble_lowlevel asm) \f -> do
+  f
+  xs <- mapM (const f) [1..n]
+  return $! xs !! (n `quot` 2)
