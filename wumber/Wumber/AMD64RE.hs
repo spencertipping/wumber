@@ -100,20 +100,20 @@ reptest n r m = tsc_fn_med n (rep r m)
 
 -- If the pipeline premise is right, these two examples should have different
 -- performance:
-test1a = reptest 1000000 200 $ replicateM_ 8 $ addsd 0 0
-test1b = reptest 1000000 200 $ replicateM_ 2 do
+test1a = reptest 10000 200 $ replicateM_ 8 $ addsd 0 0
+test1b = reptest 10000 200 $ replicateM_ 2 do
   addsd 0 0
   addsd 1 1
   addsd 2 2
   addsd 3 3
 
-test1c = reptest 1000000 200 do
+test1c = reptest 10000 200 do
   addsd 0 0; addsd 4 4
   addsd 1 1; addsd 5 5
   addsd 2 2; addsd 6 6
   addsd 3 3; addsd 7 7
 
-test1d = reptest 1000000 200 do
+test1d = reptest 10000 200 do
   addpd 0 0; addpd 4 4
   addpd 1 1; addpd 5 5
   addpd 2 2; addpd 6 6
