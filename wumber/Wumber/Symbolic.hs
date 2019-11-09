@@ -45,17 +45,21 @@ data Sym a = N a
            | Sym a :- Sym a
            | Sym a :* Sym a
            | Sym a :/ Sym a
+           | Sym a :% Sym a
+           | Sym a :// Sym a
            | Sym a :** Sym a
            | Upper (Sym a) (Sym a)
            | Lower (Sym a) (Sym a)
            | Math !MathFn (Sym a)
   deriving (Eq, Functor, Foldable, Traversable, Generic, Binary)
 
--- Precedences to match their arithmetic counterparts.
+-- Precedences to match their arithmetic counterparts when applicable.
 infixl 6 :+
 infixl 6 :-
 infixl 7 :*
 infixl 7 :/
+infixl 7 :%
+infixl 7 ://
 infixl 8 :**
 
 -- | Unary transcendental functions that would otherwise clutter up 'Sym'.
@@ -76,17 +80,23 @@ data MathFn = Abs
             | Asinh
             | Acosh
             | Atanh
+            | Ceil
+            | Floor
+            | Round
   deriving (Show, Ord, Eq, Generic, Binary)
 
 
 -- | Evaluate a symbolic quantity using Haskell math. To do this, we need a
 --   function that handles 'N' root values.
-eval :: (Floating n, ClosedComparable n) => (a -> n) -> Sym a -> n
+eval :: (Integral n, RealFrac n, Floating n, ClosedComparable n)
+     => (a -> n) -> Sym a -> n
 eval f (N a)       = f a
 eval f (a :+ b)    = eval f a + eval f b
 eval f (a :- b)    = eval f a - eval f b
 eval f (a :* b)    = eval f a * eval f b
 eval f (a :/ b)    = eval f a / eval f b
+eval f (a :% b)    = eval f a `mod` eval f b
+eval f (a :// b)   = eval f a `quot` eval f b
 eval f (a :** b)   = eval f a ** eval f b
 eval f (Upper a b) = eval f a `upper` eval f b
 eval f (Lower a b) = eval f a `lower` eval f b
@@ -95,7 +105,7 @@ eval f (Math m a)  = math_fn m (eval f a)
 
 -- | Converts a 'MathFn' into a Haskell function that operates on some
 --   floating-type value.
-math_fn :: Floating a => MathFn -> a -> a
+math_fn :: (Floating a, RealFrac a, Integral a) => MathFn -> a -> a
 math_fn Abs    = abs
 math_fn Signum = signum
 math_fn Sqrt   = sqrt
@@ -113,6 +123,9 @@ math_fn Tanh   = tanh
 math_fn Asinh  = asinh
 math_fn Acosh  = acosh
 math_fn Atanh  = atanh
+math_fn Ceil   = ceiling
+math_fn Floor  = floor
+math_fn Round  = round
 
 
 -- | Values that can tell you whether they are constants -- i.e. whether 'Sym'
@@ -152,10 +165,23 @@ instance (Constable a, Num a) => Num (Sym a) where
   signum (N a) | is_const a            = N (signum a)
   signum a                             = Math Signum a
 
+instance (Constable a, Integral a) => Integral (Sym a) where
+  quotRem (N a) (N b) | is_const a && is_const b = (N x, N y)
+    where (x, y) = a `quotRem` b
+  quotRem a b = (a :// b, a :% b)
+
+  toInteger (N a) | is_const a = toInteger a
+  toInteger _                  = error "can't force symbolic value to integer"
+
 instance (Constable a, Fractional a) => Fractional (Sym a) where
   fromRational = N . fromRational
   N a / N b | is_const a && is_const b = N (a / b)
   a   / b                              = a :/ b
+
+instance (Constable a, RealFrac a) => RealFrac (Sym a) where
+  properFraction (N a) | is_const a = (N x, N y)
+    where (x, y) = properFraction a
+  properFraction a = (a :// 1, a :% 1)
 
 instance (Constable a, Floating a) => Floating (Sym a) where
   N a ** N b | is_const a && is_const b = N (a ** b)
