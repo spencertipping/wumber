@@ -85,21 +85,65 @@ baseline = rep 0 (return ())
 -- So: add+mul capacity? Just add? Just mul? Does div eat all ports? I think
 -- these are simple "when does stuff not get faster" tests.
 
-addsd   = asm [0xf2, 0x0f, 0x58, 0xc0]  -- addsd %xmm0, %xmm0
-addsd01 = asm [0xf2, 0x0f, 0x58, 0xc1]  -- addsd %xmm0, %xmm1
-mulsd   = asm [0xf2, 0x0f, 0x59, 0xc0]  -- mulsd %xmm0, %xmm0
-divsd   = asm [0xf2, 0x0f, 0x5e, 0xc0]  -- divsd %xmm0, %xmm0
+rr a b = 0xc0 .|. shiftL a 3 .|. b
+
+addsd a b = asm [0xf2, 0x0f, 0x58, rr a b]
+mulsd a b = asm [0xf2, 0x0f, 0x59, rr a b]
+divsd a b = asm [0xf2, 0x0f, 0x5e, rr a b]
+
+addpd a b = asm [0x66, 0x0f, 0x58, rr a b]
+mulpd a b = asm [0x66, 0x0f, 0x59, rr a b]
+divpd a b = asm [0x66, 0x0f, 0x5e, rr a b]
+
+reptest n r m = tsc_fn_med n (rep r m)
+
+
+-- If the pipeline premise is right, these two examples should have different
+-- performance:
+test1a = reptest 1000000 200 $ replicateM_ 8 $ addsd 0 0
+test1b = reptest 1000000 200 $ replicateM_ 2 do
+  addsd 0 0
+  addsd 1 1
+  addsd 2 2
+  addsd 3 3
+
+test1c = reptest 1000000 200 do
+  addsd 0 0; addsd 4 4
+  addsd 1 1; addsd 5 5
+  addsd 2 2; addsd 6 6
+  addsd 3 3; addsd 7 7
+
+test1d = reptest 1000000 200 do
+  addpd 0 0; addpd 4 4
+  addpd 1 1; addpd 5 5
+  addpd 2 2; addpd 6 6
+  addpd 3 3; addpd 7 7
+
+-- (they totally do have different performance: test1c is ~8x faster than test1a)
+
+test2a = reptest 100000 200 $ replicateM_ 8 $ divsd 0 0
+test2b = reptest 100000 200 $ replicateM_ 2 do
+  divsd 0 0
+  divsd 1 1
+  divsd 2 2
+  divsd 3 3
+
+test2c = reptest 100000 200 do
+  divsd 0 0; divsd 4 4
+  divsd 1 1; divsd 5 5
+  divsd 2 2; divsd 6 6
+  divsd 3 3; divsd 7 7
 
 
 foreign import ccall "dynamic" dfn :: FunPtr (IO Double) -> IO Double
 
-tsc_fn asm n = with_jit dfn (assemble_lowlevel asm) \f -> do
+tsc_fn n asm = with_jit dfn (assemble_lowlevel asm) \f -> do
   let each !s _ = (+ s) <$> max 0 <$> f
   f
   t <- foldM each 0 [1..n]
   return $ t / fromIntegral n
 
-tsc_fn_med asm n = with_jit dfn (assemble_lowlevel asm) \f -> do
+tsc_fn_med n asm = with_jit dfn (assemble_lowlevel asm) \f -> do
   f
   xs <- mapM (const f) [1..n]
   return $! xs !! (n `quot` 2)
