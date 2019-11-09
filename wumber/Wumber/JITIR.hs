@@ -69,7 +69,12 @@ un :: Unary -> SSAReg -> State SSAReg (SSA a)
 un op r = reg >>= \o -> return $ UnOp o op r
 
 linearize' :: Sym a -> State SSAReg (SSAReg, [SSA a])
-linearize' (N x)       = do r <- backend x; return (reg_of r, [r])
+
+-- FIXME
+-- If backend expressions refer to other values, we'll need to linearize those
+-- within this process.
+linearize' (N x) = do r <- backend x; return (reg_of r, [r])
+
 linearize' (a :+ b)    = linbin Add a b
 linearize' (a :- b)    = linbin Subtract a b
 linearize' (a :* b)    = linbin Multiply a b

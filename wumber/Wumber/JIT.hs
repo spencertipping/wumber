@@ -22,6 +22,7 @@ import Foreign.Ptr            (Ptr(..), FunPtr(..), castPtr,
                                castPtrToFunPtr, nullPtr, intPtrToPtr)
 import Foreign.Storable       (Storable)
 import GHC.Generics           (Generic(..))
+import System.IO.Unsafe       (unsafePerformIO)
 import System.Posix.Types     (Fd(..), COff(..))
 
 import qualified Data.ByteString as BS
@@ -117,45 +118,45 @@ with_jit convert code f = do
 
 
 -- | Converts a 'MathFn' to a 'FunPtr' to execute that operation on 'Double's.
-dbl_mathfn :: MathFn -> Maybe (FunPtr (Double -> IO Double))
-dbl_mathfn Abs    = Just p_fabs
-dbl_mathfn Signum = Nothing
-dbl_mathfn Log    = Just p_log
-dbl_mathfn Exp    = Just p_exp
-dbl_mathfn Sqrt   = Just p_sqrt
-dbl_mathfn Sin    = Just p_sin
-dbl_mathfn Cos    = Just p_cos
-dbl_mathfn Tan    = Just p_tan
-dbl_mathfn Asin   = Just p_asin
-dbl_mathfn Acos   = Just p_acos
-dbl_mathfn Atan   = Just p_atan
-dbl_mathfn Sinh   = Just p_sinh
-dbl_mathfn Cosh   = Just p_cosh
-dbl_mathfn Tanh   = Just p_tanh
-dbl_mathfn Asinh  = Just p_asinh
-dbl_mathfn Acosh  = Just p_acosh
-dbl_mathfn Atanh  = Just p_atanh
+dbl_mathfn :: MathFn -> FunPtr (Double -> IO Double)
+dbl_mathfn Abs    = p_fabs
+dbl_mathfn Signum = p_signum
+dbl_mathfn Log    = p_log
+dbl_mathfn Exp    = p_exp
+dbl_mathfn Sqrt   = p_sqrt
+dbl_mathfn Sin    = p_sin
+dbl_mathfn Cos    = p_cos
+dbl_mathfn Tan    = p_tan
+dbl_mathfn Asin   = p_asin
+dbl_mathfn Acos   = p_acos
+dbl_mathfn Atan   = p_atan
+dbl_mathfn Sinh   = p_sinh
+dbl_mathfn Cosh   = p_cosh
+dbl_mathfn Tanh   = p_tanh
+dbl_mathfn Asinh  = p_asinh
+dbl_mathfn Acosh  = p_acosh
+dbl_mathfn Atanh  = p_atanh
 
 
 -- | Converts a 'MathFn' to a 'FunPtr' to execute that operation on 'Float's.
-float_mathfn :: MathFn -> Maybe (FunPtr (Float -> IO Float))
-float_mathfn Abs    = Just p_fabsf
-float_mathfn Signum = Nothing
-float_mathfn Log    = Just p_logf
-float_mathfn Exp    = Just p_expf
-float_mathfn Sqrt   = Just p_sqrtf
-float_mathfn Sin    = Just p_sinf
-float_mathfn Cos    = Just p_cosf
-float_mathfn Tan    = Just p_tanf
-float_mathfn Asin   = Just p_asinf
-float_mathfn Acos   = Just p_acosf
-float_mathfn Atan   = Just p_atanf
-float_mathfn Sinh   = Just p_sinhf
-float_mathfn Cosh   = Just p_coshf
-float_mathfn Tanh   = Just p_tanhf
-float_mathfn Asinh  = Just p_asinhf
-float_mathfn Acosh  = Just p_acoshf
-float_mathfn Atanh  = Just p_atanhf
+float_mathfn :: MathFn -> FunPtr (Float -> IO Float)
+float_mathfn Abs    = p_fabsf
+float_mathfn Signum = p_signumf
+float_mathfn Log    = p_logf
+float_mathfn Exp    = p_expf
+float_mathfn Sqrt   = p_sqrtf
+float_mathfn Sin    = p_sinf
+float_mathfn Cos    = p_cosf
+float_mathfn Tan    = p_tanf
+float_mathfn Asin   = p_asinf
+float_mathfn Acos   = p_acosf
+float_mathfn Atan   = p_atanf
+float_mathfn Sinh   = p_sinhf
+float_mathfn Cosh   = p_coshf
+float_mathfn Tanh   = p_tanhf
+float_mathfn Asinh  = p_asinhf
+float_mathfn Acosh  = p_acoshf
+float_mathfn Atanh  = p_atanhf
 
 
 foreign import ccall unsafe "sys/mman.h mmap"
@@ -167,6 +168,9 @@ foreign import ccall unsafe "sys/mman.h munmap"
 
 -- Math function pointers available to JIT assemblers. These are
 -- platform-independent.
+
+p_signum  = unsafePerformIO $ fn1_dbl_p   (return . signum)
+p_signumf = unsafePerformIO $ fn1_float_p (return . signum)
 
 foreign import ccall unsafe "math.h &pow"   p_pow   :: FunPtr (Double -> Double -> IO Double)
 foreign import ccall unsafe "math.h &fmax"  p_fmax  :: FunPtr (Double -> Double -> IO Double)

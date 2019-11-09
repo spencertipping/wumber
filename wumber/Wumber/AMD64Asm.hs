@@ -70,7 +70,7 @@ call p = do
   tell $ B.word64LE (fromIntegral a)
   asm [0xff, 0xd0]
 
-  where WordPtr a = (ptrToWordPtr $ castFunPtrToPtr p)
+  where WordPtr a = ptrToWordPtr $ castFunPtrToPtr p
 
 
 setup_frame :: SSAReg -> Asm ()
@@ -107,11 +107,10 @@ assemble' (BinOp o op l r) = do
                        Divide   -> 0x5e
                        Max      -> 0x5f
                        Min      -> 0x5d
-                       Pow      -> error "no SSE2 opcode for pow"
 
 assemble' (UnOp o op r) = do
   movq_mr r 0
-  call (fromJust (dbl_mathfn op))
+  call (dbl_mathfn op)
   movq_rm 0 o
 
 assemble' (Return o) = do
