@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -25,11 +27,13 @@ module Wumber.DualContour (
 
 import Control.Monad.Zip     (MonadZip, mzip)
 import Data.Bifoldable       (biList)
+import Data.Binary           (Binary(..))
 import Data.Bits             (xor, shiftL, (.&.))
 import Data.Foldable         (toList)
 import Data.Maybe            (isJust, fromJust)
 import Data.Set              (Set)
 import Data.Traversable      (traverse)
+import GHC.Generics          (Generic(..))
 import Lens.Micro            ((^.))
 import Lens.Micro.TH         (makeLenses)
 import Linear.Matrix         (identity, (!!*))
@@ -67,13 +71,13 @@ data Tree a = Bisect  { _t_meta  :: !(TreeMeta a),
             | Inside  { _t_meta :: !(TreeMeta a) }
             | Outside { _t_meta :: !(TreeMeta a) }
             | Surface { _t_meta :: !(TreeMeta a), _t_vertex :: !a }
-  deriving (Show, Ord, Eq)
+  deriving (Show, Ord, Eq, Generic, Binary)
 
 -- | Metadata stored on every tree element. We store this because we had to
 --   compute it when we built the tree.
 data TreeMeta a = TM { _tm_bound   :: !(BoundingBox a),
                        _tm_corners :: ![R] }
-  deriving (Show, Ord, Eq)
+  deriving (Show, Ord, Eq, Generic, Binary)
 
 makeLenses ''Tree
 makeLenses ''TreeMeta

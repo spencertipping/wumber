@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE BangPatterns #-}
 
@@ -11,6 +13,7 @@ module Wumber.JIT where
 
 
 import Control.Monad          (when)
+import Data.Binary            (Binary(..))
 import Data.ByteString        (ByteString)
 import Data.ByteString.Unsafe (unsafeUseAsCStringLen)
 import Foreign.C.Types        (CInt(..), CSize(..))
@@ -18,6 +21,7 @@ import Foreign.Marshal.Utils  (copyBytes)
 import Foreign.Ptr            (Ptr(..), FunPtr(..), castPtr,
                                castPtrToFunPtr, nullPtr, intPtrToPtr)
 import Foreign.Storable       (Storable)
+import GHC.Generics           (Generic(..))
 import System.Posix.Types     (Fd(..), COff(..))
 
 import qualified Data.ByteString as BS
@@ -37,6 +41,16 @@ import Wumber.Symbolic
 --   'Fn1'..'Fn4' let you call back into Haskell or C from inside a JIT context.
 --   This might not be very fast, particularly if you're calling an interpreted
 --   function, but you can do it.
+--
+--   NOTE: 'Fn1' etc are specifically for functions that don't have a
+--   representation in 'Sym' world; don't use them to call things like 'pow' or
+--   'sin'. There are two problems with 'Fn's:
+--
+--   1. They're slower, in part because they defensively spill all FP registers
+--      on x86-64. (TODO: probe them up front to figure out which XMMs we can
+--      keep.)
+--   2. They defeat hashing, which prevents 'Sym' outputs from being cached to
+--      disk.
 
 data JITN r = Const !r
             | Arg   !Int
@@ -44,6 +58,11 @@ data JITN r = Const !r
             | Fn2   (FunPtr (F2 r)) (SJN r) (SJN r)
             | Fn3   (FunPtr (F3 r)) (SJN r) (SJN r) (SJN r)
             | Fn4   (FunPtr (F4 r)) (SJN r) (SJN r) (SJN r) (SJN r)
+  deriving (Show, Eq, Generic, Binary)
+
+instance Binary (FunPtr a) where
+  put x = error "can't safely serialize a FunPtr with relocatable code"
+  get   = error "can't safely deserialize a FunPtr"
 
 type SJN r = Sym (JITN r)
 

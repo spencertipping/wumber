@@ -1,3 +1,5 @@
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE IncoherentInstances #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE KindSignatures #-}
@@ -8,7 +10,9 @@
 module Wumber.BoundingBox where
 
 import Control.Applicative
+import Data.Binary (Binary(..))
 import Data.Foldable
+import GHC.Generics (Generic(..))
 import Lens.Micro
 import Lens.Micro.TH
 import Linear.V2
@@ -22,7 +26,7 @@ import Wumber.ClosedComparable
 -- | An axis-aligned bounding box specified by two vectors. Each coordinate of
 --   '_bmin' is no larger than the corresponding coordinate in '_bmax'.
 data BoundingBox a = BB { _bmin :: !a, _bmax :: !a }
-  deriving (Show, Eq, Ord, Functor)
+  deriving (Show, Eq, Ord, Functor, Generic, Binary)
 
 makeLenses ''BoundingBox
 

@@ -1,6 +1,7 @@
 # Development frontier
 + Sym/JIT
-  + Port CVal logic to Sym
+  + Sym -> constraint isofn?
+  + Sym -> Isofn
   + Trivial AMD64 JIT for Sym (no compile analysis/optimization)
   + Reverse-engineer instruction latency/throughput
   + Auto-vectorization using XMM sidecars?
@@ -14,12 +15,15 @@
 + Dual contour
   + Cache boundaries to disk (requires hashable for Sym)
   + Mesh of quads, not just lines
-  + LOD based on view matrix
 + Parts
   + Iso-libraries for screws, beams, etc
   + Bearings
   + Axles, pulleys, belts
   + Use constraints to solve for belt path between pulleys
++ Shell
+  + Model as pure data structure
+  + JIT/iso-mesh inside shell process
+  + LOD based on view matrix
 
 
 ## Long-term
