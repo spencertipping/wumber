@@ -146,4 +146,4 @@ tsc_fn n asm = with_jit dfn (assemble_lowlevel asm) \f -> do
 tsc_fn_med n asm = with_jit dfn (assemble_lowlevel asm) \f -> do
   f
   xs <- mapM (const f) [1..n]
-  return $! xs !! (n `quot` 2)
+  return $! sort xs !! (n `quot` 2)
