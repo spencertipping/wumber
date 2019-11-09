@@ -48,6 +48,11 @@ import Wumber.ClosedComparable
 --   we run into all sorts of type problems if we try. The reason is that these
 --   numbers can't be converted to anything concrete -- just like things break
 --   if we try to provide 'Ord'. So we have our own constructors instead.
+--
+--   TODO: move 'Const' and 'Arg'/'Var' here. Having two layers complicates
+--   things substantially by adding a lot more typeclass instances, and for
+--   little purpose.
+
 data Sym a = N a
            | Sym a :+ Sym a
            | Sym a :- Sym a
