@@ -17,6 +17,9 @@
   + LOD based on view matrix
 + Parts
   + Iso-libraries for screws, beams, etc
+  + Bearings
+  + Axles, pulleys, belts
+  + Use constraints to solve for belt path between pulleys
 
 
 ## Long-term
