@@ -65,12 +65,16 @@ test-suite wumber-tests
                      , WumberTest.ConstraintSolver
                      , WumberTest.JIT
   build-depends:       base >= 4.12
+                     , binary
                      , bytestring
+                     , containers
                      , generic-random
                      , linear
                      , microlens >= 0.4
                      , process
                      , QuickCheck
+                     , unix
+                     , utf8-string
                      , vector
                      , wumber
 

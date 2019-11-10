@@ -22,12 +22,17 @@ module Wumber.Symbolic (
   Sym(..),
   MathFn(..),
   Constable(..),
+  Roundable(..),
+  Mod(..),
   math_fn,
   eval,
+  args_in,
+  binary,
 ) where
 
 
 import Data.Binary  (Binary(..))
+import Data.Set     (Set(..), empty, singleton, union)
 import Data.Vector  (Vector, (!))
 import Foreign.Ptr  (FunPtr(..))
 import GHC.Generics (Generic(..))
@@ -61,6 +66,18 @@ infixl 7 :*
 infixl 7 :/
 infixl 7 :%
 infixl 8 :**
+
+binary :: Sym a -> Maybe (Sym a, Sym a)
+binary (x :+ y)    = Just (x, y)
+binary (x :- y)    = Just (x, y)
+binary (x :* y)    = Just (x, y)
+binary (x :/ y)    = Just (x, y)
+binary (x :% y)    = Just (x, y)
+binary (x :** y)   = Just (x, y)
+binary (Upper x y) = Just (x, y)
+binary (Lower x y) = Just (x, y)
+binary _           = Nothing
+
 
 -- | Unary transcendental functions that would otherwise clutter up 'Sym'.
 data MathFn = Abs
@@ -126,6 +143,14 @@ math_fn Atanh  = atanh
 math_fn Ceil   = ceil'
 math_fn Floor  = floor'
 math_fn Round  = round'
+
+
+-- | Returns a set of all 'Arg' indexes used by an expression.
+args_in :: Sym a -> Set Int
+args_in (N _)      = empty
+args_in (Arg x)    = singleton x
+args_in (Math _ e) = args_in e
+args_in x          = args_in x' `union` args_in y' where Just (x', y') = binary x
 
 
 -- | Values that support floating-point 'mod', but without using Haskell's
