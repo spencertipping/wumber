@@ -29,9 +29,9 @@ show_expressions = True
 show_disassembly = True
 
 
-debug :: Sym Double -> BS.ByteString -> IO ()
-debug sym machinecode = do
-  when show_expressions $ putStrLn (show sym)
+debug :: VS.Vector Double -> Sym Double -> BS.ByteString -> IO ()
+debug v sym machinecode = do
+  when show_expressions $ putStrLn (show (VS.length v, sym))
   when show_disassembly do
     (Just i, _, _, p) <- createProcess
                          (proc "ndisasm" ["-b64", "-"]) { std_in = CreatePipe }
@@ -55,20 +55,17 @@ instance Arbitrary (Vector Double) where
   arbitrary = sized \n -> VS.fromList <$> replicateM n arbitrary
 
 
-gen_symtree :: Int -> Gen (Sym Double)
-gen_symtree maxarg = resize maxarg arbitrary
-
-
-prop_symjit :: Vector Double -> Property
-prop_symjit v = VS.length v > 0 && VS.length v <= 2048 ==> property do
-  s <- gen_symtree (VS.length v - 1)
+prop_symjit :: Sym Double -> Vector Double -> Property
+prop_symjit s v = VS.length v > 0 && VS.length v <= 2047 ==> property do
   let code = assemble_ssa $ linearize s
-      fn   = unsafePerformIO do debug s code; return $! VS.unsafeWith v
+      fn   = unsafePerformIO do debug v s code; return $! VS.unsafeWith v
       m    = with_jit dblfn code fn
       x    = eval (v !) s
-  if isNaN x
+      y    = unsafePerformIO m
+      diff = abs (x - y)
+  if isNaN x || isNaN y
     then discard
-    else return $ counterexample (show s) $ x === unsafePerformIO m
+    else counterexample (show (s, x, y)) $ diff < 1e-8
 
 
 return []

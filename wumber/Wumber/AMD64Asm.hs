@@ -99,9 +99,11 @@ movq_ar i x = do
 
 call :: FunPtr a -> Asm ()
 call p = do
+  hex "57"           -- save %rdi
   hex "48b8"
   tell $ B.word64LE (fromIntegral a)
   hex "ffd0"
+  hex "5f"           -- restore %rdi
   where WordPtr a = P.ptrToWordPtr $ P.castFunPtrToPtr p
 
 
