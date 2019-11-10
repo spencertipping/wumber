@@ -7,7 +7,7 @@ module WumberTest.AMD64Asm where
 
 
 import Control.Concurrent   (forkIO)
-import Control.Monad        (replicateM, when)
+import Control.Monad        (replicateM, replicateM_, when)
 import Data.Char            (chr)
 import Data.Maybe           (fromMaybe, fromJust, isNothing, isJust)
 import Data.Set
@@ -108,6 +108,11 @@ bulletproof thing = do
 forkjit :: BS.ByteString -> Sym Double -> Vector Double -> IO (Maybe Double)
 forkjit code s v = do debug v s code
                       bulletproof $ with_jit dblfn code $ VS.unsafeWith v
+
+
+prop_trivial_stability :: Property
+prop_trivial_stability = prop_symjit s (VS.fromList [0])
+  where s = Math Cos (N 11.014994588887294)
 
 
 prop_symjit :: Sym Double -> Vector Double -> Property
