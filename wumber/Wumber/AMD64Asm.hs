@@ -6,12 +6,13 @@
 module Wumber.AMD64Asm where
 
 
-import Control.Monad.RWS   (tell)
+import Control.Monad       (when)
 import Control.Monad.State (StateT, execStateT)
+import Control.Monad.RWS   (tell)
 import Data.Bits
-import Data.Maybe        (fromJust)
-import Foreign.Ptr       (FunPtr(..), WordPtr(..), ptrToWordPtr, castFunPtrToPtr)
-import GHC.Word          (Word8(..), Word16(..))
+import Data.Maybe          (fromJust)
+import Foreign.Ptr         (FunPtr(..), WordPtr(..))
+import GHC.Word            (Word8(..), Word16(..))
 
 import qualified Data.ByteString         as BS
 import qualified Data.ByteString.Builder as B
@@ -30,59 +31,92 @@ import Wumber.JITIR
 type ProcessorState = ()
 
 type XMMReg = Word8
-type Asm' a = StateT ProcessorState Asm a
+type Asm    = Assembler () ProcessorState
 
 
 assemble_ssa :: (SSAReg, [SSA Double]) -> BS.ByteString
-assemble_ssa (nregs, insns) = assemble $ flip execStateT () do
-  setup_frame nregs
-  mapM_ assemble' insns
+assemble_ssa (nregs, insns) = assemble m () ()
+  where m = do setup_frame nregs
+               mapM_ assemble' insns
 
 
-asm :: [Word8] -> Asm' ()
-asm []     = return ()
-asm (x:xs) = do emit (B.word8 x); asm xs
+leave_ret = hex "c9c3"
 
-rbp32 :: SSAReg -> Asm' ()
+addsd = rex0_modrm "f2" "0f58"
+subsd = rex0_modrm "f2" "0f5c"
+mulsd = rex0_modrm "f2" "0f59"
+divsd = rex0_modrm "f2" "0f5e"
+maxsd = rex0_modrm "f2" "0f5f"
+minsd = rex0_modrm "f2" "0f5d"
+
+lfence     = hex "0faee8"
+rdtsc_insn = hex "0f31"
+
+shl r bits = do rexw_modrm "" "c1" 3 4 r; tell $ B.word8 bits
+orq        = rexw_modrm "" "0b"
+subq       = rexw_modrm "" "2b"
+
+cvtqi2sd = rexw_modrm "f2" "0f2a"
+
+
+rex_modrm :: String -> Bool -> String -> Word8 -> Word8 -> Word8 -> Asm ()
+rex_modrm ps w h mod r m = do hex ps
+                              when (rexb /= 0x40) $ tell $ B.word8 rexb
+                              hex h
+                              tell $ B.word8 $ modrm mod r m
+  where rexb = rex w r m
+
+rex0_modrm = flip rex_modrm False
+rexw_modrm = flip rex_modrm True
+
+rex :: Bool -> Word8 -> Word8 -> Word8
+rex w r b = (if w then 0x48 else 0x40)
+            .|. shiftR (r .&. 0x08) 1
+            .|. shiftR (b .&. 0x08) 3
+
+modrm :: Word8 -> Word8 -> Word8 -> Word8
+modrm mod r m = shiftL mod 6 .|. shiftL (r .&. 0x07) 3 .|. m .&. 0x07
+
+
+rbp32 :: SSAReg -> Asm ()
 rbp32 s = tell $ B.word32LE (fromIntegral $ (s + 1) * (-8))
 
 
-movq_mr :: SSAReg -> XMMReg -> Asm' ()
+movq_mr :: SSAReg -> XMMReg -> Asm ()
 movq_mr s x = do
-  asm [0xf3, 0x0f, 0x7e, shiftL x 3 .|. 0x85]
+  rex0_modrm "f3" "0f7e" 2 x 5
   rbp32 s
 
-movq_rm :: XMMReg -> SSAReg -> Asm' ()
+movq_rm :: XMMReg -> SSAReg -> Asm ()
 movq_rm x s = do
-  asm [0x66, 0x0f, 0xd6, shiftL x 3 .|. 0x85]
+  rex0_modrm "66" "0fd6" 2 x 5
   rbp32 s
 
-movq_ar :: Int -> XMMReg -> Asm' ()
+movq_ar :: Int -> XMMReg -> Asm ()
 movq_ar i x = do
-  asm [0xf3, 0x0f, 0x7e, shiftL x 3 .|. 0x87]
+  rex0_modrm "f3" "0f7e" 2 x 7
   tell $ B.word32LE (fromIntegral $ i * 8)
 
-call :: FunPtr a -> Asm' ()
+call :: FunPtr a -> Asm ()
 call p = do
-  asm [0x48, 0xb8]
+  hex "48b8"
   tell $ B.word64LE (fromIntegral a)
-  asm [0xff, 0xd0]
+  hex "ffd0"
+  where WordPtr a = P.ptrToWordPtr $ P.castFunPtrToPtr p
 
-  where WordPtr a = ptrToWordPtr $ castFunPtrToPtr p
 
-
-setup_frame :: SSAReg -> Asm' ()
+setup_frame :: SSAReg -> Asm ()
 setup_frame nregs = do
-  asm [0xc8]
+  hex "c8"
   tell $ B.word16LE (fromIntegral $ nregs * 8)
-  asm [0x00]
+  hex "00"
 
 
-assemble' :: SSA Double -> Asm' ()
+assemble' :: SSA Double -> Asm ()
 assemble' (Const r x) = do
-  asm [0x48, 0xb8]
+  hex "48b8"
   tell $ B.doubleLE x
-  asm [0x48, 0x89, 0x85]
+  hex "488985"
   rbp32 r
 
 assemble' (PtrArg r i) = do
@@ -94,12 +128,12 @@ assemble' (BinOp o op l r) = do
   movq_mr r 1
   case op of Pow      -> call p_pow
              Mod      -> call p_fmod
-             Add      -> asm [0xf2, 0x0f, 0x58, 0xc1]
-             Subtract -> asm [0xf2, 0x0f, 0x5c, 0xc1]
-             Multiply -> asm [0xf2, 0x0f, 0x59, 0xc1]
-             Divide   -> asm [0xf2, 0x0f, 0x5e, 0xc1]
-             Max      -> asm [0xf2, 0x0f, 0x5f, 0xc1]
-             Min      -> asm [0xf2, 0x0f, 0x5d, 0xc1]
+             Add      -> addsd 3 0 1
+             Subtract -> subsd 3 0 1
+             Multiply -> mulsd 3 0 1
+             Divide   -> divsd 3 0 1
+             Max      -> maxsd 3 0 1
+             Min      -> minsd 3 0 1
   movq_rm 0 o
 
 assemble' (UnOp o op r) = do
@@ -109,4 +143,4 @@ assemble' (UnOp o op r) = do
 
 assemble' (Return o) = do
   movq_mr o 0
-  asm [0xc9, 0xc3]
+  leave_ret

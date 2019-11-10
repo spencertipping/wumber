@@ -82,6 +82,7 @@ linearize' (a :+ b)    = linbin Add a b
 linearize' (a :- b)    = linbin Subtract a b
 linearize' (a :* b)    = linbin Multiply a b
 linearize' (a :/ b)    = linbin Divide a b
+linearize' (a :% b)    = linbin Mod a b
 linearize' (a :** b)   = linbin Pow a b
 linearize' (Upper a b) = linbin Max a b
 linearize' (Lower a b) = linbin Min a b

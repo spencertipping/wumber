@@ -83,16 +83,12 @@ data MathFn = Abs
             | Ceil
             | Floor
             | Round
-  deriving (Show, Ord, Eq, Generic, Binary)
-
-
-foreign import ccall unsafe "math.h fmod"  c_fmod  :: Double -> Double -> Double
-foreign import ccall unsafe "math.h fmodf" c_fmodf :: Float  -> Float  -> Float
+  deriving (Show, Ord, Eq, Generic, Binary, Enum)
 
 
 -- | Evaluate a symbolic quantity using Haskell math. To do this, we need a
 --   function that handles 'Arg' values.
-eval :: (Integral a, RealFrac a, Floating a, ClosedComparable a)
+eval :: (Floating a, Mod a, Roundable a, ClosedComparable a)
      => (Int -> a) -> Sym a -> a
 eval f (N a)       = a
 eval f (Arg n)     = f n
@@ -100,7 +96,7 @@ eval f (a :+ b)    = eval f a + eval f b
 eval f (a :- b)    = eval f a - eval f b
 eval f (a :* b)    = eval f a * eval f b
 eval f (a :/ b)    = eval f a / eval f b
-eval f (a :% b)    = eval f a `mod` eval f b
+eval f (a :% b)    = eval f a % eval f b
 eval f (a :** b)   = eval f a ** eval f b
 eval f (Upper a b) = eval f a `upper` eval f b
 eval f (Lower a b) = eval f a `lower` eval f b
@@ -109,7 +105,7 @@ eval f (Math m a)  = math_fn m (eval f a)
 
 -- | Converts a 'MathFn' into a Haskell function that operates on some
 --   floating-type value.
-math_fn :: (Floating a, RealFrac a, Integral a) => MathFn -> a -> a
+math_fn :: (Floating a, Roundable a, Mod a) => MathFn -> a -> a
 math_fn Abs    = abs
 math_fn Signum = signum
 math_fn Sqrt   = sqrt
@@ -127,9 +123,9 @@ math_fn Tanh   = tanh
 math_fn Asinh  = asinh
 math_fn Acosh  = acosh
 math_fn Atanh  = atanh
-math_fn Ceil   = ceiling
-math_fn Floor  = floor
-math_fn Round  = round
+math_fn Ceil   = ceil'
+math_fn Floor  = floor'
+math_fn Round  = round'
 
 
 -- | Values that support floating-point 'mod', but without using Haskell's
@@ -144,6 +140,34 @@ infixl 7 %
 
 instance Mod Double where (%) = c_fmod
 instance Mod Float  where (%) = c_fmodf
+
+foreign import ccall unsafe "math.h fmod"  c_fmod  :: Double -> Double -> Double
+foreign import ccall unsafe "math.h fmodf" c_fmodf :: Float  -> Float  -> Float
+
+
+-- | Same story as 'Mod'; Haskell's 'RealFrac' demands more concreteness than we
+--   can provide.
+class Roundable a where
+  ceil'  :: a -> a
+  floor' :: a -> a
+  round' :: a -> a
+
+instance Roundable Double where
+  ceil'  = c_ceil
+  floor' = c_floor
+  round' = c_round
+
+instance Roundable Float where
+  ceil'  = c_ceilf
+  floor' = c_floorf
+  round' = c_roundf
+
+foreign import ccall unsafe "math.h ceil"   c_ceil   :: Double -> Double
+foreign import ccall unsafe "math.h ceilf"  c_ceilf  :: Float  -> Float
+foreign import ccall unsafe "math.h floor"  c_floor  :: Double -> Double
+foreign import ccall unsafe "math.h floorf" c_floorf :: Float  -> Float
+foreign import ccall unsafe "math.h round"  c_round  :: Double -> Double
+foreign import ccall unsafe "math.h roundf" c_roundf :: Float  -> Float
 
 
 -- | Values that can tell you whether they are constants -- i.e. whether 'Sym'

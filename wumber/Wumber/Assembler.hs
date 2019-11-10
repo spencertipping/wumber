@@ -7,35 +7,31 @@
 --   Assemblers are similar to 'ByteString' 'Builder's, but monadic (i.e.
 --   non-associative) so they can track byte offsets.
 
-module Wumber.Assembler where
+module Wumber.Assembler (
+  assemble,
+  Assembler,
+  hex
+) where
 
 
-import Control.Monad.RWS (RWS, evalRWS, get, modify, tell)
-import Data.String       (IsString(..))
+import Control.Monad.RWS (RWS, evalRWS, tell)
+import Numeric           (readHex)
 
 import qualified Data.ByteString         as BS
 import qualified Data.ByteString.Builder as B
 import qualified Data.ByteString.Lazy    as BL
 
 
--- | Assembler state, which is currently just the byte offset from the beginning
---   of code.
-type AsmState = Int
-type Asm      = RWS () B.Builder AsmState
-
-
 -- | Assembles code, returning a strict 'ByteString' of the result. You can use
 --   this directly with 'with_jit' or 'compile' from 'Wumber.JIT'.
-assemble :: Asm a -> BS.ByteString
-assemble m = BL.toStrict $ B.toLazyByteString b where b = snd $ evalRWS m () 0
+assemble :: Assembler r s a -> r -> s -> BS.ByteString
+assemble m r s = BL.toStrict $ B.toLazyByteString $ snd $ evalRWS m r s
 
 
-label :: Asm Int
-label = get
+type Assembler r s = RWS r B.Builder s
 
-emit :: B.Builder -> Asm ()
-emit b = do
-  tell b
-  modify (+ fromIntegral (BL.length $ B.toLazyByteString b))
 
--- TODO: actual DSL stuff (once I figure out what I want it to be)
+hex :: String -> Assembler r s ()
+hex []        = return ()
+hex (d1:d2:s) = do tell $ B.word8 (fromIntegral h); hex s
+  where [(h, _)] = readHex [d1, d2]
