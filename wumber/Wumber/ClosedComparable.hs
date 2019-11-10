@@ -19,6 +19,7 @@ class ClosedComparable a where
 
 instance {-# OVERLAPPABLE #-} Ord a => ClosedComparable a where
   {-# SPECIALIZE instance ClosedComparable Double #-}
+  {-# SPECIALIZE instance ClosedComparable Float #-}
   lower = min
   upper = max
 

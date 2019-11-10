@@ -105,7 +105,7 @@ data MathFn = Abs
 
 -- | Evaluate a symbolic quantity using Haskell math. To do this, we need a
 --   function that handles 'Arg' values.
-eval :: (Floating a, Mod a, Roundable a, ClosedComparable a)
+eval :: (Floating a, RealFloat a, Mod a, Roundable a, ClosedComparable a)
      => (Int -> a) -> Sym a -> a
 eval f (N a)       = a
 eval f (Arg n)     = f n
@@ -115,9 +115,18 @@ eval f (a :* b)    = eval f a * eval f b
 eval f (a :/ b)    = eval f a / eval f b
 eval f (a :% b)    = eval f a % eval f b
 eval f (a :** b)   = eval f a ** eval f b
-eval f (Upper a b) = eval f a `upper` eval f b
-eval f (Lower a b) = eval f a `lower` eval f b
+eval f (Upper a b) = eval f a `nan_upper` eval f b
+eval f (Lower a b) = eval f a `nan_lower` eval f b
 eval f (Math m a)  = math_fn m (eval f a)
+
+
+nan_upper x y | isNaN x = x
+              | isNaN y = y
+              | otherwise = upper x y
+
+nan_lower x y | isNaN x = x
+              | isNaN y = y
+              | otherwise = lower x y
 
 
 -- | Converts a 'MathFn' into a Haskell function that operates on some

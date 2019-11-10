@@ -31,6 +31,7 @@ import qualified Data.ByteString.UTF8 as BU
 import qualified Data.Vector.Storable as VS
 
 import Wumber.AMD64Asm
+import Wumber.ClosedComparable
 import Wumber.JIT
 import Wumber.JITIR
 import Wumber.Symbolic
@@ -40,7 +41,7 @@ import Wumber.Symbolic
 show_expressions = False
 show_disassembly = False
 
-bulletproof_jit = True
+bulletproof_jit = False
 
 
 debug :: VS.Vector Double -> Sym Double -> BS.ByteString -> IO ()
@@ -84,6 +85,12 @@ foreign import ccall unsafe "sys/wait.h waitpid" c_waitpid
   :: Pid -> Ptr CInt -> Int -> IO Pid
 
 
+-- FIXME
+-- This function spinloops in the fork sometimes. Possibly a confused select()
+-- call given that we've forked. On the bright side, it can be useful if you're
+-- trying to track down segfaults in the JIT (when it doesn't hang, it helps
+-- quickcheck trim down your test cases).
+
 bulletproof :: Bin.Binary a => IO a -> IO (Maybe a)
 bulletproof thing = do
   (r, w) <- createPipe
@@ -91,12 +98,13 @@ bulletproof thing = do
   if p /= 0
     then do p_wstat <- malloc
             hClose w
+            !b <- BS.hGetContents r
             c_waitpid p p_wstat 0
             stat <- peek p_wstat
             free p_wstat
-            if stat /= 0
-              then return Nothing
-              else Just <$> Bin.decode <$> BL.hGetContents r
+            return if stat /= 0
+                   then Nothing
+                   else Just $ Bin.decode $ BL.fromStrict b
 
     else do x <- thing
             hClose r
@@ -122,19 +130,23 @@ prop_trivial_stability = prop_symjit s (VS.fromList [0])
 
 
 prop_symjit :: Sym Double -> Vector Double -> Property
-prop_symjit s v = size_ok && bounds_ok ==> property test
+prop_symjit s v = withMaxSuccess 10000 $ size_ok && bounds_ok ==> property test
   where l         = VS.length v
         size_ok   = l > 0 && l <= 2047
         bounds_ok = fromMaybe 0 (lookupMax (args_in s)) < l
-        test | isNaN x || isNaN y' = discard
-             | otherwise = counterexample help $ isJust y && abs (x - y') < 1e-8
 
-          where x    = eval (v !) s
-                code = assemble_ssa $ linearize s
-                y    = unsafePerformIO $ forkjit code s v
-                y'   = fromMaybe (1/0) y
-                help = "\n\n" ++ show (s, x, y) ++ "\n\n"
-                       ++ BU.toString (unsafePerformIO (ndisasm code))
+        test | isNaN x || isNaN y' = discard
+             | isInfinite x        = property $ isInfinite y'
+             | isInfinite y'       = property $ isInfinite x
+             | otherwise           = counterexample help test_ok
+
+        test_ok = isJust y && abs (x - y') < 1e-8
+        x       = eval (v !) s
+        code    = assemble_ssa $ linearize s
+        y       = unsafePerformIO $ forkjit code s v
+        y'      = fromMaybe (1/0) y
+        help    = "\n\n" ++ show (s, x, y) ++ "\n\n"
+                         ++ BU.toString (unsafePerformIO (ndisasm code))
 
 
 return []
