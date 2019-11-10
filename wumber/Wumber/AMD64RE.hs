@@ -22,7 +22,7 @@ import Wumber.JIT
 
 assemble_lowlevel :: Asm a -> BS.ByteString
 assemble_lowlevel m = assemble m' () ()
-  where m' = do setup_frame 0
+  where m' = do enter 0
                 m
                 leave_ret
 

@@ -40,6 +40,8 @@ import Wumber.Symbolic
 show_expressions = False
 show_disassembly = False
 
+bulletproof_jit = True
+
 
 debug :: VS.Vector Double -> Sym Double -> BS.ByteString -> IO ()
 debug v sym machinecode = do
@@ -106,8 +108,12 @@ bulletproof thing = do
 
 
 forkjit :: BS.ByteString -> Sym Double -> Vector Double -> IO (Maybe Double)
-forkjit code s v = do debug v s code
-                      bulletproof $ with_jit dblfn code $ VS.unsafeWith v
+forkjit code s v = do
+  debug v s code
+  do_jit $ with_jit dblfn code $ VS.unsafeWith v
+  where do_jit = if bulletproof_jit
+                 then bulletproof
+                 else fmap Just
 
 
 prop_trivial_stability :: Property

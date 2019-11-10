@@ -36,8 +36,17 @@ type Asm    = Assembler () ProcessorState
 
 assemble_ssa :: (SSAReg, [SSA Double]) -> BS.ByteString
 assemble_ssa (nregs, insns) = assemble m () ()
-  where m = do setup_frame nregs
+  where m = do enter nregs
                mapM_ assemble' insns
+
+
+enter :: SSAReg -> Asm ()
+enter nregs = do
+  hex "c8"
+  tell $ B.word16LE (fromIntegral $ nregs * 8)
+  hex "00"
+  hex "50"                  -- at least one more slot for %rdi storage
+  andqimm8 3 4 (-16)        -- align %rsp to 16-byte boundary
 
 
 leave_ret = hex "c9c3"
@@ -52,9 +61,11 @@ minsd = rex0_modrm "f2" "0f5d"
 lfence     = hex "0faee8"
 rdtsc_insn = hex "0f31"
 
-shl r bits = do rexw_modrm "" "c1" 3 4 r; tell $ B.word8 bits
-orq        = rexw_modrm "" "0b"
-subq       = rexw_modrm "" "2b"
+shl r bits       = do rexw_modrm "" "c1" 3 4 r; tell $ B.word8 bits
+orq              = rexw_modrm "" "0b"
+andq             = rexw_modrm "" "23"
+andqimm8 mod m i = do rexw_modrm "" "83" mod 4 m; tell $ B.int8 i
+subq             = rexw_modrm "" "2b"
 
 cvtqi2sd = rexw_modrm "f2" "0f2a"
 
@@ -79,39 +90,35 @@ modrm mod r m = shiftL mod 6 .|. shiftL (r .&. 0x07) 3 .|. m .&. 0x07
 
 
 rbp32 :: SSAReg -> Asm ()
-rbp32 s = tell $ B.word32LE (fromIntegral $ (s + 1) * (-8))
+rbp32 s = tell $ B.int32LE (fromIntegral $ (s + 1) * (-8))
 
 
-movq_mr :: SSAReg -> XMMReg -> Asm ()
-movq_mr s x = do
+movq_mr = rexw_modrm "" "8b"
+movq_rm = rexw_modrm "" "89"
+
+movsd_mr :: SSAReg -> XMMReg -> Asm ()
+movsd_mr s x = do
   rex0_modrm "f3" "0f7e" 2 x 5
   rbp32 s
 
-movq_rm :: XMMReg -> SSAReg -> Asm ()
-movq_rm x s = do
+movsd_rm :: XMMReg -> SSAReg -> Asm ()
+movsd_rm x s = do
   rex0_modrm "66" "0fd6" 2 x 5
   rbp32 s
 
-movq_ar :: Int -> XMMReg -> Asm ()
-movq_ar i x = do
+movsd_ar :: Int -> XMMReg -> Asm ()
+movsd_ar i x = do
   rex0_modrm "f3" "0f7e" 2 x 7
   tell $ B.word32LE (fromIntegral $ i * 8)
 
 call :: FunPtr a -> Asm ()
 call p = do
-  hex "57"           -- save %rdi
+  movq_rm 0 6 4; hex "24"         -- save %rdi
   hex "48b8"
   tell $ B.word64LE (fromIntegral a)
   hex "ffd0"
-  hex "5f"           -- restore %rdi
+  movq_mr 0 6 4; hex "24"         -- restore %rdi
   where WordPtr a = P.ptrToWordPtr $ P.castFunPtrToPtr p
-
-
-setup_frame :: SSAReg -> Asm ()
-setup_frame nregs = do
-  hex "c8"
-  tell $ B.word16LE (fromIntegral $ nregs * 8)
-  hex "00"
 
 
 assemble' :: SSA Double -> Asm ()
@@ -122,12 +129,12 @@ assemble' (Const r x) = do
   rbp32 r
 
 assemble' (PtrArg r i) = do
-  movq_ar i 0
-  movq_rm 0 r
+  movsd_ar i 0
+  movsd_rm 0 r
 
 assemble' (BinOp o op l r) = do
-  movq_mr l 0
-  movq_mr r 1
+  movsd_mr l 0
+  movsd_mr r 1
   case op of Pow      -> call p_pow
              Mod      -> call p_fmod
              Add      -> addsd 3 0 1
@@ -136,13 +143,13 @@ assemble' (BinOp o op l r) = do
              Divide   -> divsd 3 0 1
              Max      -> maxsd 3 0 1
              Min      -> minsd 3 0 1
-  movq_rm 0 o
+  movsd_rm 0 o
 
 assemble' (UnOp o op r) = do
-  movq_mr r 0
+  movsd_mr r 0
   call (dbl_mathfn op)
-  movq_rm 0 o
+  movsd_rm 0 o
 
 assemble' (Return o) = do
-  movq_mr o 0
+  movsd_mr o 0
   leave_ret
