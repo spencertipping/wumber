@@ -17,6 +17,7 @@ data Binary = Add
             | Multiply
             | Divide
             | Pow
+            | Mod
             | Max
             | Min
   deriving (Show, Eq)
@@ -43,14 +44,16 @@ linearize s = (n, l ++ [Return r]) where ((r, l), n) = runState (linearize' s) 0
 
 
 type SSAReg = Int
-data SSA a = Backend SSAReg a
-           | BinOp   SSAReg Binary SSAReg SSAReg
-           | UnOp    SSAReg Unary  SSAReg
-           | Return  SSAReg
+data SSA a = Const  SSAReg a
+           | PtrArg SSAReg Int
+           | BinOp  SSAReg Binary SSAReg SSAReg
+           | UnOp   SSAReg Unary  SSAReg
+           | Return SSAReg
   deriving (Show, Eq)
 
 reg_of :: SSA a -> SSAReg
-reg_of (Backend r _)   = r
+reg_of (Const r _)     = r
+reg_of (PtrArg r _)    = r
 reg_of (BinOp r _ _ _) = r
 reg_of (UnOp r _ _)    = r
 reg_of (Return r)      = r
@@ -59,8 +62,11 @@ reg_of (Return r)      = r
 reg :: State SSAReg SSAReg
 reg = do r <- get; modify' (+ 1); return r
 
-backend :: a -> State SSAReg (SSA a)
-backend a = reg >>= return . flip Backend a
+constant :: a -> State SSAReg (SSA a)
+constant a = reg >>= return . flip Const a
+
+arg :: Int -> State SSAReg (SSA a)
+arg i = reg >>= return . flip PtrArg i
 
 bin :: Binary -> SSAReg -> SSAReg -> State SSAReg (SSA a)
 bin op l r = reg >>= \o -> return $ BinOp o op l r
@@ -70,11 +76,8 @@ un op r = reg >>= \o -> return $ UnOp o op r
 
 linearize' :: Sym a -> State SSAReg (SSAReg, [SSA a])
 
--- FIXME
--- If backend expressions refer to other values, we'll need to linearize those
--- within this process.
-linearize' (N x) = do r <- backend x; return (reg_of r, [r])
-
+linearize' (N x)       = do r <- constant x; return (reg_of r, [r])
+linearize' (Arg i)     = do r <- arg i; return (reg_of r, [r])
 linearize' (a :+ b)    = linbin Add a b
 linearize' (a :- b)    = linbin Subtract a b
 linearize' (a :* b)    = linbin Multiply a b

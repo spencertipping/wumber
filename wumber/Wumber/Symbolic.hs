@@ -1,6 +1,3 @@
-{-# LANGUAGE MonoLocalBinds #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE BlockArguments #-}
@@ -43,23 +40,14 @@ import Wumber.ClosedComparable
 --   arbitrary type that you specify. 'a' should be 'Constable'; if operands are
 --   'is_const' then the operations will happen at construction time and won't
 --   be present in the symbolic value.
---
---   NOTE: we can't implement mod/quot in terms of Haskell's numeric hierarchy;
---   we run into all sorts of type problems if we try. The reason is that these
---   numbers can't be converted to anything concrete -- just like things break
---   if we try to provide 'Ord'. So we have our own constructors instead.
---
---   TODO: move 'Const' and 'Arg'/'Var' here. Having two layers complicates
---   things substantially by adding a lot more typeclass instances, and for
---   little purpose.
 
 data Sym a = N a
+           | Arg Int
            | Sym a :+ Sym a
            | Sym a :- Sym a
            | Sym a :* Sym a
            | Sym a :/ Sym a
            | Sym a :% Sym a
-           | Sym a :// Sym a
            | Sym a :** Sym a
            | Upper (Sym a) (Sym a)
            | Lower (Sym a) (Sym a)
@@ -72,7 +60,6 @@ infixl 6 :-
 infixl 7 :*
 infixl 7 :/
 infixl 7 :%
-infixl 7 ://
 infixl 8 :**
 
 -- | Unary transcendental functions that would otherwise clutter up 'Sym'.
@@ -99,17 +86,21 @@ data MathFn = Abs
   deriving (Show, Ord, Eq, Generic, Binary)
 
 
+foreign import ccall unsafe "math.h fmod"  c_fmod  :: Double -> Double -> Double
+foreign import ccall unsafe "math.h fmodf" c_fmodf :: Float  -> Float  -> Float
+
+
 -- | Evaluate a symbolic quantity using Haskell math. To do this, we need a
---   function that handles 'N' root values.
-eval :: (Integral n, RealFrac n, Floating n, ClosedComparable n)
-     => (a -> n) -> Sym a -> n
-eval f (N a)       = f a
+--   function that handles 'Arg' values.
+eval :: (Integral a, RealFrac a, Floating a, ClosedComparable a)
+     => (Int -> a) -> Sym a -> a
+eval f (N a)       = a
+eval f (Arg n)     = f n
 eval f (a :+ b)    = eval f a + eval f b
 eval f (a :- b)    = eval f a - eval f b
 eval f (a :* b)    = eval f a * eval f b
 eval f (a :/ b)    = eval f a / eval f b
 eval f (a :% b)    = eval f a `mod` eval f b
-eval f (a :// b)   = eval f a `quot` eval f b
 eval f (a :** b)   = eval f a ** eval f b
 eval f (Upper a b) = eval f a `upper` eval f b
 eval f (Lower a b) = eval f a `lower` eval f b
@@ -141,14 +132,18 @@ math_fn Floor  = floor
 math_fn Round  = round
 
 
--- | Values that support 'quot' and 'mod', but without using Haskell's numeric
---   type hierarchy to do so.
-class QuotMod a where
-  (%)  :: a -> a -> a
-  (//) :: a -> a -> a
-
+-- | Values that support floating-point 'mod', but without using Haskell's
+--   numeric type hierarchy to do so.
+--
+--   The reason we can't use Haskell types for this is that it quantifies a
+--   number of operators with 'forall b. Integral b => a -> b' -- requiring us
+--   to provide function implementations that would coerce our abstract symbolic
+--   quantities to concrete ones if the return type dictates it.
+class Mod a where (%) :: a -> a -> a
 infixl 7 %
-infixl 7 //
+
+instance Mod Double where (%) = c_fmod
+instance Mod Float  where (%) = c_fmodf
 
 
 -- | Values that can tell you whether they are constants -- i.e. whether 'Sym'
@@ -162,17 +157,15 @@ instance Constable a => Constable (Sym a) where
 instance Constable Double where is_const _ = True
 instance Constable Float  where is_const _ = True
 
-instance {-# OVERLAPPABLE #-} Integral a => QuotMod a where
-  (%)  = mod
-  (//) = quot
-
 
 instance Show a => Show (Sym a) where
   show (N a)       = show a
+  show (Arg n)     = printf "%%%d" n
   show (a :+ b)    = printf "(%s + %s)" (show a) (show b)
   show (a :- b)    = printf "(%s - %s)" (show a) (show b)
   show (a :* b)    = printf "(%s * %s)" (show a) (show b)
   show (a :/ b)    = printf "(%s / %s)" (show a) (show b)
+  show (a :% b)    = printf "(%s %% %s)" (show a) (show b)
   show (a :** b)   = printf "(%s ** %s)" (show a) (show b)
   show (Upper a b) = printf "(%s upper %s)" (show a) (show b)
   show (Lower a b) = printf "(%s lower %s)" (show a) (show b)
@@ -197,11 +190,9 @@ instance (Constable a, Fractional a) => Fractional (Sym a) where
   N a / N b | is_const a && is_const b = N (a / b)
   a   / b                              = a :/ b
 
-instance {-# OVERLAPPABLE #-} (Constable a, QuotMod a) => QuotMod (Sym a) where
-  N a % N b  | is_const a && is_const b = N (a % b)
-  a   % b                               = a :% b
-  N a // N b | is_const a && is_const b = N (a // b)
-  a   // b                              = a :// b
+instance (Constable a, Mod a) => Mod (Sym a) where
+  N a % N b | is_const a && is_const b = N (a % b)
+  a   % b                              = a :% b
 
 instance (Constable a, Floating a) => Floating (Sym a) where
   N a ** N b | is_const a && is_const b = N (a ** b)

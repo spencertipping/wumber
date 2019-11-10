@@ -29,23 +29,6 @@ import qualified Data.ByteString as BS
 import Wumber.Symbolic
 
 
--- | A terminal type you can use with 'Wumber.Symbolic.Sym' that JIT assemblers
---   will know what to do with.
---
---   'Const' is a constant 'Float' or 'Double' (the type is fixed within each
---   JIT context).
---
---   'Arg' refers to a numbered argument passed in as a 'Ptr r'. On AMD64 this
---   would be addressable as an offset from '%rdi'. 'r' must be 'Storable'.
-
-data JITN r = Const !r
-            | Arg   !Int
-  deriving (Show, Eq, Generic, Binary)
-
-instance Constable r => Constable (JITN r) where
-  is_const (Const x) = is_const x
-  is_const _         = False
-
 type F1 r = r -> IO r
 type F2 r = r -> r -> IO r
 type F3 r = r -> r -> r -> IO r
@@ -111,6 +94,9 @@ dbl_mathfn Tanh   = p_tanh
 dbl_mathfn Asinh  = p_asinh
 dbl_mathfn Acosh  = p_acosh
 dbl_mathfn Atanh  = p_atanh
+dbl_mathfn Ceil   = p_ceil
+dbl_mathfn Floor  = p_floor
+dbl_mathfn Round  = p_round
 
 
 -- | Converts a 'MathFn' to a 'FunPtr' to execute that operation on 'Float's.
@@ -132,6 +118,9 @@ float_mathfn Tanh   = p_tanhf
 float_mathfn Asinh  = p_asinhf
 float_mathfn Acosh  = p_acoshf
 float_mathfn Atanh  = p_atanhf
+float_mathfn Ceil   = p_ceilf
+float_mathfn Floor  = p_floorf
+float_mathfn Round  = p_roundf
 
 
 foreign import ccall unsafe "sys/mman.h mmap"
@@ -148,10 +137,12 @@ p_signum  = unsafePerformIO $ fn1_dbl_p   (return . signum)
 p_signumf = unsafePerformIO $ fn1_float_p (return . signum)
 
 foreign import ccall unsafe "math.h &pow"   p_pow   :: FunPtr (Double -> Double -> IO Double)
+foreign import ccall unsafe "math.h &fmod"  p_fmod  :: FunPtr (Double -> Double -> IO Double)
 foreign import ccall unsafe "math.h &fmax"  p_fmax  :: FunPtr (Double -> Double -> IO Double)
 foreign import ccall unsafe "math.h &fmin"  p_fmin  :: FunPtr (Double -> Double -> IO Double)
 
 foreign import ccall unsafe "math.h &powf"  p_powf  :: FunPtr (Float -> Float -> IO Float)
+foreign import ccall unsafe "math.h &fmodf" p_fmodf :: FunPtr (Float -> Float -> IO Float)
 foreign import ccall unsafe "math.h &fmaxf" p_fmaxf :: FunPtr (Float -> Float -> IO Float)
 foreign import ccall unsafe "math.h &fminf" p_fminf :: FunPtr (Float -> Float -> IO Float)
 
@@ -171,6 +162,9 @@ foreign import ccall unsafe "math.h &tanh"  p_tanh  :: FunPtr (Double -> IO Doub
 foreign import ccall unsafe "math.h &asinh" p_asinh :: FunPtr (Double -> IO Double)
 foreign import ccall unsafe "math.h &acosh" p_acosh :: FunPtr (Double -> IO Double)
 foreign import ccall unsafe "math.h &atanh" p_atanh :: FunPtr (Double -> IO Double)
+foreign import ccall unsafe "math.h &ceil"  p_ceil  :: FunPtr (Double -> IO Double)
+foreign import ccall unsafe "math.h &floor" p_floor :: FunPtr (Double -> IO Double)
+foreign import ccall unsafe "math.h &round" p_round :: FunPtr (Double -> IO Double)
 
 foreign import ccall unsafe "math.h &fabsf"  p_fabsf  :: FunPtr (Float -> IO Float)
 foreign import ccall unsafe "math.h &logf"   p_logf   :: FunPtr (Float -> IO Float)
@@ -188,3 +182,6 @@ foreign import ccall unsafe "math.h &tanhf"  p_tanhf  :: FunPtr (Float -> IO Flo
 foreign import ccall unsafe "math.h &asinhf" p_asinhf :: FunPtr (Float -> IO Float)
 foreign import ccall unsafe "math.h &acoshf" p_acoshf :: FunPtr (Float -> IO Float)
 foreign import ccall unsafe "math.h &atanhf" p_atanhf :: FunPtr (Float -> IO Float)
+foreign import ccall unsafe "math.h &ceilf"  p_ceilf  :: FunPtr (Float -> IO Float)
+foreign import ccall unsafe "math.h &floorf" p_floorf :: FunPtr (Float -> IO Float)
+foreign import ccall unsafe "math.h &roundf" p_roundf :: FunPtr (Float -> IO Float)
