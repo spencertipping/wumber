@@ -60,7 +60,7 @@ iintersect f g v = lower (f v) (g v)
 inegate    f v   = negate (f v)
 
 
-model v = scs v `upper` cubearray (v / 2) -- + cubes v * (-0.3)
+model v = scs v -- `upper` cubearray (v / 2) -- + cubes v * (-0.3)
 
 jitmodel_code = assemble_ssa (linearize (model (V3 (Arg 0) (Arg 1) (Arg 2))))
 jitmodel_fn = unsafePerformIO $ compile dblfn jitmodel_code
@@ -85,12 +85,9 @@ main = do
   tell $ iso_contour jitmodel (BB (-2) 2) 8 18 0.001
   tell $ traceShow (unsafePerformIO $ readMVar sphere_calls) []
 
-  {-
-  when False $ tell $ unsafePerformIO do
+  when True $ tell $ unsafePerformIO do
     runMode (Run defaultConfig Prefix []) [
-      bench "sphere"   (nf (sphere 1)      (V3 0.5 1 0.3)),
-      bench "cube"     (nf (cube (BB 2 3)) (V3 0.5 1 0.3)),
-      bench "distance" (nf (distance 1)    (V3 0.5 1 0.3 :: V3 Double))
+      bench "model"    (nf model    (V3 0.5 1 0.3 :: V3 Double)),
+      bench "jitmodel" (nf jitmodel (V3 0.5 1 0.3 :: V3 Double))
       ]
     return []
-  -}
