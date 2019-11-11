@@ -15,7 +15,9 @@ import Control.Monad          (when)
 import Data.Binary            (Binary(..))
 import Data.ByteString        (ByteString)
 import Data.ByteString.Unsafe (unsafeUseAsCStringLen)
+import Foreign.Concurrent     (newForeignPtr)
 import Foreign.C.Types        (CInt(..), CSize(..))
+import Foreign.ForeignPtr     (ForeignPtr(..), withForeignPtr)
 import Foreign.Marshal.Utils  (copyBytes)
 import Foreign.Ptr            (Ptr(..), FunPtr(..), castPtr,
                                castPtrToFunPtr, nullPtr, intPtrToPtr)
@@ -52,33 +54,21 @@ foreign import ccall "dynamic"
   floatfn :: FunPtr (Ptr a -> IO Float) -> Ptr a -> IO Float
 
 
--- TODO
--- This module needs a lot more beef around memory management. For example, we
--- should use ForeignPtr finalizers and we should support auxiliary references,
--- e.g. to memory buffers of arguments.
-
-
 -- | Copies a 'ByteString' into an executable section of memory and returns a
---   pointer to the executable version. You'll need to 'munmap' this when you're
---   done, a process that's managed for you when you use 'with_jit'.
-compile :: ByteString -> IO (Ptr ())
-compile bs = do
+--   function that uses Haskell's calling convention. Memory is managed by a
+--   'ForeignPtr' closed over by the resulting function.
+compile :: (FunPtr (a -> IO b) -> (a -> IO b)) -> ByteString -> IO (a -> IO b)
+compile funptr_converter bs = do
   m <- mmap nullPtr (fromIntegral $ BS.length bs) 0x7 0x22 (-1) 0
-  when (m == intPtrToPtr (-1)) $ return (error "mmap failed")
+  when (m == intPtrToPtr (-1))
+    $ return (error "mmap failed")      -- TODO: use IO-based exceptions
   unsafeUseAsCStringLen bs \(p, l) -> copyBytes m p l
-  return (castPtr m)
 
+  fptr <- newForeignPtr (castPtr m) (finalize (BS.length bs) (castPtr m))
+  return \v -> withForeignPtr fptr \p -> funptr_converter (castPtrToFunPtr p) v
 
--- | Compiles a machine code function using the specified calling convention
---   ('FunPtr a -> a') and provides it to a function. 'with_jit' unmaps the
---   compiled code after completing the IO action you return, invalidating the
---   function pointer and freeing resources.
-with_jit :: (FunPtr a -> a) -> ByteString -> (a -> IO b) -> IO b
-with_jit convert code f = do
-  fn <- compile code
-  !x <- f (convert (castPtrToFunPtr fn))
-  munmap fn (fromIntegral $ BS.length code)
-  return x
+  where finalize l p = do munmap p (fromIntegral l)
+                          return ()
 
 
 -- | Converts a 'MathFn' to a 'FunPtr' to execute that operation on 'Double's.

@@ -70,8 +70,7 @@ jit_sphere_vfn r v l = r - distance v l
 
 jit_sphere_sym  = jit_sphere_vfn 2 (V3 0.5 1 2) (V3 (Arg 0) (Arg 1) (Arg 2))
 jit_sphere_code = assemble_ssa $ linearize jit_sphere_sym
-jit_sphere_fn   = unsafePerformIO . f
-  where f = unsafePerformIO $ dblfn <$> castPtrToFunPtr <$> compile jit_sphere_code
+jit_sphere_fn   = unsafePerformIO . unsafePerformIO (compile dblfn jit_sphere_code)
 
 
 handcoded_sphere :: Double -> Double -> Double -> Double -> HandcodedIsoFn

@@ -118,7 +118,8 @@ bulletproof thing = do
 forkjit :: BS.ByteString -> Sym Double -> Vector Double -> IO (Maybe Double)
 forkjit code s v = do
   debug v s code
-  do_jit $ with_jit dblfn code $ VS.unsafeWith v
+  do_jit do f <- compile dblfn code
+            VS.unsafeWith v f
   where do_jit = if bulletproof_jit
                  then bulletproof
                  else fmap Just
