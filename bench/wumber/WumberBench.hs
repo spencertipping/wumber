@@ -72,6 +72,10 @@ jit_sphere_sym  = jit_sphere_vfn 2 (V3 0.5 1 2) (V3 (Arg 0) (Arg 1) (Arg 2))
 jit_sphere_code = assemble_ssa $ linearize jit_sphere_sym
 jit_sphere_fn   = unsafePerformIO . unsafePerformIO (compile dblfn jit_sphere_code)
 
+jit_limit_sym  = 0
+jit_limit_code = assemble_ssa $ linearize jit_limit_sym
+jit_limit_fn   = unsafePerformIO . unsafePerformIO (compile dblfn jit_limit_code)
+
 
 handcoded_sphere :: Double -> Double -> Double -> Double -> HandcodedIsoFn
 handcoded_sphere r x y z (vx, vy, vz) = r - sqrt (dx*dx + dy*dy + dz*dz)

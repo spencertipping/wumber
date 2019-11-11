@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE BlockArguments #-}
@@ -54,10 +55,21 @@ foreign import ccall "dynamic"
   floatfn :: FunPtr (Ptr a -> IO Float) -> Ptr a -> IO Float
 
 
+-- | We need to move arguments across an IO boundary; otherwise 'compile' will
+--   be fixed to a specific JIT arity.
+class ForeignPtrClosure a where functify :: ForeignPtr f -> (Ptr f -> a) -> a
+
+instance ForeignPtrClosure (IO a) where
+  functify = withForeignPtr
+
+instance ForeignPtrClosure b => ForeignPtrClosure (a -> b) where
+  functify p f x = let f' x' = f x' x in functify p f'
+
+
 -- | Copies a 'ByteString' into an executable section of memory and returns a
 --   function that uses Haskell's calling convention. Memory is managed by a
 --   'ForeignPtr' closed over by the resulting function.
-compile :: (FunPtr (a -> IO b) -> (a -> IO b)) -> ByteString -> IO (a -> IO b)
+compile :: ForeignPtrClosure a => (FunPtr a -> a) -> ByteString -> IO a
 compile funptr_converter bs = do
   m <- mmap nullPtr (fromIntegral $ BS.length bs) 0x7 0x22 (-1) 0
   when (m == intPtrToPtr (-1))
@@ -65,7 +77,7 @@ compile funptr_converter bs = do
   unsafeUseAsCStringLen bs \(p, l) -> copyBytes m p l
 
   fptr <- newForeignPtr (castPtr m) (finalize (BS.length bs) (castPtr m))
-  return \v -> withForeignPtr fptr \p -> funptr_converter (castPtrToFunPtr p) v
+  return $ functify fptr (funptr_converter . castPtrToFunPtr)
 
   where finalize l p = do munmap p (fromIntegral l)
                           return ()

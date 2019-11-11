@@ -9,7 +9,7 @@ import Control.Monad (foldM, replicateM_)
 import Control.Monad.RWS (evalRWS)
 import Data.Bits
 import Data.List (sort)
-import Foreign.Ptr (FunPtr(..), nullPtr)
+import Foreign.Ptr (FunPtr(..))
 
 import qualified Data.ByteString         as BS
 import qualified Data.ByteString.Builder as B
@@ -120,15 +120,17 @@ test2c = reptest 100000 200 do
   divsd 3 3 3; divsd 3 7 7
 
 
+foreign import ccall "dynamic" dfn :: FunPtr (IO Double) -> IO Double
+
 tsc_fn n asm = do
-  f <- compile dblfn (assemble_lowlevel asm)
-  let each !s _ = (+ s) <$> max 0 <$> f nullPtr
-  f nullPtr
+  f <- compile dfn (assemble_lowlevel asm)
+  let each !s _ = (+ s) <$> max 0 <$> f
+  f
   t <- foldM each 0 [1..n]
   return $ t / fromIntegral n
 
 tsc_fn_med n asm = do
-  f <- compile dblfn (assemble_lowlevel asm)
-  f nullPtr
-  xs <- mapM (const $ f nullPtr) [1..n]
+  f <- compile dfn (assemble_lowlevel asm)
+  f
+  xs <- mapM (const f) [1..n]
   return $! sort xs !! (n `quot` 2)
