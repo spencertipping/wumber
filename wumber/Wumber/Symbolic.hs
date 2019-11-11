@@ -1,3 +1,6 @@
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE MonoLocalBinds #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE BlockArguments #-}
@@ -6,7 +9,7 @@
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveTraversable #-}
 
-{-# OPTIONS_GHC -funbox-strict-fields #-}
+{-# OPTIONS_GHC -funbox-strict-fields -Wno-missing-methods #-}
 
 
 -- | Symbolic representation of closed-form numeric expressions. 'Sym a' is an
@@ -41,10 +44,12 @@ import Text.Printf  (printf)
 import Wumber.ClosedComparable
 
 
--- | Symbolic math operations, plus upper/lower. 'N' is a backdoor into an
---   arbitrary type that you specify. 'a' should be 'Constable'; if operands are
---   'is_const' then the operations will happen at construction time and won't
---   be present in the symbolic value.
+-- | A symbolic expression whose terminal values have the specified type. 'Sym'
+--   encapsulates common math operations and is written to be easy to
+--   destructure.
+--
+--   TODO: add callbacks to Haskell and/or C functions
+--   TODO: add cond/piecewise
 
 data Sym a = N a
            | Arg Int
@@ -56,6 +61,7 @@ data Sym a = N a
            | Sym a :** Sym a
            | Upper (Sym a) (Sym a)
            | Lower (Sym a) (Sym a)
+           | Atan2 (Sym a) (Sym a)
            | Math !MathFn (Sym a)
   deriving (Eq, Functor, Foldable, Traversable, Generic, Binary)
 
@@ -67,6 +73,7 @@ infixl 7 :/
 infixl 7 :%
 infixl 8 :**
 
+
 binary :: Sym a -> Maybe (Sym a, Sym a)
 binary (x :+ y)    = Just (x, y)
 binary (x :- y)    = Just (x, y)
@@ -76,6 +83,7 @@ binary (x :% y)    = Just (x, y)
 binary (x :** y)   = Just (x, y)
 binary (Upper x y) = Just (x, y)
 binary (Lower x y) = Just (x, y)
+binary (Atan2 x y) = Just (x, y)
 binary _           = Nothing
 
 
@@ -117,6 +125,7 @@ eval f (a :% b)    = eval f a % eval f b
 eval f (a :** b)   = eval f a ** eval f b
 eval f (Upper a b) = eval f a `nan_upper` eval f b
 eval f (Lower a b) = eval f a `nan_lower` eval f b
+eval f (Atan2 a b) = eval f a `atan2` eval f b
 eval f (Math m a)  = math_fn m (eval f a)
 
 
@@ -229,6 +238,25 @@ instance Show a => Show (Sym a) where
   show (Lower a b) = printf "(%s lower %s)" (show a) (show b)
   show (Math f a)  = printf "%s(%s)" (show f) (show a)
 
+
+-- Partial instances
+-- We steal various functions from these to make the API easier to use, but we
+-- in no way qualify to actually implement them.
+
+instance Eq a => Ord (Sym a)
+
+instance (Constable a, Num a, Ord (Sym a)) => Real (Sym a)
+instance (Constable a, Num a, Ord (Sym a), Fractional a) => RealFrac (Sym a)
+
+instance (Constable a, RealFloat a, Ord (Sym a)) => RealFloat (Sym a) where
+  atan2 (N a) (N b) | is_const a && is_const b = N (atan2 a b)
+  atan2 a b                                    = Atan2 a b
+
+
+
+-- Full instances
+-- i.e. all the functions work. None of these instances require us to coerce our
+-- values to concrete or arbitrary types like 'forall b. Integral b'.
 
 instance Bounded a => Bounded (Sym a) where
   minBound = N minBound

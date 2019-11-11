@@ -63,9 +63,9 @@ transform33 m = modify $ _m33 %~ (m !*!)
 
 zoom x = transform33 (identity !!* x)
 
-swap_xz_m = identity & _x .~ V4 0 0 1 0 & _z .~ V4 1 0 0 0 :: M44 Double
-swap_yz_m = identity & _y .~ V4 0 0 1 0 & _z .~ V4 0 1 0 0 :: M44 Double
-swap_xy_m = identity & _x .~ V4 0 1 0 0 & _y .~ V4 1 0 0 0 :: M44 Double
+swap_xz_m = identity & _x .~ V4 0 0 1 0 & _z .~ V4 1 0 0 0
+swap_yz_m = identity & _y .~ V4 0 0 1 0 & _z .~ V4 0 1 0 0
+swap_xy_m = identity & _x .~ V4 0 1 0 0 & _y .~ V4 1 0 0 0
 
 rx θ = amul $ rotate_x_m θ
 ry θ = amul $ rotate_y_m θ

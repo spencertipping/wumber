@@ -153,11 +153,13 @@ foreign import ccall "math.h &pow"   p_pow   :: FunPtr (Double -> Double -> IO D
 foreign import ccall "math.h &fmod"  p_fmod  :: FunPtr (Double -> Double -> IO Double)
 foreign import ccall "math.h &fmax"  p_fmax  :: FunPtr (Double -> Double -> IO Double)
 foreign import ccall "math.h &fmin"  p_fmin  :: FunPtr (Double -> Double -> IO Double)
+foreign import ccall "math.h &atan2" p_atan2 :: FunPtr (Double -> Double -> IO Double)
 
-foreign import ccall "math.h &powf"  p_powf  :: FunPtr (Float -> Float -> IO Float)
-foreign import ccall "math.h &fmodf" p_fmodf :: FunPtr (Float -> Float -> IO Float)
-foreign import ccall "math.h &fmaxf" p_fmaxf :: FunPtr (Float -> Float -> IO Float)
-foreign import ccall "math.h &fminf" p_fminf :: FunPtr (Float -> Float -> IO Float)
+foreign import ccall "math.h &powf"   p_powf   :: FunPtr (Float -> Float -> IO Float)
+foreign import ccall "math.h &fmodf"  p_fmodf  :: FunPtr (Float -> Float -> IO Float)
+foreign import ccall "math.h &fmaxf"  p_fmaxf  :: FunPtr (Float -> Float -> IO Float)
+foreign import ccall "math.h &fminf"  p_fminf  :: FunPtr (Float -> Float -> IO Float)
+foreign import ccall "math.h &atan2f" p_atan2f :: FunPtr (Float -> Float -> IO Float)
 
 foreign import ccall "math.h &fabs"  p_fabs  :: FunPtr (Double -> IO Double)
 foreign import ccall "math.h &log"   p_log   :: FunPtr (Double -> IO Double)

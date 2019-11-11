@@ -137,6 +137,7 @@ assemble' (BinOp o op l r) = do
   movsd_mr r 1
   case op of Pow      -> call p_pow
              Mod      -> call p_fmod
+             Atan2'   -> call p_atan2
              Add      -> addsd 3 0 1
              Subtract -> subsd 3 0 1
              Multiply -> mulsd 3 0 1

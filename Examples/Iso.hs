@@ -5,6 +5,8 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 
+{-# OPTIONS -fobject-code #-}
+
 module Examples.Iso where
 
 import Control.Monad
@@ -38,19 +40,40 @@ screw :: Double -> V3 Double -> V3 Double
 screw dθ v@(V3 x y z) = v *! rotate_z_m (dθ * z)
 
 
+τ = pi * 2
+
+
+-- Hex-cap machine bolt, screw threads and all
+
+-- First let's model the threads: a triangular section screw-extruded along an
+-- axis. I'll space the threads one unit apart and extrude along the Z axis.
+--
+-- The profile function should be an iso over ρ and z.
+
+threads p d v@(V3 x y z) = p ρ z'
+  where θ  = atan2 x y
+        ρ  = sqrt (x**2 + y**2)
+        z' = ((z * d + θ/τ) % 1 + 1) % 1
+
+t45 od ρ z = od - sin (τ/6) * ρ + abs (z - 0.5)
+
+
+x_lt l (V3 x _ _) = l - x
+z_lt l (V3 _ _ z) = l - z
+
+hex_cap r v = foldl' lower maxBound
+  $ map (\θ -> x_lt r (v *! rotate_z_m (N θ))) [0, 60 .. 360]
+
+
+bolt od ts = thread_part `iunion` head_part
+  where thread_part = (threads (t45 od) 2 . (/ ts)) `iintersect` z_lt 0
+        head_part   = hex_cap od `iintersect`
+                      cube (BB (V3 minBound minBound 0) (V3 maxBound maxBound 0.5))
+
+
 -- Isofunctions for testing
-sphere_calls = unsafePerformIO $ newMVar 0
+sphere l v = 1.5 - distance v l
 
-
-count_sphere_calls = True
-
---sphere :: Num a => V3 a -> IsoFn (V3 a)
-sphere l v | count_sphere_calls = unsafePerformIO do
-               modifyMVar_ sphere_calls (return . (+ 1))
-               return $ 1 - distance v l
-           | otherwise = 1 - distance v l
-
---cube :: Num a => BoundingBox (V3 a) -> IsoFn (V3 a)
 cube (BB (V3 x1 y1 z1) (V3 x2 y2 z2)) (V3 x y z) =
   foldl' lower maxBound [ x - x1, x2 - x, y - y1, y2 - y, z - z1, z2 - z ]
 
@@ -60,13 +83,14 @@ iintersect f g v = lower (f v) (g v)
 inegate    f v   = negate (f v)
 
 
-model v = scs v -- `upper` cubearray (v / 2) -- + cubes v * (-0.3)
+model = bolt 0.5 0.4
+--model v = threads (t45 0.5) (v * 3) -- scs v -- `upper` cubearray (v / 2) -- + cubes v * (-0.3)
 
-jitmodel_code = assemble_ssa (linearize (model (V3 (Arg 0) (Arg 1) (Arg 2))))
-jitmodel_fn = unsafePerformIO $ compile dblfn jitmodel_code
+jitmodel_code       = assemble_ssa (linearize (model (V3 (Arg 0) (Arg 1) (Arg 2))))
+jitmodel_fn         = unsafePerformIO $ compile dblfn jitmodel_code
 jitmodel (V3 x y z) = unsafePerformIO $ unsafeWith (fromList [x, y, z]) jitmodel_fn
 
-spheres = sphere 0 `iunion` sphere 0.8
+spheres = sphere 0 `iunion` sphere 0.9
 scs     = spheres `iunion` cube (BB (-1.5) (-0.5))
                   `iunion` cube (BB (-1.2) (-0.2))
 
@@ -79,15 +103,14 @@ xycube (x, y) = cube (BB (V3 (N x) (N y) 0 ^-^ 0.05) (V3 (N x) (N y) 0 ^+^ 0.05)
 
 main :: Wumber ()
 main = do
-  liftIO $ modifyMVar_ sphere_calls (\_ -> return 0)
-  zoom 0.01
+  zoom 0.005
+  tell $ iso_contour jitmodel (BB (-2) 2) 15 24 0.1
 
-  tell $ iso_contour jitmodel (BB (-2) 2) 8 18 0.001
-  tell $ traceShow (unsafePerformIO $ readMVar sphere_calls) []
-
-  when True $ tell $ unsafePerformIO do
+  {-
+  when False $ tell $ unsafePerformIO do
     runMode (Run defaultConfig Prefix []) [
       bench "model"    (nf model    (V3 0.5 1 0.3 :: V3 Double)),
       bench "jitmodel" (nf jitmodel (V3 0.5 1 0.3 :: V3 Double))
       ]
     return []
+  -}

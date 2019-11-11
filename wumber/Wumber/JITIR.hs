@@ -20,6 +20,7 @@ data Binary = Add
             | Mod
             | Max
             | Min
+            | Atan2'       -- OMG FIXME nomenclature
   deriving (Show, Eq)
 
 
@@ -86,6 +87,7 @@ linearize' (a :% b)    = linbin Mod a b
 linearize' (a :** b)   = linbin Pow a b
 linearize' (Upper a b) = linbin Max a b
 linearize' (Lower a b) = linbin Min a b
+linearize' (Atan2 a b) = linbin Atan2' a b
 linearize' (Math f a)  = linun f a
 
 linbin :: Binary -> Sym a -> Sym a -> State SSAReg (SSAReg, [SSA a])

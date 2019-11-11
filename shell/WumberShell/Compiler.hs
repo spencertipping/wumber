@@ -5,12 +5,13 @@ module WumberShell.Compiler where
 
 import Control.Concurrent
 import Control.Concurrent.MVar
-import qualified Data.ByteString.UTF8 as B8
 import Data.Maybe
-import Language.Haskell.Interpreter
 import System.INotify hiding (Event)
 import System.IO (stderr)
 import Text.Printf
+
+import qualified Data.ByteString.UTF8         as B8
+import qualified Language.Haskell.Interpreter as HI
 
 import Wumber hiding (compile)
 
@@ -36,7 +37,7 @@ compile :: MVar (Maybe [Element]) -> FilePath -> IO ()
 compile model f = do
   eprintf "\027[2J\027[1;1Hcompiling...\n"
 
-  r <- runInterpreter do
+  r <- HI.runInterpreter do
     -- TODO
     -- For whatever reason, I can't seem to get this to work outside a stack
     -- build environment. It's possible it never will, but I'd like to figure
@@ -45,16 +46,19 @@ compile model f = do
     -- It fails on the loadModules step, before any of our imports/etc. I
     -- suspect I'm misusing hint by calling loadModules and then trying to mess
     -- with imports.
+    --
+    -- Worst case we git-clone wumber as source into some temp dir, then add it
+    -- to the search path. (Ugh.)
 
-    loadModules [f]
-    setTopLevelModules [module_name f]
-    interpret "main" (as :: Wumber ())
+    HI.loadModules [f]
+    HI.setTopLevelModules [module_name f]
+    HI.interpret "main" (HI.as :: Wumber ())
 
   case r of
-    Left (WontCompile xs) -> do
+    Left (HI.WontCompile xs) -> do
       swapMVar model Nothing
       eprintf "\027[2J\027[1;1H%s error\n" f
-      mapM_ (\case GhcError {errMsg} -> printf "%s\n" errMsg) xs
+      mapM_ (\case HI.GhcError {HI.errMsg} -> printf "%s\n" errMsg) xs
 
     Left e -> do
       swapMVar model Nothing
