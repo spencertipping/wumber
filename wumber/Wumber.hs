@@ -1,9 +1,12 @@
 module Wumber (
+  module Wumber.AMD64Asm,
   module Wumber.BoundingBox,
   module Wumber.ClosedComparable,
   module Wumber.Cursor,
   module Wumber.DualContour,
   module Wumber.Element,
+  module Wumber.JIT,
+  module Wumber.JITIR,
   module Wumber.Numeric,
   module Wumber.Sketch,
   module Wumber.Symbolic,
@@ -15,11 +18,14 @@ module Wumber (
 import Control.Monad.RWS.Strict
 import GHC.Float
 
+import Wumber.AMD64Asm
 import Wumber.BoundingBox
 import Wumber.ClosedComparable
 import Wumber.Cursor
 import Wumber.DualContour
 import Wumber.Element
+import Wumber.JIT
+import Wumber.JITIR
 import Wumber.Numeric
 import Wumber.Sketch
 import Wumber.Symbolic

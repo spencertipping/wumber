@@ -12,7 +12,7 @@ import System.INotify hiding (Event)
 import System.IO (stderr)
 import Text.Printf
 
-import Wumber
+import Wumber hiding (compile)
 
 
 eprintf :: HPrintfType r => String -> r

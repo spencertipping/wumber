@@ -230,6 +230,10 @@ instance Show a => Show (Sym a) where
   show (Math f a)  = printf "%s(%s)" (show f) (show a)
 
 
+instance Bounded a => Bounded (Sym a) where
+  minBound = N minBound
+  maxBound = N maxBound
+
 instance (Constable a, Num a) => Num (Sym a) where
   fromInteger  = N . fromInteger
   N a + N b | is_const a && is_const b = N (a + b)
