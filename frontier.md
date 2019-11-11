@@ -23,6 +23,7 @@
   + Cache boundaries to disk (requires hashable for Sym)
   + More robust handling of near-edge cases (convergent normals or boundary hints)
   + Mesh of quads, not just lines
+  + View contouring? i.e. dual contouring in 2D wrt the view matrix?
 + Parts
   + Iso-libraries for screws, beams, etc
   + Bearings
