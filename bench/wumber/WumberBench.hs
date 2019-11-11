@@ -7,10 +7,19 @@ import Criterion
 import Criterion.Main
 import Data.Either
 import Data.Foldable
+import Data.Vector.Storable (Vector, fromList, unsafeWith)
+import Foreign.Ptr (castPtrToFunPtr)
 import Language.Haskell.Interpreter
 import Linear.Metric
 import Linear.V2
 import Linear.V3
+import System.IO.Unsafe (unsafePerformIO)
+
+import Wumber.AMD64Asm
+import Wumber.DualContour
+import Wumber.JIT
+import Wumber.JITIR
+import Wumber.Symbolic
 
 
 test_hint :: IO (Either InterpreterError (V2 Double))
@@ -54,6 +63,13 @@ hint_baseline = eitherError <$> runInterpreter do
 
 type HandcodedIsoFn = (Double, Double, Double) -> Double
 type VectorIsoFn = V3 Double -> Double
+type JitIsoFn = Vector Double -> Double
+
+
+jit_sphere_sym  = 2 - sqrt ((Arg 0 - 0.5) ** 2 + (Arg 1 - 1) ** 2 + (Arg 2 - 2) ** 2) :: Sym Double
+jit_sphere_code = assemble_ssa $ linearize jit_sphere_sym
+jit_sphere_fn   = unsafePerformIO . f
+  where f = unsafePerformIO $ dblfn <$> castPtrToFunPtr <$> compile jit_sphere_code
 
 
 handcoded_sphere :: Double -> Double -> Double -> Double -> HandcodedIsoFn
@@ -105,20 +121,25 @@ app_vector_cube a b x = foldl' min (1/0) $ liftA2 min lower upper
 
 main = defaultMain
   [
-    {-
-    bench "HC sphere" (nf handcoded_const_sphere                    (1, 2, 3)),
-    bench "H  sphere" (nf (handcoded_sphere        2     0.5 1 2)   (1, 2, 3)),
-    bench "HV sphere" (nf (handcoded_vector_sphere 2 (V3 0.5 1 2)) (V3 1 2 3)),
-    bench "V  sphere" (nf (vector_sphere           2 (V3 0.5 1 2)) (V3 1 2 3)),
+    -- bench "HC sphere" (nf handcoded_const_sphere                    (1, 2, 3)),
+    -- bench "HV sphere" (nf (handcoded_vector_sphere 2 (V3 0.5 1 2)) (V3 1 2 3)),
 
+    bench "H  sphere" (nf (handcoded_sphere        2     0.5 1 2)   (1, 2, 3)),
+    bench "V  sphere" (nf (vector_sphere           2 (V3 0.5 1 2)) (V3 1 2 3)),
+    unsafePerformIO $ unsafeWith (fromList [1::Double, 2, 3]) \p -> do
+      return $ bench "J  sphere" (nf jit_sphere_fn p)
+
+    {-
     bench "HV cube"   (nf (handcoded_vector_cube (V3 1 2 3) (V3 4 5 6)) (V3 7 8 9)),
     bench "FV cube"   (nf (fold_vector_cube      (V3 1 2 3) (V3 4 5 6)) (V3 7 8 9)),
     bench "AV cube"   (nf (app_vector_cube       (V3 1 2 3) (V3 4 5 6)) (V3 7 8 9)),
     -}
 
+    {-
     bench "hint V3"            (nfIO load_linear),
     bench "hint baseline"      (nfIO hint_baseline),
     bench "hint wumbersym"     (nfIO load_wumbersym),
     bench "hint wumbersym_nop" (nfIO load_wumbersym_nop),
     bench "hint wumber_all"    (nfIO load_wumber_all)
+    -}
   ]

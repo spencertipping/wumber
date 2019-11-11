@@ -4,7 +4,13 @@
   + Reverse-engineer instruction latency/throughput
   + Sym -> constraint isofn?
   + Sym -> Isofn
+  + CSE and vectorization?
   + Auto-vectorization using XMM sidecars?
++ QA
+  + **Done:** JIT tests
+  + JIT benchmarks
+  + Dual contouring benchmarks
+  + Compilation benchmarks
 + DSL
   + Finalize constraint DSL
   + Figure out object model for common shapes, esp axis/angular symmetries

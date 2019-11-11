@@ -92,6 +92,7 @@ test-suite wumber-bench
                      , linear
                      , microlens >= 0.4
                      , QuickCheck
+                     , vector
                      , wumber
 
 
