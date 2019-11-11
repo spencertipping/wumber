@@ -71,16 +71,21 @@ instance ForeignPtrClosure b => ForeignPtrClosure (a -> b) where
 --   'ForeignPtr' closed over by the resulting function.
 compile :: ForeignPtrClosure a => (FunPtr a -> a) -> ByteString -> IO a
 compile funptr_converter bs = do
-  m <- mmap nullPtr (fromIntegral $ BS.length bs) 0x7 0x22 (-1) 0
-  when (m == intPtrToPtr (-1))
-    $ return (error "mmap failed")      -- TODO: use IO-based exceptions
-  unsafeUseAsCStringLen bs \(p, l) -> copyBytes m p l
-
-  fptr <- newForeignPtr (castPtr m) (finalize (BS.length bs) (castPtr m))
+  m    <- codeptr bs
+  fptr <- newForeignPtr m (finalize (BS.length bs) m)
   return $ functify fptr (funptr_converter . castPtrToFunPtr)
 
   where finalize l p = do munmap p (fromIntegral l)
                           return ()
+
+
+codeptr :: ByteString -> IO (Ptr a)
+codeptr bs = do
+  m <- mmap nullPtr (fromIntegral $ BS.length bs) 0x7 0x22 (-1) 0
+  when (m == intPtrToPtr (-1))
+    $ return (error "mmap failed")      -- TODO: use IO-based exceptions
+  unsafeUseAsCStringLen bs \(p, l) -> copyBytes m p l
+  return $ castPtr m
 
 
 -- | Converts a 'MathFn' to a 'FunPtr' to execute that operation on 'Double's.

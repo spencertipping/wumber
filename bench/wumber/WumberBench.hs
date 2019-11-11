@@ -8,12 +8,15 @@ import Criterion.Main
 import Data.Either
 import Data.Foldable
 import Data.Vector.Storable (Vector, fromList, unsafeWith)
-import Foreign.Ptr (castPtrToFunPtr)
+import Foreign.Ptr (castPtrToFunPtr, nullPtr)
 import Language.Haskell.Interpreter
 import Linear.Metric
 import Linear.V2
 import Linear.V3
+import Numeric (showHex)
 import System.IO.Unsafe (unsafePerformIO)
+
+import qualified Data.ByteString as BS
 
 import Wumber.AMD64Asm
 import Wumber.DualContour
@@ -76,6 +79,10 @@ jit_limit_sym  = 0
 jit_limit_code = assemble_ssa $ linearize jit_limit_sym
 jit_limit_fn   = unsafePerformIO . unsafePerformIO (compile dblfn jit_limit_code)
 
+jit_limit2_fn  = unsafePerformIO . unsafePerformIO (dblfn <$> castPtrToFunPtr <$> codeptr jit_limit_code)
+
+jit_limit3_fn  = unsafePerformIO . unsafePerformIO (dblfn <$> castPtrToFunPtr <$> codeptr (BS.pack [0xc3]))
+
 
 handcoded_sphere :: Double -> Double -> Double -> Double -> HandcodedIsoFn
 handcoded_sphere r x y z (vx, vy, vz) = r - sqrt (dx*dx + dy*dy + dz*dz)
@@ -131,8 +138,13 @@ main = defaultMain
 
     bench "H  sphere" (nf (handcoded_sphere        2     0.5 1 2)   (1, 2, 3)),
     bench "V  sphere" (nf (vector_sphere           2 (V3 0.5 1 2)) (V3 1 2 3)),
+
     unsafePerformIO $ unsafeWith (fromList [1::Double, 2, 3]) \p -> do
-      return $ bench "J  sphere" (nf jit_sphere_fn p)
+      return $ bench "J  sphere" (nf jit_sphere_fn p),
+
+    bench "J  limit"  (nf jit_limit_fn  nullPtr),
+    bench "J  limit2" (nf jit_limit2_fn nullPtr),
+    bench "J  limit3" (nf jit_limit3_fn nullPtr)
 
     {-
     bench "HV cube"   (nf (handcoded_vector_cube (V3 1 2 3) (V3 4 5 6)) (V3 7 8 9)),
