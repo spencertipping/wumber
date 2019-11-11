@@ -52,6 +52,12 @@ foreign import ccall "dynamic"
   floatfn :: FunPtr (Ptr a -> IO Float) -> Ptr a -> IO Float
 
 
+-- TODO
+-- This module needs a lot more beef around memory management. For example, we
+-- should use ForeignPtr finalizers and we should support auxiliary references,
+-- e.g. to memory buffers of arguments.
+
+
 -- | Copies a 'ByteString' into an executable section of memory and returns a
 --   pointer to the executable version. You'll need to 'munmap' this when you're
 --   done, a process that's managed for you when you use 'with_jit'.
