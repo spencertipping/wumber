@@ -227,6 +227,8 @@ instance StorableVector (V2 R) where
 --
 --   NOTE: arguments to 'lerp' are a little counterintuitive: 'lerp 0 a b == b'
 --   and 'lerp 1 a b == a'.
+--
+--   TODO: convert to BFGS?
 
 surface_point :: Additive f => IsoFn (f R) -> (f R, f R) -> f R
 surface_point f (a, b) = lerp (newton 0.5) b a
