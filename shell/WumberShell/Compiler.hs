@@ -1,19 +1,24 @@
 {-# LANGUAGE NamedFieldPuns, LambdaCase, BlockArguments, TemplateHaskell #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
-module WumberShell.Compiler where
+module WumberShell.Compiler (
+  compiler_loop
+) where
 
 import Control.Concurrent
 import Control.Concurrent.MVar
+import Control.Monad (forM_)
 import Data.Maybe
+import Data.Vector.Storable (unsafeWith)
 import System.INotify hiding (Event)
 import System.IO (stderr)
+import System.IO.Unsafe (unsafePerformIO)
 import Text.Printf
 
 import qualified Data.ByteString.UTF8         as B8
 import qualified Language.Haskell.Interpreter as HI
 
-import Wumber hiding (compile)
+import Wumber
 
 
 eprintf :: HPrintfType r => String -> r
@@ -23,8 +28,8 @@ eprintf = hPrintf stderr
 compiler_loop :: MVar (Maybe [Element]) -> FilePath -> IO ()
 compiler_loop model f = do
   i <- initINotify
-  addWatch i [MoveIn, Modify] (B8.fromString f) (const $ compile model f)
-  compile model f
+  addWatch i [MoveIn, Modify] (B8.fromString f) (const $ recompile model f)
+  recompile model f
 
 
 module_name :: FilePath -> String
@@ -33,8 +38,12 @@ module_name p = map dotify $ take (length p - 3) p
         dotify  c  =  c
 
 
-compile :: MVar (Maybe [Element]) -> FilePath -> IO ()
-compile model f = do
+worker :: MVar ThreadId
+worker = unsafePerformIO newEmptyMVar
+
+
+recompile :: MVar (Maybe [Element]) -> FilePath -> IO ()
+recompile model f = do
   eprintf "\027[2J\027[1;1Hcompiling...\n"
 
   r <- HI.runInterpreter do
@@ -66,6 +75,22 @@ compile model f = do
       eprintf "%s\n" (show e)
 
     Right p -> do
-      m <- runWumber init_cursor p
-      swapMVar model $ Just m
+      w <- tryTakeMVar worker
+      case w of Just t -> killThread t
+                _      -> return ()
+
+      w <- update_model model p
+      swapMVar worker w
       eprintf "\027[2J\027[1;1H%s OK\n" f
+
+
+update_model :: MVar (Maybe [Element]) -> Wumber () -> IO ThreadId
+update_model model m = forkOS do
+  (s:_) <- runWumber init_cursor m
+  fp <- compile dblfn $ assemble_ssa (linearize s)
+  let fn = unsafePerformIO . flip unsafeWith fp . to_storable_vector
+  forM_ [6..18] \r -> do
+    eprintf "\027[2J\027[1;1Hrendering at %d..." r
+    let ls = iso_contour fn (BB (-2) 2) r (max 15 (r + 6)) 0.1
+    eprintf " [%d line(s)]" (length ls)
+    swapMVar model $! Just $! ls

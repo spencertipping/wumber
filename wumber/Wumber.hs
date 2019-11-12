@@ -8,8 +8,9 @@ module Wumber (
   module Wumber.JIT,
   module Wumber.JITIR,
   module Wumber.Numeric,
-  module Wumber.Sketch,
   module Wumber.Symbolic,
+
+  Wumber,
   runWumber,
   f2d, d2f, fi,
   tau, sincos
@@ -17,6 +18,7 @@ module Wumber (
 
 import Control.Monad.RWS.Strict
 import GHC.Float
+import Linear.V3 (V3)
 
 import Wumber.AMD64Asm
 import Wumber.BoundingBox
@@ -27,8 +29,12 @@ import Wumber.Element
 import Wumber.JIT
 import Wumber.JITIR
 import Wumber.Numeric
-import Wumber.Sketch
 import Wumber.Symbolic
+
+
+-- | The 'Wumber' monad, which is how you convey state to the shell and render
+--   stuff.
+type Wumber = RWST () [Sym Double] Cursor IO
 
 
 -- Remedial Haskell functions
@@ -41,5 +47,5 @@ tau      = 2 * pi
 sincos θ = (sin r, cos r) where r = θ / 360 * tau
 
 
-runWumber :: Cursor -> Wumber () -> IO [Element]
+runWumber :: Cursor -> Wumber () -> IO [Sym Double]
 runWumber c m = snd <$> execRWST m () c

@@ -27,7 +27,6 @@ import Linear.Vector
 import Wumber.Element
 
 
-type Wumber = RWST () [Element] Cursor IO
 type Cursor = M44 Double
 
 init_cursor :: Cursor

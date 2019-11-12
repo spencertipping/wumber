@@ -20,19 +20,21 @@
   + Partition by inputs
   + Simplify linear subsystems
 + Dual contour
+  + Incremental/progressive scanning
+  + Prioritize bisections by expected error
   + Cache boundaries to disk (requires hashable for Sym)
   + More robust handling of near-edge cases (convergent normals or boundary hints)
   + Mesh of quads, not just lines
   + View contouring? i.e. dual contouring in 2D wrt the view matrix?
++ Shell
+  + **Done:** JIT/iso-mesh inside shell process
+  + **Done:** Model as pure data structure
+  + LOD based on view matrix
 + Parts
   + Iso-libraries for screws, beams, etc
   + Bearings
   + Axles, pulleys, belts
   + Use constraints to solve for belt path between pulleys
-+ Shell
-  + JIT/iso-mesh inside shell process
-  + Model as pure data structure
-  + LOD based on view matrix
 
 
 ## Long-term

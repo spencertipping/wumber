@@ -72,7 +72,7 @@ bolt od ts = thread_part `iunion` head_part
 
 
 -- Isofunctions for testing
-sphere l v = 1.5 - distance v l
+sphere l v = 0.8 - distance v l
 
 cube (BB (V3 x1 y1 z1) (V3 x2 y2 z2)) (V3 x y z) =
   foldl' lower maxBound [ x - x1, x2 - x, y - y1, y2 - y, z - z1, z2 - z ]
@@ -83,12 +83,8 @@ iintersect f g v = lower (f v) (g v)
 inegate    f v   = negate (f v)
 
 
-model = bolt 0.5 0.4
+model = bolt 0.5 0.4 `iunion` scs
 --model v = threads (t45 0.5) (v * 3) -- scs v -- `upper` cubearray (v / 2) -- + cubes v * (-0.3)
-
-jitmodel_code       = assemble_ssa (linearize (model (V3 (Arg 0) (Arg 1) (Arg 2))))
-jitmodel_fn         = unsafePerformIO $ compile dblfn jitmodel_code
-jitmodel (V3 x y z) = unsafePerformIO $ unsafeWith (fromList [x, y, z]) jitmodel_fn
 
 spheres = sphere 0 `iunion` sphere 0.9
 scs     = spheres `iunion` cube (BB (-1.5) (-0.5))
@@ -104,13 +100,4 @@ xycube (x, y) = cube (BB (V3 (N x) (N y) 0 ^-^ 0.05) (V3 (N x) (N y) 0 ^+^ 0.05)
 main :: Wumber ()
 main = do
   zoom 0.005
-  tell $ iso_contour jitmodel (BB (-2) 2) 15 24 0.1
-
-  {-
-  when False $ tell $ unsafePerformIO do
-    runMode (Run defaultConfig Prefix []) [
-      bench "model"    (nf model    (V3 0.5 1 0.3 :: V3 Double)),
-      bench "jitmodel" (nf jitmodel (V3 0.5 1 0.3 :: V3 Double))
-      ]
-    return []
-  -}
+  tell [model (V3 (Arg 0) (Arg 1) (Arg 2))]
