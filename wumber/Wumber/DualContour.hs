@@ -104,6 +104,14 @@ iso_contour f b minn maxn bias = lines (trace_lines t)
 
 
 -- | Constructs a tree whose structure is determined by the 'SplitFn'.
+--
+--   TODO: almost every vertex is shared by more than one cell, but we
+--   re-evaluate the function instead of reusing data.
+--
+--   TODO: infer crossing points using normals and 'max_gradient'.
+--
+--   TODO: let 'sf' specify which split it wants, then bisect down to that axis.
+
 build :: (Metric v, Traversable v, Applicative v, Fractional (v R), MonadZip v,
           StorableVector (v R))
       => IsoFn (v R) -> BoundingBox (v R) -> SplitFn (v R) -> R -> Tree (v R)
@@ -139,7 +147,7 @@ trace_cells t                = map pair $ edge_pairs (length l)
 
 
 -- | Uses dual contouring to find lines along an isosurface. The lines end up
---   forming a closed net.
+--   forming a closed net unless your cells are too large.
 trace_lines :: (Applicative v, Foldable v) => Tree (v R) -> [(v R, v R)]
 trace_lines (Bisect _ _ l r) = go l r ++ trace_lines l ++ trace_lines r
   where go l r
