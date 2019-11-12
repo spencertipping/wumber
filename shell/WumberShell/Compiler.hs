@@ -92,5 +92,5 @@ update_model model m = forkOS do
   forM_ [6..18] \r -> do
     eprintf "\027[2J\027[1;1Hrendering at %d..." r
     let ls = iso_contour fn (BB (-2) 2) r (max 15 (r + 6)) 0.1
-    eprintf " [%d line(s)]" (length ls)
+    eprintf " [%d line(s)]" (length ls) -- NB: force list before swapping mvar
     swapMVar model $! Just $! ls
