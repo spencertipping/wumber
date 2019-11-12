@@ -1,4 +1,4 @@
-{-# LANGUAGE NamedFieldPuns, LambdaCase, BlockArguments, TemplateHaskell #-}
+{-# LANGUAGE NamedFieldPuns, LambdaCase, BlockArguments #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 module WumberShell.Compiler (

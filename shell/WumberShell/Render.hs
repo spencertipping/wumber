@@ -1,4 +1,4 @@
-{-# LANGUAGE NamedFieldPuns, LambdaCase, BlockArguments, MultiWayIf #-}
+{-# LANGUAGE BlockArguments #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 module WumberShell.Render where
