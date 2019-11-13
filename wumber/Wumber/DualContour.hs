@@ -30,7 +30,6 @@ import Data.Bifoldable       (biList)
 import Data.Binary           (Binary(..))
 import Data.Bits             (xor, shiftL, (.&.))
 import Data.Foldable         (toList)
-import Data.Function.Memoize (memoize, deriveMemoizable, Memoizable(..))
 import Data.Maybe            (isJust, fromJust)
 import Data.Set              (Set)
 import Data.Traversable      (traverse)
@@ -51,12 +50,6 @@ import qualified Numeric.LinearAlgebra as LA
 import Wumber.BoundingBox
 import Wumber.Element
 import Wumber.Numeric
-
-
-deriveMemoizable ''V3
-
-instance Memoizable Double where
-  memoize f = memoize (\(a, b) -> f $ encodeFloat a b) . decodeFloat
 
 
 -- | An isoshape function you want to evaluate.
@@ -102,8 +95,7 @@ t_size _                = 1
 --   and returns a list of 'Element's to contour it.
 iso_contour :: IsoFn (V3 R) -> BB3D -> Int -> Int -> R -> [Element]
 iso_contour f b minn maxn bias = lines (trace_lines t)
-  where f'    = memoize f
-        t     = build f' b sf bias
+  where t     = build f b sf bias
         lines = map (\(v1, v2) -> shape_of identity [v1, v2])
 
         sf _ n (TM b (v:vs)) _

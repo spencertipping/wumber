@@ -28,7 +28,6 @@ library
                      , hmatrix
                      , hmatrix-gsl
                      , linear
-                     , memoize >= 0.8.1
                      , microlens
                      , microlens-th
                      , mtl
