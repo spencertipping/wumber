@@ -1,7 +1,10 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE BangPatterns #-}
 
--- | Reverse-engineer operation timings on AMD64 processors.
+-- | Reverse-engineer operation timings on AMD64 processors. This allows us to
+--   generalize optimization logic across multiple processor models, which is a
+--   lot easier than digging through the instruction latency/throughput tables
+--   and hard-coding it.
 module Wumber.AMD64RE where
 
 

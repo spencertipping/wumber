@@ -182,7 +182,10 @@ jit_a_fn m = unsafePerformIO do
 
 
 model_fn  = jit_a_fn model
-model2_fn = jit_a_fn \v -> model v + model v
+
+-- With FFI overhead, model2_fn is 2x slower than model_fn but produces
+-- identical results
+model2_fn = jit_a_fn \v -> (model v + model v + model v + model v) / 4
 
 
 main = defaultMain
