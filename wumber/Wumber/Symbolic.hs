@@ -255,8 +255,13 @@ instance Show a => Show (Sym a) where
 -- Partial instances
 -- We steal various functions from these to make the API easier to use, but we
 -- in no way qualify to actually implement them.
+--
+-- FIXME: this is awful. We should just write our own atan2 alternative instead
+-- of using fake instances. Missing methods infinite-loop and run out of memory,
+-- which is diabolical, impossible to debug, and completely user-hostile.
 
-instance Eq a => Ord (Sym a)
+instance Eq a => Ord (Sym a) where
+  compare a b = error "sym instances aren't actually ordered"
 
 instance (Constable a, Num a, Ord (Sym a)) => Real (Sym a)
 instance (Constable a, Num a, Ord (Sym a), Fractional a) => RealFrac (Sym a)
