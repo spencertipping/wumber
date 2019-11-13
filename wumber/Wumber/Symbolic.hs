@@ -50,6 +50,7 @@ import Wumber.ClosedComparable
 --
 --   TODO: add callbacks to Haskell and/or C functions
 --   TODO: add cond/piecewise
+--   TODO: move JITIR binary to a generalized unpack here
 
 data Sym a = N a
            | Arg Int
@@ -251,7 +252,6 @@ instance (Constable a, Num a, Ord (Sym a), Fractional a) => RealFrac (Sym a)
 instance (Constable a, RealFloat a, Ord (Sym a)) => RealFloat (Sym a) where
   atan2 (N a) (N b) | is_const a && is_const b = N (atan2 a b)
   atan2 a b                                    = Atan2 a b
-
 
 
 -- Full instances

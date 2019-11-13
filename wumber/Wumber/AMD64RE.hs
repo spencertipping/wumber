@@ -5,7 +5,7 @@
 module Wumber.AMD64RE where
 
 
-import Control.Monad (foldM, replicateM_)
+import Control.Monad (foldM, replicateM_, forM_)
 import Control.Monad.RWS (evalRWS)
 import Data.Bits
 import Data.List (sort)
@@ -103,17 +103,31 @@ test1c = reptest 10000 200 do
   addsd 3 2 2; addsd 3 6 6
   addsd 3 3 3; addsd 3 7 7
 
+test1d = reptest 10000 100 $ forM_ [0..15] \i -> addsd 3 i i
+
 -- (they totally do have different performance: test1c is ~8x faster than test1a)
 
+test2a = reptest 10000 200 do
+  divsd 3 0 0; divsd 3 4 4
+  addsd 3 1 1; addsd 3 5 5
+  addsd 3 2 2; addsd 3 6 6
+  addsd 3 3 3; addsd 3 7 7
 
-test2a = reptest 100000 200 $ replicateM_ 8 $ divsd 3 0 0
-test2b = reptest 100000 200 $ replicateM_ 2 do
+test2b = reptest 10000 200 do
+  divsd 3 0 0; divsd 3 0 0
+  addsd 3 1 1; addsd 3 5 5
+  addsd 3 2 2; addsd 3 6 6
+  addsd 3 3 3; addsd 3 7 7
+
+
+test2c = reptest 100000 200 $ replicateM_ 8 $ divsd 3 0 0
+test2d = reptest 100000 200 $ replicateM_ 2 do
   divsd 3 0 0
   divsd 3 1 1
   divsd 3 2 2
   divsd 3 3 3
 
-test2c = reptest 100000 200 do
+test2e = reptest 100000 200 do
   divsd 3 0 0; divsd 3 4 4
   divsd 3 1 1; divsd 3 5 5
   divsd 3 2 2; divsd 3 6 6

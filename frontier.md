@@ -30,6 +30,7 @@
   + Mesh of quads, not just lines
   + View contouring? i.e. dual contouring in 2D wrt the view matrix?
   + 4D meshing for animation/object-through-time collision detection
+    + Collisions happen only at the `t` coordinates of 4D vertices
 + Shell
   + **Done:** JIT/iso-mesh inside shell process
   + **Done:** Model as pure data structure
@@ -50,3 +51,5 @@
   + Trace capacitance/impedance: integrate layout and design
   + Live-test hardware driver for unknown circuits
   + Fast approximation > slow detail; we can always export to SPICE
+  + `n+1`-D dual contouring for implicit time-stepped FEA
+  + Circuits as constraint systems to be minimized
