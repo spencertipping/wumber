@@ -1,3 +1,5 @@
+{-# LANGUAGE NoMonomorphismRestriction #-}
+
 module Wumber (
   module Wumber.AMD64Asm,
   module Wumber.BoundingBox,
@@ -13,7 +15,7 @@ module Wumber (
   Wumber,
   runWumber,
   f2d, d2f, fi,
-  tau, sincos
+  tau, τ, sincos
 ) where
 
 import Control.Monad.RWS.Strict
@@ -44,6 +46,7 @@ fi  = fromIntegral
 
 
 tau      = 2 * pi
+τ        = tau
 sincos θ = (sin r, cos r) where r = θ / 360 * tau
 
 

@@ -28,7 +28,7 @@ assemble_lowlevel m = assemble m' () ()
 
 
 -- | Serializing 'rdtsc', storing the result into all 64 bits of '%rax'. The
---   'rdtsc' instruction uses '%edx:%eax', which is very unhelpful.
+--   amd64 'rdtsc' instruction uses '%edx:%eax', which is very unhelpful.
 rdtsc :: Asm ()
 rdtsc = do
   lfence

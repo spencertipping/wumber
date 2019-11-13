@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -24,6 +26,7 @@
 module Wumber.Symbolic (
   Sym(..),
   MathFn(..),
+  FromFloating(..),
   Constable(..),
   Roundable(..),
   Mod(..),
@@ -73,6 +76,15 @@ infixl 7 :*
 infixl 7 :/
 infixl 7 :%
 infixl 8 :**
+
+
+-- | The class of things coercible either to numbers or 'Sym' instances. This
+--   makes it easier to write polymorphic code.
+class FromFloating n a where from_floating :: n -> a
+
+instance FromFloating a (Sym a) where from_floating = N . from_floating
+instance FromFloating a a       where from_floating = id
+instance Num a => FromFloating Integer a where from_floating = fromInteger
 
 
 binary :: Sym a -> Maybe (Sym a, Sym a)

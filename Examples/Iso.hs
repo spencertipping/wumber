@@ -40,9 +40,6 @@ screw :: Double -> V3 Double -> V3 Double
 screw dθ v@(V3 x y z) = v *! rotate_z_m (dθ * z)
 
 
-τ = pi * 2
-
-
 -- Hex-cap machine bolt, screw threads and all
 
 -- First let's model the threads: a triangular section screw-extruded along an
@@ -91,10 +88,6 @@ scs     = spheres `iunion` cube (BB (-1.5) (-0.5))
                   `iunion` cube (BB (-1.2) (-0.2))
 
 cubes   = cube (BB (-1) 1)
-
-cubearray     = foldl1 iunion $ map xycube coords
-coords        = cfor [-1,-0.8..1] \x -> for [-1,-0.8..1] (x,)
-xycube (x, y) = cube (BB (V3 (N x) (N y) 0 ^-^ 0.05) (V3 (N x) (N y) 0 ^+^ 0.05))
 
 
 main :: Wumber ()
