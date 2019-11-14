@@ -57,3 +57,9 @@ be able to quickly re-traverse and redo calculations, then sort and split the
 most important ones. This is going to require our nodes to store the max error
 in their children so we can skip whole sections at a time -- and that means the
 view-matrix step is applied at the last moment, as a scaling factor.
+
+```
+unexpanded nodes in tree
+  >> heapify by vm-scaled size * intrinsic error
+  >> pull+split until deadline (and heapify children)
+```
