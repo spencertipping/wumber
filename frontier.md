@@ -10,8 +10,8 @@
 + QA
   + **Done:** JIT tests
   + **Done:** JIT benchmarks
-  + Dual contouring benchmarks
-  + Compilation benchmarks
+  + **Done:** Dual contouring benchmarks
+  + **Done-ish:** Compilation benchmarks
   + Refactor benchmark harness generally, enable named selection
 + DSL
   + Finalize constraint DSL
