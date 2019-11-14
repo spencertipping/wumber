@@ -43,6 +43,7 @@ import Linear.V3             (V3(..))
 import Linear.Vector         (Additive, lerp, (^*))
 import Numeric.LinearAlgebra ((!))
 
+import qualified Data.Sequence as SQ
 import qualified Data.Set as S
 import qualified Linear.V as V
 import qualified Numeric.LinearAlgebra as LA
@@ -93,10 +94,10 @@ t_size _                = 1
 
 -- | Traces an iso element to the specified non-surface and surface resolutions
 --   and returns a list of 'Element's to contour it.
-iso_contour :: IsoFn (V3 R) -> BB3D -> Int -> Int -> R -> [Element]
+iso_contour :: IsoFn (V3 R) -> BB3D -> Int -> Int -> R -> SQ.Seq Element
 iso_contour f b minn maxn bias = lines (trace_lines t)
   where t     = build f b sf bias
-        lines = map (\(v1, v2) -> shape_of identity [v1, v2])
+        lines = fmap (\(v1, v2) -> shape_of identity [v1, v2])
 
         sf _ n (TM b (v:vs)) _
           | any ((/= signum v) . signum) vs = n < maxn
@@ -148,18 +149,18 @@ trace_cells t                = map pair $ edge_pairs (length l)
 
 -- | Uses dual contouring to find lines along an isosurface. The lines end up
 --   forming a closed net unless your cells are too large.
-trace_lines :: (Applicative v, Foldable v) => Tree (v R) -> [(v R, v R)]
-trace_lines (Bisect _ _ l r) = go l r ++ trace_lines l ++ trace_lines r
+trace_lines :: (Applicative v, Foldable v) => Tree (v R) -> SQ.Seq (v R, v R)
+trace_lines (Bisect _ _ l r) = go l r SQ.>< trace_lines l SQ.>< trace_lines r
   where go l r
-          | not (intersects (l^.t_bound) (r^.t_bound))         = []
-          | collapsed_dimensions (l^.t_bound) (r^.t_bound) > 1 = []
+          | not (intersects (l^.t_bound) (r^.t_bound))         = SQ.empty
+          | collapsed_dimensions (l^.t_bound) (r^.t_bound) > 1 = SQ.empty
           | otherwise = case (l, r) of
-              (Bisect _ _ l' r', _) -> go l' r ++ go r' r
-              (_, Bisect _ _ l' r') -> go l l' ++ go l r'
-              (Surface _ v1, Surface _ v2) -> [(v1, v2)]
-              _ -> []
+              (Bisect _ _ l' r', _) -> go l' r SQ.>< go r' r
+              (_, Bisect _ _ l' r') -> go l l' SQ.>< go l r'
+              (Surface _ v1, Surface _ v2) -> SQ.singleton (v1, v2)
+              _ -> SQ.empty
 
-trace_lines _ = []
+trace_lines _ = SQ.empty
 
 
 -- | Locates the vertex within a 'Surface' cell. We do this by minimizing an

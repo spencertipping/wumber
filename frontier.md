@@ -1,13 +1,13 @@
 # Development frontier
 ## Frontend
 + Dual contour
+  + Prioritize bisections by expected error
   + Accept/generate surface hints, e.g. by extrapolating from tangent planes
   + Incremental/progressive scanning (reuse already-computed data)
-  + Prioritize bisections by expected error
-  + Deduplicate function evaluations, possibly just with a `Map`
   + Cache boundaries to disk (requires fingerprinting for Sym)
   + Mesh of quads, not just lines
   + View contouring? i.e. dual contouring in 2D wrt the view matrix?
+  + Deduplicate function evaluations, possibly just with a `Map`
 + Shell
   + **Done:** JIT/iso-mesh inside shell process
   + **Done:** Model as pure data structure
