@@ -23,7 +23,10 @@ isofn evaluation).
 We need to be able to infer error nonlocally: a cell _near_ some error should be
 able to indicate expected error in another location. This suggests that our
 error is a distribution we'll discover as we go, which might break stuff. It's
-awkward to update everything in a priority queue when we learn new things. We
-can get around this a little if we make the rule that nobody can decrease error.
-Then it's "modify N head elements", not "modify every element" -- and I think
-the overhead is justifiable.
+awkward to update everything in a priority queue when we learn new things.
+
+...so rather than have any sort of continuous distribution, maybe we just
+attribute error directly to un-bisected cells and maintain them in a spatial
+index. Then updates are _O(log n)_: find by spatial index, unheap, reheap.
+
+I also like this idea because it lets the user iteratively refine the mesh.
