@@ -59,7 +59,7 @@ x_lt l (V3 x _ _) = l - x
 z_lt l (V3 _ _ z) = l - z
 
 hex_cap r v = foldl' lower maxBound
-  $ map (\θ -> x_lt r (v *! rotate_z_m (N θ))) [0, 60 .. 360]
+  $ map (\θ -> x_lt r (v *! rotate_z_m (N θ))) [0, 60 .. 300]
 
 
 bolt od ts = thread_part `iunion` head_part
@@ -80,7 +80,10 @@ iintersect f g v = lower (f v) (g v)
 inegate    f v   = negate (f v)
 
 
-model = bolt 0.5 0.4 `iunion` scs
+moved_by t f v = f (v - t)
+
+
+model = moved_by (V3 0 1.1 0) (bolt 0.5 0.4) `iunion` scs
 --model v = threads (t45 0.5) (v * 3) -- scs v -- `upper` cubearray (v / 2) -- + cubes v * (-0.3)
 
 spheres = sphere 0 `iunion` sphere 0.9

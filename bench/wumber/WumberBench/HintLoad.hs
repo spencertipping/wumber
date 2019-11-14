@@ -13,6 +13,7 @@ import Criterion.Main
 import Data.Either
 import Data.Foldable
 import Data.Vector.Storable (Vector, fromList, unsafeWith)
+import Debug.Trace (trace)
 import Foreign.Ptr (castPtrToFunPtr, nullPtr)
 import Language.Haskell.Interpreter
 import Linear.Matrix ((*!))
@@ -37,6 +38,9 @@ eitherError (Left a)  = error (show a)
 eitherError (Right a) = a
 
 
+-- TODO
+-- Hint can't load Linear.V3 from 'stack bench' ... not sure what's going on.
+
 load_linear :: IO (V3 Double)
 load_linear = eitherError <$> runInterpreter do
   setImports ["Prelude", "Linear.Metric", "Linear.V2", "Linear.V3", "Linear.Vector"]
@@ -46,7 +50,7 @@ load_linear = eitherError <$> runInterpreter do
 load_wumbersym :: IO Double
 load_wumbersym = eitherError <$> runInterpreter do
   setImports ["Prelude", "Wumber.Symbolic"]
-  interpret "eval undefined $ N 4 + N 5" (as :: Double)
+  interpret "eval (const 0) $ N 4 + N 5" (as :: Double)
 
 
 load_wumbersym_nop :: IO Double
@@ -57,7 +61,7 @@ load_wumbersym_nop = eitherError <$> runInterpreter do
 load_wumber_all :: IO Double
 load_wumber_all = eitherError <$> runInterpreter do
   setImports ["Prelude", "Wumber"]
-  interpret "eval undefined $ N 4 + N 5" (as :: Double)
+  interpret "eval (const 0) $ N 4 + N 5" (as :: Double)
 
 
 hint_baseline :: IO Double
@@ -66,10 +70,12 @@ hint_baseline = eitherError <$> runInterpreter do
   interpret "4 + 5" (as :: Double)
 
 
-benchmarks = [
+benchmarks = trace "skipping hint benchmarks (TODO: fix)" [
+  {-
   bench "hint/V3"            (nfIO load_linear),
   bench "hint/baseline"      (nfIO hint_baseline),
   bench "hint/wumbersym"     (nfIO load_wumbersym),
   bench "hint/wumbersym_nop" (nfIO load_wumbersym_nop),
   bench "hint/wumber_all"    (nfIO load_wumber_all)
-             ]
+  -}
+  ]
