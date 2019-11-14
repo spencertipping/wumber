@@ -30,3 +30,18 @@ attribute error directly to un-bisected cells and maintain them in a spatial
 index. Then updates are _O(log n)_: find by spatial index, unheap, reheap.
 
 I also like this idea because it lets the user iteratively refine the mesh.
+
+
+## Bisection vs arbitrary splits
+The explore-the-space problem doesn't demand that our splits bisect anything;
+they could be chosen to maximize expected unknown at the split point. If we
+apply the right distributive property to the line-tracing step (as we do now), I
+think it should also work fine without even splits.
+
+(Verified: nothing breaks catastrophically, although the model looks strange if
+bisections are sufficiently biased.)
+
+
+## Progressive contouring
+Or, how do we rapidly update a potentially huge list of lines we've obtained
+from tracing?

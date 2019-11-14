@@ -306,11 +306,11 @@ edge_pairs n = [(i, i `xor` shiftL 1 x) | i <- [0..(1 `shiftL` (n-1))],
 
 -- | Bisect a bounding box along the specified axis vector. Your warranty is
 --   void if you specify a vector that isn't axis-aligned.
-bisect :: (Metric v, Fractional (v a), Fractional a)
+bisect :: (Metric v, Fractional (v a), Fractional a, Floating a)
        => v a -> BoundingBox (v a) -> (BoundingBox (v a), BoundingBox (v a))
 bisect a (BB l u) = (BB l (l + mp/2 + mo), BB (l + mp/2) u)
   where d  = u - l
-        mp = a `project` d
+        mp = project a d
         mo = d - mp
 
 {-# SPECIALIZE bisect :: V3 R -> BB3D -> (BB3D, BB3D) #-}

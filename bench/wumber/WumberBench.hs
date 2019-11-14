@@ -11,6 +11,6 @@ import qualified WumberBench.HintLoad     as HL
 
 
 main = defaultMain bs
-  where bs = concat [ HF.benchmarks,
-                      HL.benchmarks,
-                      C.benchmarks ]
+  where bs = concat [ C.benchmarks,
+                      HF.benchmarks,
+                      HL.benchmarks ]

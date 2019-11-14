@@ -90,7 +90,7 @@ intersects a b = exists $ intersect a b
 {-# SPECIALIZE INLINE intersects :: BB2D -> BB2D -> Bool #-}
 
 
--- | Returns the number of dimension which become trivial when two bounding
+-- | Returns the number of dimensions which become trivial when two bounding
 --   boxes are intersected. For example, two adjacent 3D cubes would produce a
 --   2D rectangle, so one dimension would have been trivialized.
 collapsed_dimensions :: (Applicative f, Foldable f, Ord a, ClosedComparable a)

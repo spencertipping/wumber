@@ -13,6 +13,7 @@ import Criterion.Main
 import Data.Either
 import Data.Foldable
 import Data.Vector.Storable (Vector, fromList, unsafeWith)
+import Debug.Trace (trace)
 import Foreign.Ptr (castPtrToFunPtr, nullPtr)
 import Linear.Matrix ((*!))
 import Linear.Metric
@@ -20,10 +21,18 @@ import Linear.V2
 import Linear.V3
 import Numeric (showHex)
 import System.IO.Unsafe (unsafePerformIO)
+import Text.Printf (printf)
 
 import qualified Data.ByteString as BS
 
 import Wumber
+
+
+just_tree :: IsoFn (V3 R) -> BB3D -> Int -> Int -> R -> Tree (V3 R)
+just_tree f b minn maxn bias = build f b sf bias
+  where sf _ n (TM b (v:vs)) _
+          | any ((/= signum v) . signum) vs = n < maxn
+          | otherwise                       = n < minn
 
 
 -- Test model
@@ -90,12 +99,28 @@ model_fn  = jit_a_fn model
 model2_fn = jit_a_fn \v -> (model v + model v + model v + model v) / 4
 
 
-benchmarks = [
-  bench "model/jit"  (nf model_fn  (V3 0.5 1 2 :: V3 Double)),
-  bench "model/jit2" (nf model2_fn (V3 0.5 1 2 :: V3 Double)),
-  bench "model/ghc"  (nf model     (V3 0.5 1 2 :: V3 Double)),
+isotree12 = just_tree model_fn (BB (-2) 2) 6  12 0.1
+isotree18 = just_tree model_fn (BB (-2) 2) 12 18 0.1
+isotree24 = just_tree model_fn (BB (-2) 2) 18 24 0.1
 
-  bench "contour12/jit"  (nf (length . iso_contour model_fn  (BB (-2) 2) 6 12) 0.1),
-  bench "contour12/jit2" (nf (length . iso_contour model2_fn (BB (-2) 2) 6 12) 0.1),
-  bench "contour12/hs"   (nf (length . iso_contour model     (BB (-2) 2) 6 12) 0.1)
-  ]
+
+benchmarks = trace info bs
+  where info = printf "isotree12: %d; isotree18: %d; isotree24: %d\n"
+                      (t_size isotree12) (t_size isotree18) (t_size isotree24)
+        bs = [
+          bench "model/jit"  (nf model_fn  (V3 0.5 1 2 :: V3 Double)),
+          -- bench "model/jit2" (nf model2_fn (V3 0.5 1 2 :: V3 Double)),
+          bench "model/ghc"  (nf model     (V3 0.5 1 2 :: V3 Double)),
+
+          bench "tree/jit"  (nf (t_size . just_tree model_fn  (BB (-2) 2) 6 12) 0.1),
+          -- bench "tree/jit2" (nf (t_size . just_tree model2_fn (BB (-2) 2) 6 12) 0.1),
+          -- bench "tree/hs"   (nf (t_size . just_tree model     (BB (-2) 2) 6 12) 0.1),
+
+          bench "contour/trace12" (nf (length . trace_lines) isotree12),
+          bench "contour/trace18" (nf (length . trace_lines) isotree18),
+          bench "contour/trace24" (nf (length . trace_lines) isotree24),
+
+          bench "contour12/jit"  (nf (length . iso_contour model_fn  (BB (-2) 2) 6 12) 0.1)
+          -- bench "contour12/jit2" (nf (length . iso_contour model2_fn (BB (-2) 2) 6 12) 0.1),
+          -- bench "contour12/hs"   (nf (length . iso_contour model     (BB (-2) 2) 6 12) 0.1)
+          ]
