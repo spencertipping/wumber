@@ -1,26 +1,5 @@
 # Development frontier
-+ Sym/JIT
-  + **Done:** Trivial AMD64 JIT for Sym (no compile analysis/optimization)
-  + **Done:** Sym -> Isofn
-  + Call back into Haskell/C
-  + Piecewise/`cond`
-  + Reverse-engineer instruction latency/throughput
-  + Sym -> constraint isofn?
-  + CSE and vectorization?
-+ QA
-  + **Done:** JIT tests
-  + **Done:** JIT benchmarks
-  + **Done:** Dual contouring benchmarks
-  + **Done-ish:** Compilation benchmarks
-  + Refactor benchmark harness generally, enable named selection
-+ DSL
-  + Finalize constraint DSL
-  + Figure out object model for common shapes, esp axis/angular symmetries
-  + Mirror x/y/etc?
-  + Boundary hinting
-+ Constraints
-  + Partition by inputs
-  + Simplify linear subsystems
+## Frontend
 + Dual contour
   + Accept/generate surface hints, e.g. by extrapolating from tangent planes
   + Incremental/progressive scanning (reuse already-computed data)
@@ -29,17 +8,56 @@
   + Cache boundaries to disk (requires fingerprinting for Sym)
   + Mesh of quads, not just lines
   + View contouring? i.e. dual contouring in 2D wrt the view matrix?
-  + 4D meshing for animation/object-through-time collision detection
-    + Collisions happen only at the `t` coordinates of 4D vertices
 + Shell
   + **Done:** JIT/iso-mesh inside shell process
   + **Done:** Model as pure data structure
   + LOD based on view matrix: incorporate "visually perceptible error" into DC
+  + Restrict DC to small bounds, possibly integrated with model
++ Shell CLI
+  + Select variable(s) to be rendered
+  + Build views programmatically, integrated with constraints
+  + Export bulk constraint solutions
+
+
+## Backend
++ Sym API
+  + **Done:** Sym -> Isofn
+  + Call back into Haskell/C
+  + Piecewise/`cond`
+  + Sym -> constraint isofn?
++ Sym compiler
+  + Algebraic simplification
++ JIT
+  + **Done:** Trivial AMD64 JIT for Sym (no compile analysis/optimization)
+  + Reverse-engineer instruction latency/throughput
+  + Register allocation
+  + Generate processor-optimized code
+  + Auto-vectorization
++ QA
+  + **Done:** JIT tests
+  + **Done:** JIT benchmarks
+  + **Done:** Dual contouring benchmarks
+  + **Done but broken:** Hint load benchmarks
+  + Refactor benchmark harness generally, enable named selection
++ Constraints
+  + Partition by inputs
+  + Simplify linear subsystems
++ Simulation
+  + 4D meshing for animation/object-through-time collision detection
+    + Collisions happen only at the `t` coordinates of 4D vertices
+
+
+## Modeling
 + Parts
   + Iso-libraries for screws, beams, etc
   + Bearings
   + Axles, pulleys, belts
   + Use constraints to solve for belt path between pulleys
++ DSL
+  + Finalize constraint DSL
+  + Figure out object model for common shapes, esp axis/angular symmetries
+  + Mirror x/y/etc?
+  + Boundary hinting
 
 
 ## Long-term
