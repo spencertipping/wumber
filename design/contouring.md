@@ -44,4 +44,16 @@ bisections are sufficiently biased.)
 
 ## Progressive contouring
 Or, how do we rapidly update a potentially huge list of lines we've obtained
-from tracing?
+from tracing? ...actually, let's skip this for now. Our current trace overhead
+is about 1μs/line, which isn't much (and we can't easily improve it).
+
+Instead, let's focus on the tree-exploration end. This is pretty simple if we
+just use local error; we calculate it once per cell, determine a threshold, and
+expand. If we're time-sensitive we might run the highest-error cells for n
+milliseconds, then stop and iterate.
+
+If we're using the view matrix to calculate apparent error, then we'll want to
+be able to quickly re-traverse and redo calculations, then sort and split the
+most important ones. This is going to require our nodes to store the max error
+in their children so we can skip whole sections at a time -- and that means the
+view-matrix step is applied at the last moment, as a scaling factor.
