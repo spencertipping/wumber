@@ -21,6 +21,7 @@ module Wumber.DualContour (
   build,
   trace_cells,
   trace_lines,
+  trace_lines3D,
   StorableVector(..)
 ) where
 
@@ -161,6 +162,30 @@ trace_lines (Bisect _ _ l r) = go l r SQ.>< trace_lines l SQ.>< trace_lines r
               _ -> SQ.empty
 
 trace_lines _ = SQ.empty
+
+
+trace_lines3D :: Tree (V3 R) -> SQ.Seq (V3 R, V3 R)
+trace_lines3D (Bisect _ _ l r) = go l r SQ.>< trace_lines l SQ.>< trace_lines r
+  where go l r
+          | not (intersects' (l^.t_bound) (r^.t_bound))         = SQ.empty
+          | collapsed_dimensions' (l^.t_bound) (r^.t_bound) > 1 = SQ.empty
+          | otherwise = case (l, r) of
+              (Bisect _ _ l' r', _) -> go l' r SQ.>< go r' r
+              (_, Bisect _ _ l' r') -> go l l' SQ.>< go l r'
+              (Surface _ v1, Surface _ v2) -> SQ.singleton (v1, v2)
+              _ -> SQ.empty
+
+        intersects' (BB (V3 x1 y1 z1) (V3 x2 y2 z2))
+                    (BB (V3 x3 y3 z3) (V3 x4 y4 z4)) =
+          max x1 x3 <= min x2 x4 && max y1 y3 <= min y2 y4 && max z1 z3 <= min z2 z4
+
+        collapsed_dimensions' (BB (V3 x1 y1 z1) (V3 x2 y2 z2))
+                              (BB (V3 x3 y3 z3) (V3 x4 y4 z4)) =
+          (if max x1 x3 >= min x2 x4 then 1 else 0) +
+          (if max y1 y3 >= min y2 y4 then 1 else 0) +
+          (if max z1 z3 >= min z2 z4 then 1 else 0)
+
+trace_lines3D _ = SQ.empty
 
 
 -- | Locates the vertex within a 'Surface' cell. We do this by minimizing an

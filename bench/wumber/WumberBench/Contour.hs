@@ -116,9 +116,11 @@ benchmarks = trace info bs
           -- bench "tree/jit2" (nf (t_size . just_tree model2_fn (BB (-2) 2) 6 12) 0.1),
           -- bench "tree/hs"   (nf (t_size . just_tree model     (BB (-2) 2) 6 12) 0.1),
 
-          bench "contour/trace12" (nf (length . trace_lines) isotree12),
-          bench "contour/trace18" (nf (length . trace_lines) isotree18),
-          bench "contour/trace24" (nf (length . trace_lines) isotree24),
+          bench "contour/trace/12" (nf (length . trace_lines) isotree12),
+          bench "contour/trace3D/12" (nf (length . trace_lines3D) isotree12),
+          bench "contour/trace/18" (nf (length . trace_lines) isotree18),
+          bench "contour/trace3D/18" (nf (length . trace_lines3D) isotree18),
+          -- bench "contour/trace/24" (nf (length . trace_lines) isotree24),
 
           bench "contour12/jit"  (nf (length . iso_contour model_fn  (BB (-2) 2) 6 12) 0.1)
           -- bench "contour12/jit2" (nf (length . iso_contour model2_fn (BB (-2) 2) 6 12) 0.1),

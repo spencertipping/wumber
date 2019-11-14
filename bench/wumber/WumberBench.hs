@@ -5,12 +5,14 @@ import Criterion.Main
 
 import Wumber
 
+import qualified WumberBench.BoundingBox  as BB
 import qualified WumberBench.Contour      as C
 import qualified WumberBench.HandcodedFns as HF
 import qualified WumberBench.HintLoad     as HL
 
 
 main = defaultMain bs
-  where bs = concat [ C.benchmarks,
+  where bs = concat [ BB.benchmarks,
+                      C.benchmarks,
                       HF.benchmarks,
                       HL.benchmarks ]
