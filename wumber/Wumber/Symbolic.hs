@@ -252,94 +252,53 @@ instance Show a => Show (Sym a) where
   show (Math f a)  = printf "%s(%s)" (show f) (show a)
 
 
--- Partial instances
--- We steal various functions from these to make the API easier to use, but we
--- in no way qualify to actually implement them.
---
--- FIXME: this is awful. We should just write our own atan2 alternative instead
--- of using fake instances. Missing methods infinite-loop and run out of memory,
--- which is diabolical, impossible to debug, and completely user-hostile.
+cf_unary f _  (N a) | is_const a = N (f a)
+cf_unary _ op x                  = op x
 
-instance Eq a => Ord (Sym a) where
-  compare a b = error "sym instances aren't actually ordered"
+cf_binary f _  (N a) (N b) | is_const a && is_const b = N (f a b)
+cf_binary _ op x     y                                = op x y
 
-instance (Constable a, Num a, Ord (Sym a)) => Real (Sym a)
-instance (Constable a, Num a, Ord (Sym a), Fractional a) => RealFrac (Sym a)
-
-instance (Constable a, RealFloat a, Ord (Sym a)) => RealFloat (Sym a) where
-  atan2 (N a) (N b) | is_const a && is_const b = N (atan2 a b)
-  atan2 a b                                    = Atan2 a b
-
-
--- Full instances
--- i.e. all the functions work. None of these instances require us to coerce our
--- values to concrete or arbitrary types like 'forall b. Integral b'.
 
 instance Bounded a => Bounded (Sym a) where
   minBound = N minBound
   maxBound = N maxBound
 
 instance (Constable a, Num a) => Num (Sym a) where
-  fromInteger  = N . fromInteger
-  N a + N b | is_const a && is_const b = N (a + b)
-  a   + b                              = a :+ b
-  N a - N b | is_const a && is_const b = N (a - b)
-  a   - b                              = a :- b
-  N a * N b | is_const a && is_const b = N (a * b)
-  a   * b                              = a :* b
-  abs (N a) | is_const a               = N (abs a)
-  abs a                                = Math Abs a
-  signum (N a) | is_const a            = N (signum a)
-  signum a                             = Math Signum a
+  fromInteger = N . fromInteger
+  (+)    = cf_binary (+) (:+)
+  (-)    = cf_binary (-) (:-)
+  (*)    = cf_binary (*) (:*)
+  abs    = cf_unary abs (Math Abs)
+  signum = cf_unary signum (Math Signum)
 
 instance (Constable a, Fractional a) => Fractional (Sym a) where
   fromRational = N . fromRational
-  N a / N b | is_const a && is_const b = N (a / b)
-  a   / b                              = a :/ b
+  (/) = cf_binary (/) (:/)
 
 instance (Constable a, Mod a) => Mod (Sym a) where
-  N a % N b | is_const a && is_const b = N (a % b)
-  a   % b                              = a :% b
+  (%) = cf_binary (%) (:%)
 
 instance (Constable a, Floating a) => Floating (Sym a) where
-  N a ** N b | is_const a && is_const b = N (a ** b)
-  a   ** b                              = a :** b
+  pi = N pi
 
-  pi                       = N pi
-  exp (N a)   | is_const a = N (exp a)
-  exp a                    = Math Exp a
-  log (N a)   | is_const a = N (log a)
-  log a                    = Math Log a
-  sqrt (N a)  | is_const a = N (sqrt a)
-  sqrt a                   = Math Sqrt a
+  (**) = cf_binary (**) (:**)
 
-  sin (N a)   | is_const a = N (sin a)
-  sin a                    = Math Sin a
-  cos (N a)   | is_const a = N (cos a)
-  cos a                    = Math Cos a
-  tan (N a)   | is_const a = N (tan a)
-  tan a                    = Math Tan a
-  asin (N a)  | is_const a = N (asin a)
-  asin a                   = Math Asin a
-  acos (N a)  | is_const a = N (acos a)
-  acos a                   = Math Acos a
-  atan (N a)  | is_const a = N (atan a)
-  atan a                   = Math Atan a
-  sinh (N a)  | is_const a = N (sinh a)
-  sinh a                   = Math Sinh a
-  cosh (N a)  | is_const a = N (cosh a)
-  cosh a                   = Math Cosh a
-  tanh (N a)  | is_const a = N (tanh a)
-  tanh a                   = Math Tanh a
-  asinh (N a) | is_const a = N (asinh a)
-  asinh a                  = Math Asinh a
-  acosh (N a) | is_const a = N (acosh a)
-  acosh a                  = Math Acosh a
-  atanh (N a) | is_const a = N (atanh a)
-  atanh a                  = Math Atanh a
+  exp   = cf_unary exp   (Math Exp)
+  log   = cf_unary log   (Math Log)
+  sqrt  = cf_unary sqrt  (Math Sqrt)
+  sin   = cf_unary sin   (Math Sin)
+  cos   = cf_unary cos   (Math Cos)
+  tan   = cf_unary tan   (Math Tan)
+  asin  = cf_unary asin  (Math Asin)
+  acos  = cf_unary acos  (Math Acos)
+  atan  = cf_unary atan  (Math Atan)
+  sinh  = cf_unary sinh  (Math Sinh)
+  cosh  = cf_unary cosh  (Math Cosh)
+  tanh  = cf_unary tanh  (Math Tanh)
+  asinh = cf_unary asinh (Math Asinh)
+  acosh = cf_unary acosh (Math Acosh)
+  atanh = cf_unary atanh (Math Atanh)
 
 instance (Constable a, ClosedComparable a) => ClosedComparable (Sym a) where
-  lower (N a) (N b) | is_const a && is_const b = N (lower a b)
-  lower a     b                                = Lower a b
-  upper (N a) (N b) | is_const a && is_const b = N (upper a b)
-  upper a     b                                = Upper a b
+  lower = cf_binary lower Lower
+  upper = cf_binary upper Upper

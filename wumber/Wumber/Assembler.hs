@@ -5,7 +5,7 @@
 
 -- | A DSL for assembling machine code and doing requisite value conversions.
 --   Assemblers are similar to 'ByteString' 'Builder's, but monadic (i.e.
---   non-associative) so they can track byte offsets.
+--   non-associative) so they can do things like track byte offsets.
 
 module Wumber.Assembler (
   assemble,
