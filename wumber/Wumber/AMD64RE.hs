@@ -93,48 +93,72 @@ reptest n r m = tsc_fn_med n (rep r m)
 
 -- If the pipeline premise is right, these two examples should have different
 -- performance:
-test1a = reptest 10000 200 $ replicateM_ 8 $ addsd 3 0 0
-test1b = reptest 10000 200 $ replicateM_ 2 do
+test1a = reptest 100 200 $ replicateM_ 8 $ addsd 3 0 0
+test1b = reptest 100 200 $ replicateM_ 2 do
   addsd 3 0 0
   addsd 3 1 1
   addsd 3 2 2
   addsd 3 3 3
 
-test1c = reptest 10000 200 do
+test1c = reptest 100 200 do
   addsd 3 0 0; addsd 3 4 4
   addsd 3 1 1; addsd 3 5 5
   addsd 3 2 2; addsd 3 6 6
   addsd 3 3 3; addsd 3 7 7
 
-test1d = reptest 10000 100 $ forM_ [0..15] \i -> addsd 3 i i
+test1d = reptest 100 100 $ forM_ [0..15] \i -> addsd 3 i i
 
 -- (they totally do have different performance: test1c is ~8x faster than test1a)
 
-test2a = reptest 10000 200 do
+test2a = reptest 100 200 do
   divsd 3 0 0; divsd 3 4 4
   addsd 3 1 1; addsd 3 5 5
   addsd 3 2 2; addsd 3 6 6
   addsd 3 3 3; addsd 3 7 7
 
-test2b = reptest 10000 200 do
+test2b = reptest 100 200 do
   divsd 3 0 0; divsd 3 0 0
   addsd 3 1 1; addsd 3 5 5
   addsd 3 2 2; addsd 3 6 6
   addsd 3 3 3; addsd 3 7 7
 
 
-test2c = reptest 100000 200 $ replicateM_ 8 $ divsd 3 0 0
-test2d = reptest 100000 200 $ replicateM_ 2 do
+test2c = reptest 100 200 $ replicateM_ 8 $ divsd 3 0 0
+test2d = reptest 100 200 $ replicateM_ 2 do
   divsd 3 0 0
   divsd 3 1 1
   divsd 3 2 2
   divsd 3 3 3
 
-test2e = reptest 100000 200 do
+test2e = reptest 100 200 do
   divsd 3 0 0; divsd 3 4 4
   divsd 3 1 1; divsd 3 5 5
   divsd 3 2 2; divsd 3 6 6
   divsd 3 3 3; divsd 3 7 7
+
+
+-- Latency testing: how many addsds do we need between same-register things?
+-- It doesn't seem to matter. Interesting. Register dependencies matter much
+-- more than instruction ordering. The main thing is that it fits into the
+-- reorder buffer.
+test3a = reptest 10000 200 do
+  addsd 3 0 0
+  addsd 3 0 0      -- zero
+  forM_ [1..15] \i -> addsd 3 i i
+
+test3b = reptest 10000 200 do
+  addsd 3 0 0
+  addsd 3 1 1
+  addsd 3 0 0
+  forM_ [2..15] \i -> addsd 3 i i
+
+test3c = reptest 10000 200 do
+  addsd 3 0 0
+  addsd 3 1 1
+  addsd 3 2 2
+  addsd 3 3 3
+  addsd 3 0 0
+  forM_ [4..15] \i -> addsd 3 i i
 
 
 foreign import ccall "dynamic" dfn :: FunPtr (IO Double) -> IO Double
