@@ -58,6 +58,8 @@ divsd = rex0_modrm "f2" "0f5e"
 maxsd = rex0_modrm "f2" "0f5f"
 minsd = rex0_modrm "f2" "0f5d"
 
+addpd = rex0_modrm "66" "0f58"
+
 lfence     = hex "0faee8"
 rdtsc_insn = hex "0f31"
 

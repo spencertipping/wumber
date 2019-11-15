@@ -161,6 +161,13 @@ test3c = reptest 10000 200 do
   forM_ [4..15] \i -> addsd 3 i i
 
 
+-- addsd vs addpd (identical performance)
+test4a = reptest 10000 1600 $ addsd 3 0 0
+test4b = reptest 10000 1600 $ addpd 3 0 0
+test4c = reptest 10000 200 $ forM_ [0..7] \i -> addsd 3 i i
+test4d = reptest 10000 200 $ forM_ [0..7] \i -> addpd 3 i i
+
+
 foreign import ccall "dynamic" dfn :: FunPtr (IO Double) -> IO Double
 
 tsc_fn n asm = do
