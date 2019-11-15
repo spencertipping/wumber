@@ -11,7 +11,7 @@
 {-# LANGUAGE DeriveFoldable #-}
 {-# LANGUAGE DeriveTraversable #-}
 
-{-# OPTIONS_GHC -funbox-strict-fields -Wno-missing-methods #-}
+{-# OPTIONS_GHC -funbox-strict-fields #-}
 
 
 -- | Symbolic representation of closed-form numeric expressions. 'Sym a' is an
@@ -56,7 +56,7 @@ import Wumber.ClosedComparable
 --   TODO: move JITIR binary to a generalized unpack here
 
 data Sym a = N a
-           | Arg Int
+           | Arg !Int
            | Sym a :+ Sym a
            | Sym a :- Sym a
            | Sym a :* Sym a
@@ -252,6 +252,7 @@ instance Show a => Show (Sym a) where
   show (Math f a)  = printf "%s(%s)" (show f) (show a)
 
 
+-- Constant folding helpers
 cf_unary f _  (N a) | is_const a = N (f a)
 cf_unary _ op x                  = op x
 
