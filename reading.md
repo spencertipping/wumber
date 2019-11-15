@@ -21,6 +21,17 @@
 + [StackOverflow: kdtrees vs octrees](https://cstheory.stackexchange.com/questions/8470/why-would-one-ever-use-an-octree-over-a-kd-tree)
 
 
+## General modeling
++ [NURBS](https://en.wikipedia.org/wiki/Non-uniform_rational_B-spline) (and a
+  bunch of linked articles)
++ [Isogeometric analysis](https://en.wikipedia.org/wiki/Isogeometric_analysis)
+
+
+## Isogeometric FEM
++ [Reference implementation](https://github.com/rafavzqz/geopdes)
++ [Matlab implementation](https://sourceforge.net/projects/cmcodes/files/)
+
+
 ## Dealing with isosurfaces
 + [Wikipedia: isosurface](https://en.wikipedia.org/wiki/Isosurface)
 + [Boris the Brave: dual contouring](https://www.boristhebrave.com/2018/04/15/dual-contouring-tutorial/)
