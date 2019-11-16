@@ -25,11 +25,19 @@
 + [NURBS](https://en.wikipedia.org/wiki/Non-uniform_rational_B-spline) (and a
   bunch of linked articles)
 + [Isogeometric analysis](https://en.wikipedia.org/wiki/Isogeometric_analysis)
++ [U-splines whitepaper](https://coreform.com/usplines)
++ [Bézier vs B-spline](https://www.quora.com/What-is-the-difference-between-a-Bezier-curve-and-a-spline)
++ [Subdivision surfaces](https://en.wikipedia.org/wiki/Subdivision_surface)
++ [Ray-tracing NURBS](https://www.cs.utah.edu/~shirley/papers/raynurbs.pdf)
 
 
 ## Isogeometric FEM
++ [What is IGA?](https://www.quora.com/What-is-isogeometric-analysis)
 + [Reference implementation](https://github.com/rafavzqz/geopdes)
 + [Matlab implementation](https://sourceforge.net/projects/cmcodes/files/)
++ [IGA for electromagnetism](https://digitalcommons.odu.edu/cgi/viewcontent.cgi?article=1136&context=mae_etds)
++ [IGA for Navier-Stokes equations](https://www.wias-berlin.de/people/john/BETREUUNG/master_queirolo.pdf)
++ [IGA with T-splines](https://scholarsarchive.byu.edu/cgi/viewcontent.cgi?article=2903&context=etd)
 
 
 ## Dealing with isosurfaces
