@@ -17,9 +17,10 @@
 
 
 ## Modeling
-+ Parts
++ General
   + Parts as objects, not just implicit fns (this way we get constraints)
-  + NURBS
+  + NURBS or some sort of splines
++ Parts
   + Iso-libraries for screws, beams, etc
   + Bearings
   + Axles, pulleys, belts
