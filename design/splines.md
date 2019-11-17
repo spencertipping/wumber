@@ -26,3 +26,7 @@ set them using two types of constraints:
 
 1. Cross-section must provide X amount of flexural stiffness
 2. Cross-section must fit within X bounds
+
+Maybe we should think of NURBS as outputs of an optimization problem, rather
+than having them be hand-drawn. You specify what you need the part to do (in
+terms of forces), and the solver minimizes total weight/machining cost/etc.
