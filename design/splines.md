@@ -30,3 +30,15 @@ set them using two types of constraints:
 Maybe we should think of NURBS as outputs of an optimization problem, rather
 than having them be hand-drawn. You specify what you need the part to do (in
 terms of forces), and the solver minimizes total weight/machining cost/etc.
+
+
+## Rethinking things
+Splines were always an approximation from a design perspective. Real-world
+processes yield things that are spline-like, but splines don't provide a
+physically significant basis (even in the IGA sense: we can coerce finite
+elements, but nothing about our materials is particularly well suited to that
+representation).
+
+...so maybe the right challenge is to find different ways to do spline-like
+things, ideally using some sort of simulation-based optimizer. If we want
+chamfered corners, we create a cost function for sharp edges.

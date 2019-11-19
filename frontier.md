@@ -19,7 +19,6 @@
 ## Modeling
 + General
   + Parts as objects, not just implicit fns (this way we get constraints)
-  + NURBS or some sort of splines
 + Parts
   + Iso-libraries for screws, beams, etc
   + Bearings
@@ -50,6 +49,8 @@
 + Simulation
   + 4D meshing for animation/object-through-time collision detection
     + Collisions happen only at the `t` coordinates of 4D vertices
++ Meshing
+  + Progressive solid meshing for FEA, driven by error gradient
 
 
 ## Long-term
