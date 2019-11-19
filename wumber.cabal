@@ -10,7 +10,7 @@ maintainer:          spencer.tipping@gmail.com
 copyright:           Copyright (C) 2019, Spencer Tipping and Joyce Tipping
 category:            CAD
 build-type:          Simple
-extra-source-files:  CHANGELOG.md, README.md
+extra-source-files:  README.md
 
 
 -- CAD engine
@@ -80,7 +80,7 @@ test-suite wumber-tests
 
 benchmark wumber-bench
   type:                exitcode-stdio-1.0
-  ghc-options:         -O3 -threaded -with-rtsopts=-N
+  ghc-options:         -O2 -threaded -with-rtsopts=-N
   default-language:    Haskell2010
   hs-source-dirs:      bench/wumber
   main-is:             WumberBench.hs
