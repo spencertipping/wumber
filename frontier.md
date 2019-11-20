@@ -3,8 +3,9 @@
 + Dual contour
   + Prioritize bisections by expected error
   + Accept/generate surface hints, e.g. by extrapolating from tangent planes
+  + More accurate edge rendering, particularly for nonaligned corners
   + Incremental/progressive scanning (reuse already-computed data)
-  + Mesh of quads, not just lines
+  + Mesh to quads/prisms, not just lines
   + View contouring? i.e. dual contouring in 2D wrt the view matrix?
   + Deduplicate function evaluations
 + Shell
@@ -17,6 +18,13 @@
 
 
 ## Modeling
++ 2D
+  + Simple iso-profile for 2D objects (dual contouring)
+  + Constraints for layout
+  + Render 2D within a 3D context, given a plane + UV coordinates
+  + Support for text/labels?
+  + Diagrams/lines/graphs/etc?
+    + This is more like sketching than modeling per se
 + General
   + Parts as objects, not just implicit fns (this way we get constraints)
 + Parts
@@ -31,6 +39,10 @@
 
 
 ## Backend
++ Boundary-aware CSG
+  + DC isn't sufficient for realtime modeling: we need boundary/corner hints
+  + LOD-variant feature hinting
+  + Calculate LOD by view prominence
 + Sym API
   + Call back into Haskell/C
   + Piecewise/`cond`
