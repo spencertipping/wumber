@@ -1,5 +1,8 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
+
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 -- | Functions to split a set of constraints into independent subsystems and
@@ -12,8 +15,9 @@ module Wumber.ConstraintSplit (
 ) where
 
 
-import Data.List  (partition)
-import Lens.Micro ((&))
+import Data.List    (partition)
+import GHC.Generics (Generic)
+import Lens.Micro   ((&))
 
 import qualified Data.Set             as S
 import qualified Data.Vector          as V
@@ -42,11 +46,17 @@ subsystems cs = cs & map (\c -> ([c], constraint_deps c))
 --   'Subsystem' also collects the initial value of each variable and removes
 --   those elements from the 'Constraint' list.
 data Subsystem = Subsystem [Constraint] (V.Vector Int) (VS.Vector R)
+  deriving (Show, Eq, Generic)
 
 
 -- | Reduces a set of constraints to a subsystem with compactly-identified
 --   variables (whose indexes correspond to 'Vector' indexes used by the GSL
 --   minimizer).
+--
+--   TODO
+--   This function should call into the algebraic simplification stuff so that
+--   our subsystems are fully reduced when they get sent off to the solver.
+
 subsystem :: [Constraint] -> Subsystem
 subsystem cs = Subsystem cs (V.generate (maxid + 1) id) inits
   where maxid = S.findMax $ S.unions $ map constraint_deps cs

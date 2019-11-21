@@ -2,17 +2,17 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DeriveAnyClass #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 
 module Wumber.Constraint where
 
-import Control.Applicative
-import Control.Monad
-import Control.Monad.RWS
-import Data.Foldable
-import Data.Maybe
-import Text.Printf
+import Control.Monad.RWS (RWS, get, tell, modify)
+import Data.Binary       (Binary)
+import Data.Foldable     (toList)
+import GHC.Generics      (Generic(..))
 
 import Wumber.ClosedComparable
 import Wumber.Numeric
@@ -30,10 +30,11 @@ type CVal = Sym R
 data Constraint = CEqual      !CVal !CVal
                 | CMinimize   !CVal
                 | CInitialize !Int !R
+  deriving (Show, Eq, Generic, Binary)
 
 
 -- | 'Constrained' is a monad that keeps track of 'Arg' IDs and collects
---   constraint expressions whose values should end up being zero.
+--   equivalences, quantities to minimize, and initial values.
 type Constrained a = RWS () [Constraint] Int a
 
 
