@@ -43,7 +43,7 @@ library
                      , Wumber.ClosedComparable
                      , Wumber.Constraint
                      , Wumber.ConstraintSolver
-                     , Wumber.ConstraintSimplify
+                     , Wumber.ConstraintSplit
                      , Wumber.DualContour
                      , Wumber.GeometricConstraints
                      , Wumber.Cursor
