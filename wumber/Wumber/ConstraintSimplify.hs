@@ -10,6 +10,7 @@
 
 module Wumber.ConstraintSimplify where
 
+import Data.List (partition)
 import qualified Data.Map.Strict as M
 import qualified Data.Set as S
 import qualified Data.Vector as V
@@ -19,6 +20,13 @@ import Lens.Micro
 import Wumber.Constraint
 import Wumber.Numeric
 import Wumber.Symbolic
+
+
+-- | Separates independent subsystems. This is the first thing we do when
+--   simplifying a set of constraints.
+partition_by_vars :: [Constraint] -> [[Constraint]]
+partition_by_vars cs = filter (not . null) $ map fst $ group_by_overlap pairs
+  where pairs = cs & map \c -> ([c], constraint_deps c)
 
 
 -- | 'Simplified cs v inits' means "a set of constraints whose variables have
@@ -52,15 +60,21 @@ remap_solution :: V.Vector Int -> VS.Vector R -> [(Int, R)]
 remap_solution mi xs = V.toList mi `zip` VS.toList xs
 
 
--- | Separates independent subsystems. This is the first thing we do when
---   simplifying a set of constraints.
-partition_by_vars :: [Constraint] -> [[Constraint]]
-partition_by_vars cs = [cs]
-  where pairs = cs & map \c -> ([c], constraint_deps c)
+-- | Groups values by overlapping set elements, transitively. The result is a
+--   list of values whose sets are fully disjoint.
+group_by_overlap :: Ord b => [([a], S.Set b)] -> [([a], S.Set b)]
+group_by_overlap [] = []
+group_by_overlap ((l, s) : r)
+  | null inside = (l, s) : group_by_overlap r
+  | otherwise   = group_by_overlap ((l', s') : outside)
+
+  where (outside, inside) = partition (S.disjoint s . snd) r
+        l'                = l ++ concatMap fst inside
+        s'                = S.unions (s : map snd inside)
 
 
--- | The full set of initial values in a constraint.
+-- | The full set of variables referred to by a constraint.
 constraint_deps :: Constraint -> S.Set Int
 constraint_deps (CEqual a b)      = args_in a `S.union` args_in b
 constraint_deps (CMinimize v)     = args_in v
-constraint_deps (CInitialize _ _) = S.empty
+constraint_deps (CInitialize i _) = S.singleton i

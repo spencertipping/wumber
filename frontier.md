@@ -44,9 +44,9 @@
   + LOD-variant feature hinting
   + Calculate LOD by view prominence
 + Sym API
+  + **Done:** Sym -> constraint isofn?
   + Call back into Haskell/C
   + Piecewise/`cond`
-  + Sym -> constraint isofn?
 + Sym compiler
   + Algebraic simplification
   + Alias local quantities (SSA variables)
@@ -56,7 +56,7 @@
   + Generate processor-optimized code
   + Auto-vectorization
 + Constraints
-  + Partition by inputs
+  + **Done:** Partition by arg dependencies
   + Simplify linear subsystems
 + Simulation
   + 4D meshing for animation/object-through-time collision detection

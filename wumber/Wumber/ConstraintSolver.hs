@@ -14,7 +14,6 @@ module Wumber.ConstraintSolver where
 
 import Control.Monad
 import Control.Monad.RWS
-import qualified Data.List as L
 import qualified Data.Set as S
 import qualified Data.Vector as V
 import qualified Data.Vector.Storable as VS
