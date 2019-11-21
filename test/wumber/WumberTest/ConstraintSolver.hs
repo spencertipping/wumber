@@ -12,6 +12,8 @@ import Linear.V3
 import Test.QuickCheck
 import Text.Printf
 
+import qualified Data.Vector.Storable as VS
+
 import Debug.Trace
 
 import Wumber.Constraint
@@ -47,7 +49,7 @@ solvable :: (Rewritable a b, Show b) => R -> Int -> Constrained a -> Property
 solvable δ n m = counterexample (show (xs, v, a)) $ v <= ε
   where ε           = sqrt δ
         (a, xs, cs) = solve_full δ n m
-        v           = eval_constraints cs xs
+        v           = eval (xs VS.!) (constraint_cost cs)
 
 
 solve_δ    = 1e-6

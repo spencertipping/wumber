@@ -52,6 +52,7 @@ library
                      , Wumber.JITIR
                      , Wumber.Numeric
                      , Wumber.Symbolic
+                     , Wumber.SymbolicJIT
 
 
 test-suite wumber-tests

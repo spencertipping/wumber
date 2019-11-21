@@ -22,13 +22,12 @@ import Data.Vector.Storable (Vector, (!))
 import Lens.Micro
 import Numeric.GSL.Minimization
 
-import Wumber.AMD64Asm
+import Wumber.ClosedComparable
 import Wumber.Constraint
 import Wumber.ConstraintSimplify
-import Wumber.JIT
-import Wumber.JITIR
 import Wumber.Numeric
 import Wumber.Symbolic
+import Wumber.SymbolicJIT
 
 
 -- | The class of objects that can have constraint variables rewritten into
@@ -67,18 +66,14 @@ solve_full δ n m = (rewrite (eval (solution !)) a, solution, cs)
 solve' :: R -> Int -> Simplified -> [(Int, R)]
 solve' δ n (Simplified cs mi start) = remap_solution mi xs
   where (xs, _)     = minimizeV NMSimplex2 δ n search_size f start
-        f           = eval_constraints cs
+        f           = jit (constraint_cost cs)
         search_size = VS.replicate (V.length mi) 1
         vars        = concatMap (S.toList . constraint_deps) cs
 
 
--- | The cost function for a set of constraints at a given solution value. This
---   is called by the GSL minimizer.
---
---   TODO: convert to JIT
-
-eval_constraints :: [Constraint] -> Vector R -> R
-eval_constraints cs xs = L.foldl' (\t v -> t + each v) 0 cs
-  where each (CEqual a b)      = (eval (xs !) a - eval (xs !) b) ** 2
-        each (CMinimize v)     = max 0 $ eval (xs !) v
-        each (CInitialize _ _) = 0
+-- | The cost function for a set of constraints at a given solution value.
+constraint_cost :: [Constraint] -> CVal
+constraint_cost cs = sum $ concatMap each cs
+  where each (CEqual a b)      = [(a - b) ** 2]
+        each (CMinimize v)     = [upper 0 v]
+        each (CInitialize _ _) = []
