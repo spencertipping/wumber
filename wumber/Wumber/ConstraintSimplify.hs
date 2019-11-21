@@ -36,7 +36,7 @@ data Simplified = Simplified [Constraint] (V.Vector Int) (VS.Vector R)
 --   indexes used by the GSL minimizer).
 simplify :: [Constraint] -> Simplified
 simplify cs = Simplified cs (V.generate (maxid + 1) id) inits
-  where maxid = foldl1 max $ map (S.findMax . constraint_deps) cs
+  where maxid = S.findMax $ S.unions $ map constraint_deps cs
         inits = VS.generate (maxid + 1) (const 0) VS.// ivs
         ivs   = cs & concatMap \case CInitialize i v -> [(i, v)]
                                      _               -> []

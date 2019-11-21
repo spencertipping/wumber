@@ -6,9 +6,11 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE UndecidableInstances #-}
+
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 module Wumber.ConstraintSolver where
+
 
 import Control.Monad
 import Control.Monad.RWS
@@ -36,7 +38,11 @@ import Wumber.Symbolic
 class Rewritable a b | a -> b where rewrite :: (CVal -> R) -> a -> b
 
 instance Rewritable CVal R where rewrite = id
-instance (Functor f, Rewritable a b) => Rewritable (f a) (f b) where
+
+-- TODO
+-- Fully generalize this; if I try now, I get fundep collisions because Sym is
+-- itself a functor.
+instance Functor f => Rewritable (f CVal) (f R) where
   rewrite = fmap . rewrite
 
 
