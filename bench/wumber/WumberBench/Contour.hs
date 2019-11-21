@@ -37,7 +37,7 @@ just_tree f b minn maxn bias = build f b sf bias
 
 -- Test model
 threads p d v@(V3 x y z) = p ρ z'
-  where θ  = Atan2 x y
+  where θ  = Fn2 Atan2 x y
         ρ  = sqrt (x**2 + y**2)
         z' = ((z * d + θ/τ) % 1 + 1) % 1
 

@@ -48,7 +48,7 @@ screw dθ v@(V3 x y z) = v *! rotate_z_m (dθ * z)
 -- The profile function should be an iso over ρ and z.
 
 threads p d v@(V3 x y z) = p ρ z'
-  where θ  = Atan2 x y
+  where θ  = Fn2 Atan2 x y
         ρ  = sqrt (x**2 + y**2)
         z' = ((z * d + θ/τ) % 1 + 1) % 1
 
