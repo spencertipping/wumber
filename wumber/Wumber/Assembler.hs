@@ -1,6 +1,4 @@
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE BlockArguments #-}
-{-# LANGUAGE GADTs #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 -- | A DSL for assembling machine code and doing requisite value conversions.
@@ -26,7 +24,7 @@ import qualified Data.ByteString.Lazy    as BL
 
 
 -- | Assembles code, returning a strict 'ByteString' of the result. You can use
---   this directly with 'with_jit' or 'compile' from 'Wumber.JIT'.
+--   this directly with 'compile' from 'Wumber.JIT'.
 assemble :: Assembler r s a -> r -> s -> BS.ByteString
 assemble m r s = BL.toStrict $ B.toLazyByteString $ snd $ evalRWS m r s
 

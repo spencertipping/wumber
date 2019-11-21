@@ -4,6 +4,7 @@
   + Deduplicate function evaluations
   + Prioritize bisections by expected error
   + Accept/generate surface hints, e.g. by extrapolating from tangent planes
+  + Detect errors by verifying surface normal against function gradient
   + More accurate edge rendering, particularly for nonaligned corners
   + Incremental/progressive scanning (reuse already-computed data)
   + Mesh to quads/prisms, not just lines
@@ -11,6 +12,7 @@
 + Shell
   + LOD based on view matrix: incorporate "visually perceptible error" into DC
   + Restrict DC to small bounds, possibly integrated with model
+  + Augment/rewrite Gloss so we can use real fonts/etc
 + Shell CLI
   + Select variable(s) to be rendered
   + Build views programmatically, integrated with constraints
@@ -25,7 +27,7 @@
   + Support for text/labels?
   + Diagrams/lines/graphs/etc?
     + This is more like sketching than modeling per se
-+ General
++ Object model
   + Parts as objects, not just implicit fns (this way we get constraints)
 + Parts
   + Iso-libraries for screws, beams, etc
@@ -46,9 +48,13 @@
 + Sym API
   + Call back into Haskell/C
   + Piecewise/`cond`
+  + Horrible `Integer` embedding hack to bypass `forall` constraints
 + Sym compiler
   + Algebraic simplification
   + Alias local quantities (SSA variables)
++ Assembler
+  + Multi-branch assembly
+  + Constant vector + indexing
 + JIT
   + Reverse-engineer instruction latency/throughput
   + Register allocation
