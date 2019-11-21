@@ -1,13 +1,13 @@
 # Development frontier
 ## Frontend
 + Dual contour
+  + Deduplicate function evaluations
   + Prioritize bisections by expected error
   + Accept/generate surface hints, e.g. by extrapolating from tangent planes
   + More accurate edge rendering, particularly for nonaligned corners
   + Incremental/progressive scanning (reuse already-computed data)
   + Mesh to quads/prisms, not just lines
   + View contouring? i.e. dual contouring in 2D wrt the view matrix?
-  + Deduplicate function evaluations
 + Shell
   + LOD based on view matrix: incorporate "visually perceptible error" into DC
   + Restrict DC to small bounds, possibly integrated with model
@@ -44,7 +44,6 @@
   + LOD-variant feature hinting
   + Calculate LOD by view prominence
 + Sym API
-  + **Done:** Sym -> constraint isofn?
   + Call back into Haskell/C
   + Piecewise/`cond`
 + Sym compiler
@@ -56,7 +55,6 @@
   + Generate processor-optimized code
   + Auto-vectorization
 + Constraints
-  + **Done:** Partition by arg dependencies
   + Simplify linear subsystems
 + Simulation
   + 4D meshing for animation/object-through-time collision detection
@@ -74,5 +72,4 @@
   + Trace capacitance/impedance: integrate layout and design
   + Live-test hardware driver for unknown circuits
   + Fast approximation > slow detail; we can always export to SPICE
-  + `n+1`-D dual contouring for implicit time-stepped FEA
   + Circuits as constraint systems to be minimized

@@ -240,10 +240,8 @@ surface_point f (a, b) = lerp (newton 0.5) b a
         newton x | x' < 0 || x' > 1  = bisect_solve 0 1
                  | abs (f' x') < δ 1 = x'
                  | otherwise         = newton x'
-          where x' = newton_next x
-
-        newton_next x = x - y*δf
-          where y  = f' x
+          where x' = x - y*δf
+                y  = f' x
                 δx = δ x
                 δf = f' (x + δx) - f' (x - δx) / (2 * δx)
 
@@ -314,5 +312,5 @@ bisect a (BB l u) = (BB l (l + mp/2 + mo), BB (l + mp/2) u)
         mp = project a d
         mo = d - mp
 
-{-# SPECIALIZE bisect :: V3 R -> BB3D -> (BB3D, BB3D) #-}
-{-# SPECIALIZE bisect :: V2 R -> BB2D -> (BB2D, BB2D) #-}
+{-# SPECIALIZE INLINE bisect :: V3 R -> BB3D -> (BB3D, BB3D) #-}
+{-# SPECIALIZE INLINE bisect :: V2 R -> BB2D -> (BB2D, BB2D) #-}
