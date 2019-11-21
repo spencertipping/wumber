@@ -37,7 +37,7 @@ just_tree f b minn maxn bias = build f b sf bias
 
 -- Test model
 threads p d v@(V3 x y z) = p ρ z'
-  where θ  = atan2 x y
+  where θ  = Atan2 x y
         ρ  = sqrt (x**2 + y**2)
         z' = ((z * d + θ/τ) % 1 + 1) % 1
 
@@ -48,7 +48,7 @@ x_lt l (V3 x _ _) = l - x
 z_lt l (V3 _ _ z) = l - z
 
 hex_cap r v = foldl' lower maxBound
-  $ map (\θ -> x_lt r (v *! rotate_z_m (from_floating θ))) [0, 60 .. 300]
+  $ map (\θ -> x_lt r (v *! rotate_z_m (N θ))) [0, 60 .. 300]
 
 
 bolt od ts = thread_part `iunion` head_part
@@ -75,12 +75,7 @@ scs     = spheres `iunion` cube (BB (-1.5) (-0.5))
 moved_by t f v = f (v - t)
 
 
--- TODO
--- This constraint set is just silly. There is no way I want to inflict this on
--- users who want polymorphic code.
-model :: (ClosedComparable a, FromFloating a a, Fractional a,
-          Floating a, FromFloating Integer a, Bounded a, RealFloat a, Mod a)
-      => V3 a -> a
+model :: V3 (Sym R) -> Sym R
 model = moved_by (V3 0 1.1 0) (bolt 0.5 0.4) `iunion` scs
 
 
@@ -110,7 +105,7 @@ benchmarks = trace info bs
         bs = [
           bench "model/jit"  (nf model_fn  (V3 0.5 1 2 :: V3 Double)),
           -- bench "model/jit2" (nf model2_fn (V3 0.5 1 2 :: V3 Double)),
-          bench "model/ghc"  (nf model     (V3 0.5 1 2 :: V3 Double)),
+          -- bench "model/ghc"  (nf model     (V3 0.5 1 2 :: V3 Double)),
 
           bench "tree/jit"  (nf (t_size . just_tree model_fn  (BB (-2) 2) 6 12) 0.1),
           -- bench "tree/jit2" (nf (t_size . just_tree model2_fn (BB (-2) 2) 6 12) 0.1),
