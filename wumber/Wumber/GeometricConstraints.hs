@@ -20,11 +20,7 @@ import Linear.Vector
 import Wumber.BoundingBox
 import Wumber.ClosedComparable
 import Wumber.Constraint
-
-
--- | The real circle constant. We all know π was a mistake.
-τ :: Floating a => a
-τ = pi * 2
+import Wumber.Numeric
 
 
 -- | An N-dimensional axis-aligned rectangle defined by a corner and a size. The

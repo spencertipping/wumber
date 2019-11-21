@@ -1,13 +1,25 @@
 {-# LANGUAGE BlockArguments #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
-module Wumber.Numeric (
-  R, δ
-) where
+-- | General-purpose numeric utilities.
+module Wumber.Numeric where
+
+import GHC.Float
+
+
+-- Remedial Haskell functions
+f2d = float2Double
+d2f = double2Float
+fi  = fromIntegral
 
 
 -- | Real numbers within Wumber.
 type R = Double
+
+
+-- | The real circle constant. We all know π was a mistake.
+τ :: Floating a => a
+τ = pi * 2
 
 
 -- | Calculates an appropriate numerical delta for the given value by
