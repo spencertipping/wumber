@@ -17,19 +17,21 @@ import Debug.Trace
 import Wumber.Constraint
 import Wumber.ConstraintSolver
 import Wumber.GeometricConstraints
+import Wumber.Numeric
+import Wumber.Symbolic
 
 
 newtype UnitInterval a = UnitInterval a deriving Show
-instance Arbitrary (UnitInterval N) where
+instance Arbitrary (UnitInterval R) where
   arbitrary = UnitInterval <$> choose (-1, 1)
 
 
-instance Arbitrary CVal where arbitrary = CConst <$> arbitrary
+instance Arbitrary CVal where arbitrary = N <$> arbitrary
 
-instance Arbitrary (V2 N) where
+instance Arbitrary (V2 R) where
   arbitrary = V2 <$> arbitrary <*> arbitrary
 
-instance Arbitrary (V3 N) where
+instance Arbitrary (V3 R) where
   arbitrary = V3 <$> arbitrary <*> arbitrary <*> arbitrary
 
 
@@ -41,7 +43,7 @@ instance Arbitrary (V3 N) where
 --   resulting cost will be at most √δ. There's no mathematical rigor to this
 --   other than saying it's half as precise in log-terms.
 
-solvable :: (Rewritable a b, Show b) => N -> Int -> Constrained a -> Property
+solvable :: (Rewritable a b, Show b) => R -> Int -> Constrained a -> Property
 solvable δ n m = counterexample (show (xs, v, a)) $ v <= ε
   where ε           = sqrt δ
         (a, xs, cs) = solve_full δ n m
@@ -54,46 +56,46 @@ iterations = 10000
 t = solvable solve_δ iterations
 
 
-prop_uni_linear :: N -> NonZero N -> CVal -> CVal -> Property
+prop_uni_linear :: R -> NonZero R -> CVal -> CVal -> Property
 prop_uni_linear x (NonZero m) b y = t do
   v <- var x
-  v * CConst m + b =-= y
+  v * N m + b =-= y
   return [v]
 
 
-prop_uni_quadratic :: NonNegative N -> NonNegative N -> Property
+prop_uni_quadratic :: NonNegative R -> NonNegative R -> Property
 prop_uni_quadratic (NonNegative x) (NonNegative y) = t do
   v <- var x
-  v*v =-= CConst y
+  v*v =-= N y
   return [v]
 
 
-prop_v2dist :: V2 N -> NonNegative N -> Property
+prop_v2dist :: V2 R -> NonNegative R -> Property
 prop_v2dist vec (NonNegative d) = t do
   v <- vars vec
-  norm v =-= CConst d
+  norm v =-= N d
   return v
 
 
-prop_v2joint_lt :: V2 N -> NonNegative N -> Property
+prop_v2joint_lt :: V2 R -> NonNegative R -> Property
 prop_v2joint_lt vec (NonNegative d) = t do
   v <- vars vec
   v^._x  <-= v^._y
-  norm v =-= CConst d
+  norm v =-= N d
   return v
 
-prop_v2joint_eq :: V2 N -> NonNegative N -> Property
+prop_v2joint_eq :: V2 R -> NonNegative R -> Property
 prop_v2joint_eq vec (NonNegative d) = t do
   v <- vars vec
   v^._x  =-= v^._y
-  norm v =-= CConst d
+  norm v =-= N d
   return v
 
 
-prop_v3dist :: V3 N -> NonNegative N -> Property
+prop_v3dist :: V3 R -> NonNegative R -> Property
 prop_v3dist vec (NonNegative d) = t do
   v <- vars vec
-  norm v =-= CConst d
+  norm v =-= N d
   return v
 
 
@@ -106,8 +108,8 @@ prop_v3dist vec (NonNegative d) = t do
 -- those, and it isn't very sensitive. But certain inputs will result in no
 -- solution. This test manages to find those.
 
-prop_hexagon :: V2 N -> V2 N -> V2 N -> V2 N -> V2 N -> V2 N
-             -> Positive N -> Property
+prop_hexagon :: V2 R -> V2 R -> V2 R -> V2 R -> V2 R -> V2 R
+             -> Positive R -> Property
 prop_hexagon a b c d e f (Positive dist) = t do
   av <- vars a
   bv <- vars b
@@ -116,7 +118,7 @@ prop_hexagon a b c d e f (Positive dist) = t do
   ev <- vars e
   fv <- vars f
 
-  all_equal [CConst dist,
+  all_equal [N dist,
              distance av bv,
              distance bv cv,
              distance cv dv,
@@ -127,7 +129,7 @@ prop_hexagon a b c d e f (Positive dist) = t do
   -- TODO: these fail to converge if all points have equal starting values (and
   -- possibly in other cases).
   {-
-  all_equal [cos $ CConst (τ / 6),
+  all_equal [cos $ N (τ / 6),
              inner_angle_cos av bv cv,
              inner_angle_cos bv cv dv,
              inner_angle_cos cv dv ev,

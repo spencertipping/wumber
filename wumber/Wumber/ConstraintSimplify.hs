@@ -17,20 +17,29 @@ import qualified Data.Vector.Storable as VS
 import Lens.Micro
 
 import Wumber.Constraint
+import Wumber.Numeric
+import Wumber.Symbolic
 
 
--- | 'Simplified cs v' means "a set of constraints whose variables have
---   compact 'VarID's, and you can convert each back to the original using
+-- | 'Simplified cs v inits' means "a set of constraints whose variables have
+--   compact 'Int's, and you can convert each back to the original using
 --   'v ! i'". 'remap_solution' does this for you once you have a 'Vector' with
 --   solution values.
-data Simplified = Simplified [Constraint] (V.Vector VarID)
+--
+--   'Simplified' also collects the initial value of each variable and removes
+--   those elements from the 'Constraint' list.
+data Simplified = Simplified [Constraint] (V.Vector Int) (VS.Vector R)
+
 
 -- | Reduces a set of constraints to a simplified constraint bundle with
 --   compactly-identified variables (whose 'VarID's correspond to 'Vector'
 --   indexes used by the GSL minimizer).
 simplify :: [Constraint] -> Simplified
-simplify cs = Simplified cs (V.generate (maxid + 1) id)
-  where (maxid, _) = foldl1 max $ map (S.findMax . constraint_deps) cs
+simplify cs = Simplified cs (V.generate (maxid + 1) id) inits
+  where maxid = foldl1 max $ map (S.findMax . constraint_deps) cs
+        inits = VS.generate (maxid + 1) (const 0) VS.// ivs
+        ivs   = cs & concatMap \case CInitialize i v -> [(i, v)]
+                                     _               -> []
 
 
 -- | Remaps a compact solution vector into the original variable space by
@@ -39,7 +48,7 @@ simplify cs = Simplified cs (V.generate (maxid + 1) id)
 --   for constraint systems to get partitioned into multiple subproblems and
 --   recombined after the fact (which isn't an operation that vectors are
 --   particularly good at).
-remap_solution :: V.Vector VarID -> VS.Vector N -> [(VarID, N)]
+remap_solution :: V.Vector Int -> VS.Vector R -> [(Int, R)]
 remap_solution mi xs = V.toList mi `zip` VS.toList xs
 
 
@@ -47,22 +56,11 @@ remap_solution mi xs = V.toList mi `zip` VS.toList xs
 --   simplifying a set of constraints.
 partition_by_vars :: [Constraint] -> [[Constraint]]
 partition_by_vars cs = [cs]
-  where pairs = cs & map \c -> ([c], S.map fst (constraint_deps c))
+  where pairs = cs & map \c -> ([c], constraint_deps c)
 
 
 -- | The full set of initial values in a constraint.
-constraint_deps :: Constraint -> S.Set (VarID, N)
-constraint_deps (CEqual a b)  = deps a `S.union` deps b
-constraint_deps (CMinimize v) = deps v
-
-
--- | All independent variable IDs and initial values used to calculate the given
---   constraint value. This is used both to construct initial solution vectors
---   for GSL, and to figure out which constraints are independent.
-deps :: CVal -> S.Set (VarID, N)
-deps (CVar i v)            = S.singleton (i, v)
-deps (CConst _)            = S.empty
-deps (CLinear _ _ v)       = deps v
-deps (CNonlinear xs _ _)   = S.unions (map deps xs)
-deps (CNonlinearU v _ _)   = deps v
-deps (CNonlinearB l r _ _) = deps l `S.union` deps r
+constraint_deps :: Constraint -> S.Set Int
+constraint_deps (CEqual a b)      = args_in a `S.union` args_in b
+constraint_deps (CMinimize v)     = args_in v
+constraint_deps (CInitialize _ _) = S.empty
