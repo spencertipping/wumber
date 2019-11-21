@@ -22,7 +22,9 @@ import System.IO            (hClose, hFlush, stdout)
 import System.IO.Unsafe     (unsafePerformIO)
 import System.Posix.Types
 import System.Process
-import Test.QuickCheck
+import Test.QuickCheck      (quickCheckAll, Arbitrary(..), Gen(..), Property(..),
+                             discard, counterexample, property, sized, (==>),
+                             oneof, choose)
 
 import qualified Data.Binary          as Bin
 import qualified Data.ByteString      as BS
@@ -61,8 +63,8 @@ ndisasm code = do
   return b
 
 
-instance Arbitrary MathFn where
-  arbitrary = genericArbitraryU
+instance Arbitrary SymFn1 where arbitrary = genericArbitraryU
+instance Arbitrary SymFn2 where arbitrary = genericArbitraryU
 
 instance Arbitrary (Sym Double) where
   arbitrary = oneof [ terminal, nonterminal ]
@@ -71,9 +73,10 @@ instance Arbitrary (Sym Double) where
                                        case v of Arg _ -> Arg <$> choose (0, n)
                                                  _     -> return v
 
-  shrink x = case binary x of
-    Just (x, y) -> [x, y]
-    _           -> []
+  shrink (Fn2 f x y) = [x, y]
+  shrink (Fn1 f x)   = [x]
+  shrink _           = []
+
 
 instance Arbitrary (Vector Double) where
   arbitrary = sized \n -> VS.fromList <$> replicateM n arbitrary
@@ -127,7 +130,7 @@ forkjit code s v = do
 
 prop_trivial_stability :: Property
 prop_trivial_stability = prop_symjit s (VS.fromList [0])
-  where s = Math Cos (N 11.014994588887294)
+  where s = Fn1 Cos (N 11.014994588887294)
 
 
 prop_symjit :: Sym Double -> Vector Double -> Property

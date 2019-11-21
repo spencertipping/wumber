@@ -22,6 +22,7 @@ import qualified Foreign.Ptr             as P
 import Wumber.Assembler
 import Wumber.JIT
 import Wumber.JITIR
+import Wumber.Symbolic
 
 
 -- TODO
@@ -134,23 +135,23 @@ assemble' (PtrArg r i) = do
   movsd_ar i 0
   movsd_rm 0 r
 
-assemble' (BinOp o op l r) = do
+assemble' (Op2 o op l r) = do
   movsd_mr l 0
   movsd_mr r 1
   case op of Pow      -> call p_pow
              Mod      -> call p_fmod
-             Atan2'   -> call p_atan2
+             Atan2    -> call p_atan2
              Add      -> addsd 3 0 1
              Subtract -> subsd 3 0 1
              Multiply -> mulsd 3 0 1
              Divide   -> divsd 3 0 1
-             Max      -> maxsd 3 0 1
-             Min      -> minsd 3 0 1
+             Upper    -> maxsd 3 0 1
+             Lower    -> minsd 3 0 1
   movsd_rm 0 o
 
-assemble' (UnOp o op r) = do
+assemble' (Op1 o op r) = do
   movsd_mr r 0
-  call (dbl_mathfn op)
+  call (fn op :: FunPtr (Double -> IO Double))
   movsd_rm 0 o
 
 assemble' (Return o) = do

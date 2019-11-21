@@ -11,19 +11,6 @@ import Control.Monad.State (State, runState, get, modify')
 import Wumber.Symbolic
 
 
-type Unary  = MathFn
-data Binary = Add
-            | Subtract
-            | Multiply
-            | Divide
-            | Pow
-            | Mod
-            | Max
-            | Min
-            | Atan2'       -- OMG FIXME nomenclature
-  deriving (Show, Eq)
-
-
 -- TODO
 -- Figure out what kind of IR makes sense here. For example, IR shouldn't know
 -- about vectorized instructions but it should provide information that's useful
@@ -47,17 +34,17 @@ linearize s = (n, l ++ [Return r]) where ((r, l), n) = runState (linearize' s) 0
 type SSAReg = Int
 data SSA a = Const  SSAReg a
            | PtrArg SSAReg Int
-           | BinOp  SSAReg Binary SSAReg SSAReg
-           | UnOp   SSAReg Unary  SSAReg
+           | Op1    SSAReg SymFn1 SSAReg
+           | Op2    SSAReg SymFn2 SSAReg SSAReg
            | Return SSAReg
   deriving (Show, Eq)
 
 reg_of :: SSA a -> SSAReg
-reg_of (Const r _)     = r
-reg_of (PtrArg r _)    = r
-reg_of (BinOp r _ _ _) = r
-reg_of (UnOp r _ _)    = r
-reg_of (Return r)      = r
+reg_of (Const r _)   = r
+reg_of (PtrArg r _)  = r
+reg_of (Op1 r _ _)   = r
+reg_of (Op2 r _ _ _) = r
+reg_of (Return r)    = r
 
 
 reg :: State SSAReg SSAReg
@@ -69,35 +56,27 @@ constant a = reg >>= return . flip Const a
 arg :: Int -> State SSAReg (SSA a)
 arg i = reg >>= return . flip PtrArg i
 
-bin :: Binary -> SSAReg -> SSAReg -> State SSAReg (SSA a)
-bin op l r = reg >>= \o -> return $ BinOp o op l r
+bin :: SymFn2 -> SSAReg -> SSAReg -> State SSAReg (SSA a)
+bin op l r = reg >>= \o -> return $ Op2 o op l r
 
-un :: Unary -> SSAReg -> State SSAReg (SSA a)
-un op r = reg >>= \o -> return $ UnOp o op r
+un :: SymFn1 -> SSAReg -> State SSAReg (SSA a)
+un op r = reg >>= \o -> return $ Op1 o op r
 
 linearize' :: Sym a -> State SSAReg (SSAReg, [SSA a])
 
-linearize' (N x)       = do r <- constant x; return (reg_of r, [r])
-linearize' (Arg i)     = do r <- arg i; return (reg_of r, [r])
-linearize' (a :+ b)    = linbin Add a b
-linearize' (a :- b)    = linbin Subtract a b
-linearize' (a :* b)    = linbin Multiply a b
-linearize' (a :/ b)    = linbin Divide a b
-linearize' (a :% b)    = linbin Mod a b
-linearize' (a :** b)   = linbin Pow a b
-linearize' (Upper a b) = linbin Max a b
-linearize' (Lower a b) = linbin Min a b
-linearize' (Atan2 a b) = linbin Atan2' a b
-linearize' (Math f a)  = linun f a
+linearize' (N x)        = do r <- constant x; return (reg_of r, [r])
+linearize' (Arg i)      = do r <- arg i; return (reg_of r, [r])
+linearize' (Fn1 op a)   = linun op a
+linearize' (Fn2 op a b) = linbin op a b
 
-linbin :: Binary -> Sym a -> Sym a -> State SSAReg (SSAReg, [SSA a])
+linbin :: SymFn2 -> Sym a -> Sym a -> State SSAReg (SSAReg, [SSA a])
 linbin op a b = do
   (ra, la) <- linearize' a
   (rb, lb) <- linearize' b
   r <- bin op ra rb
   return (reg_of r, la ++ lb ++ [r])
 
-linun :: Unary -> Sym a -> State SSAReg (SSAReg, [SSA a])
+linun :: SymFn1 -> Sym a -> State SSAReg (SSAReg, [SSA a])
 linun op a = do
   (ra, la) <- linearize' a
   r <- un op ra

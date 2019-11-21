@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE BlockArguments #-}
@@ -32,6 +33,7 @@ import qualified Data.ByteString as BS
 import Wumber.Symbolic
 
 
+-- TODO: something with these
 type F1 r = r -> IO r
 type F2 r = r -> r -> IO r
 type F3 r = r -> r -> r -> IO r
@@ -75,8 +77,7 @@ compile funptr_converter bs = do
   fptr <- newForeignPtr m (finalize (BS.length bs) m)
   return $ functify fptr (funptr_converter . castPtrToFunPtr)
 
-  where finalize l p = do munmap p (fromIntegral l)
-                          return ()
+  where finalize l p = munmap p (fromIntegral l) >> return ()
 
 
 codeptr :: ByteString -> IO (Ptr a)
@@ -88,52 +89,49 @@ codeptr bs = do
   return $ castPtr m
 
 
--- | Converts a 'MathFn' to a 'FunPtr' to execute that operation on 'Double's.
-dbl_mathfn :: MathFn -> FunPtr (Double -> IO Double)
-dbl_mathfn Abs    = p_fabs
-dbl_mathfn Signum = p_signum
-dbl_mathfn Log    = p_log
-dbl_mathfn Exp    = p_exp
-dbl_mathfn Sqrt   = p_sqrt
-dbl_mathfn Sin    = p_sin
-dbl_mathfn Cos    = p_cos
-dbl_mathfn Tan    = p_tan
-dbl_mathfn Asin   = p_asin
-dbl_mathfn Acos   = p_acos
-dbl_mathfn Atan   = p_atan
-dbl_mathfn Sinh   = p_sinh
-dbl_mathfn Cosh   = p_cosh
-dbl_mathfn Tanh   = p_tanh
-dbl_mathfn Asinh  = p_asinh
-dbl_mathfn Acosh  = p_acosh
-dbl_mathfn Atanh  = p_atanh
-dbl_mathfn Ceil   = p_ceil
-dbl_mathfn Floor  = p_floor
-dbl_mathfn Round  = p_round
+instance Functionable SymFn1 (FunPtr (Double -> IO Double)) where
+  fn Abs    = p_fabs
+  fn Signum = p_signum
+  fn Log    = p_log
+  fn Exp    = p_exp
+  fn Sqrt   = p_sqrt
+  fn Sin    = p_sin
+  fn Cos    = p_cos
+  fn Tan    = p_tan
+  fn Asin   = p_asin
+  fn Acos   = p_acos
+  fn Atan   = p_atan
+  fn Sinh   = p_sinh
+  fn Cosh   = p_cosh
+  fn Tanh   = p_tanh
+  fn Asinh  = p_asinh
+  fn Acosh  = p_acosh
+  fn Atanh  = p_atanh
+  fn Ceil   = p_ceil
+  fn Floor  = p_floor
+  fn Round  = p_round
 
-
--- | Converts a 'MathFn' to a 'FunPtr' to execute that operation on 'Float's.
-float_mathfn :: MathFn -> FunPtr (Float -> IO Float)
-float_mathfn Abs    = p_fabsf
-float_mathfn Signum = p_signumf
-float_mathfn Log    = p_logf
-float_mathfn Exp    = p_expf
-float_mathfn Sqrt   = p_sqrtf
-float_mathfn Sin    = p_sinf
-float_mathfn Cos    = p_cosf
-float_mathfn Tan    = p_tanf
-float_mathfn Asin   = p_asinf
-float_mathfn Acos   = p_acosf
-float_mathfn Atan   = p_atanf
-float_mathfn Sinh   = p_sinhf
-float_mathfn Cosh   = p_coshf
-float_mathfn Tanh   = p_tanhf
-float_mathfn Asinh  = p_asinhf
-float_mathfn Acosh  = p_acoshf
-float_mathfn Atanh  = p_atanhf
-float_mathfn Ceil   = p_ceilf
-float_mathfn Floor  = p_floorf
-float_mathfn Round  = p_roundf
+instance Functionable SymFn1 (FunPtr (Float -> IO Float)) where
+  fn Abs    = p_fabsf
+  fn Signum = p_signumf
+  fn Log    = p_logf
+  fn Exp    = p_expf
+  fn Sqrt   = p_sqrtf
+  fn Sin    = p_sinf
+  fn Cos    = p_cosf
+  fn Tan    = p_tanf
+  fn Asin   = p_asinf
+  fn Acos   = p_acosf
+  fn Atan   = p_atanf
+  fn Sinh   = p_sinhf
+  fn Cosh   = p_coshf
+  fn Tanh   = p_tanhf
+  fn Asinh  = p_asinhf
+  fn Acosh  = p_acoshf
+  fn Atanh  = p_atanhf
+  fn Ceil   = p_ceilf
+  fn Floor  = p_floorf
+  fn Round  = p_roundf
 
 
 foreign import ccall unsafe "sys/mman.h mmap"
