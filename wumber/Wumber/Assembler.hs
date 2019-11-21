@@ -6,6 +6,9 @@
 -- | A DSL for assembling machine code and doing requisite value conversions.
 --   Assemblers are similar to 'ByteString' 'Builder's, but monadic (i.e.
 --   non-associative) so they can do things like track byte offsets.
+--
+--   TODO: multipart assembly so we can refer to branch addresses
+--   TODO: build up a constant vector
 
 module Wumber.Assembler (
   assemble,

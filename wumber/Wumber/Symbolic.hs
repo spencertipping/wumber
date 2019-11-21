@@ -22,6 +22,8 @@
 --   'Sym' constant-folds at construction time. If you don't want this behavior,
 --   have 'is_const' return 'False' for all values. (See 'Constable', which 'a'
 --   must implement.)
+--
+--   TODO: A-normal form?
 
 module Wumber.Symbolic (
   Sym(..),
@@ -191,6 +193,10 @@ args_in x          = args_in x' `union` args_in y' where Just (x', y') = binary 
 --   number of operators with 'forall b. Integral b => a -> b' -- requiring us
 --   to provide function implementations that would coerce our abstract symbolic
 --   quantities to concrete ones if the return type dictates it.
+--
+--   TODO
+--   Use SHA and clown-car Integer embedding to work around this
+
 class Mod a where (%) :: a -> a -> a
 infixl 7 %
 
