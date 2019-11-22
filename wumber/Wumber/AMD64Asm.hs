@@ -9,7 +9,7 @@ module Wumber.AMD64Asm where
 import Control.Monad       (when)
 import Control.Monad.State (StateT, execStateT)
 import Control.Monad.RWS   (tell)
-import Data.Bits
+import Data.Bits           (shiftL, shiftR, (.|.), (.&.))
 import Data.Maybe          (fromJust)
 import Foreign.Ptr         (FunPtr(..), WordPtr(..))
 import GHC.Word            (Word8(..), Word16(..))

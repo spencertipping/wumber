@@ -28,6 +28,7 @@
 
 module Wumber.Symbolic (
   Sym(..),
+  ArgID,
   SymFn1(..),
   SymFn2(..),
   FromFloating(..),
@@ -58,20 +59,12 @@ import Wumber.ClosedComparable
 --   TODO: add cond/piecewise
 
 data Sym a = N a
-           | Arg !Int
+           | Arg !ArgID
            | Fn1 !SymFn1 (Sym a)
            | Fn2 !SymFn2 (Sym a) (Sym a)
   deriving (Show, Eq, Functor, Foldable, Traversable, Generic, Binary)
 
--- Precedences to match their arithmetic counterparts when applicable.
-{-
-infixl 6 :+
-infixl 6 :-
-infixl 7 :*
-infixl 7 :/
-infixl 7 :%
-infixl 8 :**
--}
+type ArgID = Int
 
 
 -- | The class of things coercible either to numbers or 'Sym' instances. This
@@ -121,20 +114,11 @@ data SymFn2 = Add
 -- | Evaluate a symbolic quantity using Haskell math. To do this, we need a
 --   function that handles 'Arg' values.
 eval :: (Floating a, RealFloat a, Mod a, Roundable a, ClosedComparable a)
-     => (Int -> a) -> Sym a -> a
+     => (ArgID -> a) -> Sym a -> a
 eval f (N a)        = a
 eval f (Arg n)      = f n
 eval f (Fn1 op a)   = fn op (eval f a)
 eval f (Fn2 op a b) = fn op (eval f a) (eval f b)
-
-
-nan_upper x y | isNaN x = x
-              | isNaN y = y
-              | otherwise = upper x y
-
-nan_lower x y | isNaN x = x
-              | isNaN y = y
-              | otherwise = lower x y
 
 
 class Functionable x t | t -> x where
@@ -175,8 +159,17 @@ instance (Floating a, Mod a, ClosedComparable a, RealFloat a) =>
   fn Atan2    = atan2
 
 
+nan_upper x y | isNaN x = x
+              | isNaN y = y
+              | otherwise = upper x y
+
+nan_lower x y | isNaN x = x
+              | isNaN y = y
+              | otherwise = lower x y
+
+
 -- | Returns a set of all 'Arg' indexes used by an expression.
-args_in :: Sym a -> Set Int
+args_in :: Sym a -> Set ArgID
 args_in (N _)       = empty
 args_in (Arg x)     = singleton x
 args_in (Fn1 _ a)   = args_in a

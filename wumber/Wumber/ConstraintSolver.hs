@@ -23,8 +23,8 @@ import Data.Vector.Storable     (Vector, (!))
 import Lens.Micro               ((&))
 import Numeric.GSL.Minimization (minimizeV, MinimizeMethod(..))
 
-import qualified Data.Set as S
-import qualified Data.Vector as V
+import qualified Data.Set             as S
+import qualified Data.Vector          as V
 import qualified Data.Vector.Storable as VS
 
 import Wumber.ClosedComparable
@@ -80,6 +80,9 @@ solve' δ n (Subsystem cs mi start) = remap_solution mi xs
   where (xs, _)     = minimizeV NMSimplex2 δ n search_size f start
         f           = jit (constraint_cost cs)
         search_size = VS.replicate (V.length mi) 1
+
+-- TODO: bypass minimizeV and call the C function directly. This will save some
+-- Haskell/C FFI overhead, although the total impact isn't high.
 
 
 -- | The total cost for a set of constraints. It's ok for this to be slow; the

@@ -29,13 +29,13 @@ type CVal = Sym R
 --   numerical step.
 data Constraint = CEqual      !CVal !CVal
                 | CMinimize   !CVal
-                | CInitialize !Int !R
+                | CInitialize !ArgID !R
   deriving (Show, Eq, Generic, Binary)
 
 
 -- | 'Constrained' is a monad that keeps track of 'Arg' IDs and collects
 --   equivalences, quantities to minimize, and initial values.
-type Constrained a = RWS () [Constraint] Int a
+type Constrained a = RWS () [Constraint] ArgID a
 
 
 -- | Create a new constrained variable initialized to the given value.

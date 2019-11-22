@@ -53,7 +53,7 @@ reg = do r <- get; modify' (+ 1); return r
 constant :: a -> State SSAReg (SSA a)
 constant a = reg >>= return . flip Const a
 
-arg :: Int -> State SSAReg (SSA a)
+arg :: ArgID -> State SSAReg (SSA a)
 arg i = reg >>= return . flip PtrArg i
 
 bin :: SymFn2 -> SSAReg -> SSAReg -> State SSAReg (SSA a)
