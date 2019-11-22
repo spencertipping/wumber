@@ -33,7 +33,6 @@ library
                      , mtl
                      , parallel
                      , random
-                     , template-haskell
                      , text
                      , vector >= 0.12.0.3
   exposed-modules:     Wumber

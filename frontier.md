@@ -51,7 +51,6 @@
   + Horrible `Integer` embedding hack to bypass `forall` constraints
 + Sym compiler
   + Algebraic simplification
-    + TemplateHaskell for computed pattern matching
   + Alias local quantities (SSA variables)
 + Assembler
   + Multi-branch assembly
