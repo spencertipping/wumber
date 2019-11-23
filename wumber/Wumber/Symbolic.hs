@@ -9,6 +9,9 @@
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 
+-- NOTE: this is required to avoid infinite loops when defining recip and negate
+{-# LANGUAGE NegativeLiterals #-}
+
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 
@@ -16,10 +19,6 @@
 --   expression grammar whose terminals have type 'a'. 'Sym' is used both to
 --   simplify linear equations for constraints, and to JIT-compile cost and
 --   isosurface functions.
---
---   'Sym' constant-folds at construction time. If you don't want this behavior,
---   have 'is_const' return 'False' for all values. (See 'Constable', which 'a'
---   must implement.)
 --
 --   TODO: A-normal form?
 
@@ -288,7 +287,6 @@ instance Bounded a => Bounded (Sym a) where
 instance (Ord a, Mod a, RealFloat a, Fractional a) => Fractional (Sym a) where
   fromRational = p0 . fromRational
   recip x      = ppow x (-1)
-  a / b        = a * ppow b (-1)
 
 instance (Ord a, Mod a, RealFloat a, Num a) => Mod (Sym a) where
   a % b | a == b    = 0
