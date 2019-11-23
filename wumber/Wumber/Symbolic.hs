@@ -58,11 +58,11 @@ import Wumber.ClosedComparable
 --   TODO: add callbacks to Haskell and/or C functions
 --   TODO: add cond/piecewise
 
-data Sym a = N a
+data Sym a = N !a
            | Arg !ArgID
            | Fn1 !SymFn1 (Sym a)
            | Fn2 !SymFn2 (Sym a) (Sym a)
-  deriving (Show, Eq, Functor, Foldable, Traversable, Generic, Binary)
+  deriving (Show, Ord, Eq, Functor, Foldable, Traversable, Generic, Binary)
 
 type ArgID = Int
 
