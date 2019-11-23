@@ -1,3 +1,5 @@
+{-# LANGUAGE MonoLocalBinds #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -8,6 +10,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE ConstraintKinds #-}
 
 -- NOTE: this is required to avoid infinite loops when defining recip and negate
 {-# LANGUAGE NegativeLiterals #-}
@@ -30,7 +33,6 @@ module Wumber.Symbolic (
   VarID,
   SymFn1(..),
   SymFn2(..),
-  Mod(..),
   Functionable(..),
   eval,
   vars_in,
@@ -55,24 +57,46 @@ import Wumber.ClosedComparable
 --   constant folding, condensing common subexpressions (e.g. 'x + x' becomes
 --   '2*x'), and keeping track of variable dependencies and invertibility.
 --
+--   NOTE: 'Sym's aren't 'Ord' in the sense you expect, so I've taken some
+--   effort to make sure they don't claim to be (this way you can't use 'max'
+--   and 'min' instead of 'upper' and 'lower'). The short version of this story
+--   is that we use 'Ord' internally to do efficient term factoring, but this
+--   definition has nothing to do with numerical comparisons.
+--
 --   TODO: add callbacks to Haskell and/or C functions
 --   TODO: add cond/piecewise
 
-data Sym a = [SymTerm a] :+ a
+data Sym a     = [SymTerm a] :+ a deriving (Eq, Generic, Binary)
+data SymTerm a = a :* [SymExp a]  deriving (Ord, Eq, Generic, Binary)
+data SymExp a  = SymVar a :** a   deriving (Ord, Eq, Generic, Binary)
+data SymVar a  = Var !VarID
+               | Fn1 !SymFn1 (Set VarID) (OrdSym a)
+               | Fn2 !SymFn2 (Set VarID) (OrdSym a) (OrdSym a)
   deriving (Ord, Eq, Generic, Binary)
 
-data SymTerm a = a :* [SymExp a]
-  deriving (Ord, Eq, Generic, Binary)
-
-data SymExp a = SymVar a :** a
-  deriving (Ord, Eq, Generic, Binary)
-
-data SymVar a = Var !VarID
-              | Fn1 !SymFn1 (Set VarID) (Sym a)
-              | Fn2 !SymFn2 (Set VarID) (Sym a) (Sym a)
-  deriving (Ord, Eq, Generic, Binary)
+-- | The workaround we use to add an ordering to 'Sym' without exporting it
+--   outside this module.
+newtype OrdSym a = OS (Sym a) deriving (Show, Eq, Generic, Binary)
 
 type VarID = Int
+
+infixl 6 :+
+infixl 7 :*
+infixl 8 :**
+
+-- | All of the typeclasses 'a' will end up belonging to for 'Sym'. I'm aliasing
+--   it because otherwise we'd end up writing it out a bunch of times.
+type SymConstraints a = (Show a, OtherOrd a, Num a, RealFloat a, Floating a,
+                         Integral a, ClosedComparable a)
+
+instance Ord a => Ord (OrdSym a) where
+  compare (OS ([] :+ a)) (OS ([] :+ b)) = compare a b
+  compare (OS (xs :+ _)) (OS (ys :+ _)) = compare xs ys
+
+
+class    Eq a          => OtherOrd a       where (<<) :: a -> a -> Bool
+instance (Eq a, Ord a) => OtherOrd (Sym a) where a << b = OS a << OS b
+instance (Eq a, Ord a) => OtherOrd a       where (<<)   = (<)
 
 
 instance (Num a, Eq a, Show a) => Show (Sym a) where
@@ -102,80 +126,80 @@ instance (Num a, Eq a, Show a) => Show (SymVar a) where
   show (Fn2 f _ x y) = show f ++ "(" ++ show x ++ ", " ++ show y ++ ")"
 
 
-infixl 6 :+
-infixl 7 :*
-infixl 8 :**
-
-
 -- | Evaluate a symbolic quantity using Haskell math. To do this, we need a
---   function that handles 'Arg' values.
---
---   TODO: remove RealFloat constraint, or have Sym implement RealFloat. I want
---   to be able to use 'eval' to rewrite things.
-
-eval :: (Floating a, RealFloat a, Mod a, ClosedComparable a)
-     => (VarID -> a) -> Sym a -> a
-
+--   function that handles 'Var' values.
+eval :: SymConstraints a => (VarID -> a) -> Sym a -> a
 eval f (ts :+ b) = b + sum (map eval_t ts)
-  where eval_t (a :* xs)      = a * product (map eval_e xs)
-        eval_e (x :** n)      = eval_v x ** n
-        eval_v (Var i)        = f i
-        eval_v (Fn1 op _ x)   = fn op (eval f x)
-        eval_v (Fn2 op _ x y) = fn op (eval f x) (eval f y)
+  where eval_t (a :* xs)                = a * product (map eval_e xs)
+        eval_e (x :** n)                = eval_v x ** n
+        eval_v (Var i)                  = f i
+        eval_v (Fn1 op _ (OS x))        = fn op (eval f x)
+        eval_v (Fn2 op _ (OS x) (OS y)) = fn op (eval f x) (eval f y)
 
 
-p0   = ([] :+)
-t0   = (:* [])
-vp x = [1 :* [x :** 1]] :+ 0
-var  = vp . Var
+class    ToSym a       where sym :: SymConstraints x => a x -> Sym x
+instance ToSym Sym     where sym   = id
+instance ToSym SymTerm where sym a = [a] :+ 0
+instance ToSym SymExp  where sym a = sym $ 1 :* [a]
+instance ToSym SymVar  where sym a = sym $ a :** 1
 
+
+val :: a -> Sym a
+val = ([] :+)
+
+var :: SymConstraints a => VarID -> Sym a
+var = sym . Var
+
+fn1 :: SymConstraints a => SymFn1 -> Sym a -> Sym a
 fn1 f ([] :+ x) = [] :+ fn f x
-fn1 f x         = vp $ Fn1 f (vars_in x) x
+fn1 f x         = sym $ Fn1 f (vars_in x) (OS x)
 
+fn2 :: SymConstraints a => SymFn2 -> Sym a -> Sym a -> Sym a
 fn2 f ([] :+ x) ([] :+ y) = [] :+ fn f x y
-fn2 f x y                 = vp $ Fn2 f (vars_in x `union` vars_in y) x y
-
-pt (xs :+ _) = xs
-te (_ :* es) = es
-ev (v :** _) = v
+fn2 f x y                 = sym $ Fn2 f (vars_in x `union` vars_in y) (OS x) (OS y)
 
 
-merge_with :: Ord o => (a -> o) -> (a -> b) -> (a -> a -> b) -> [a] -> [a] -> [b]
+-- | Merges sorted lists of things, whether those are terms or exponent things
+--   or variables. You can use a view function to view each element, e.g. to
+--   merge on term variables ignoring coefficients. This function gives us an
+--   efficient way to keep polynomials factored.
+merge_with :: OtherOrd o => (a -> o) -> (a -> b) -> (a -> a -> b) -> [a] -> [a] -> [b]
 merge_with _ i _ xs [] = map i xs
 merge_with _ i _ [] ys = map i ys
-merge_with v i f (x:xs) (y:ys) | v x < v y = i x   : merge_with v i f xs (y:ys)
-                               | v y < v x = i y   : merge_with v i f (x:xs) ys
-                               | otherwise = f x y : merge_with v i f xs ys
+merge_with v i f (x:xs) (y:ys) | v x << v y = i x   : merge_with v i f xs (y:ys)
+                               | v y << v x = i y   : merge_with v i f (x:xs) ys
+                               | otherwise  = f x y : merge_with v i f xs ys
 
 
-padd :: (Eq a, Num a, RealFloat a, Ord a) => Sym a -> Sym a -> Sym a
+-- | Polynomial addition with term grouping.
+padd :: SymConstraints a => Sym a -> Sym a -> Sym a
 padd (xs :+ a) (ys :+ b) = concat (merge_with te (: []) tadd xs ys) :+ (a + b)
-  where tadd (a :* x) (b :* _) | a + b /= 0 = [(a + b) :* x]
+  where te (_ :* es) = es
+        tadd (a :* x) (b :* _) | a + b /= 0 = [(a + b) :* x]
                                | otherwise  = []
 
-pmul :: (Num a, Mod a, RealFloat a, Ord a) => Sym a -> Sym a -> Sym a
-pmul (xs :+ a) (ys :+ b) = sum [tmul x y | x <- t0 a : xs, y <- t0 b : ys]
+pmul :: SymConstraints a => Sym a -> Sym a -> Sym a
+pmul (xs :+ a) (ys :+ b) = sum [tmul x y | x <- a :* [] : xs,
+                                           y <- b :* [] : ys]
+  where tmul (a :* xs) (b :* ys) | null es    = []              :+ a * b
+                                 | a * b /= 0 = [(a * b) :* es] :+ 0
+                                 | otherwise  = 0
+          where ev (v :** _) = v
+                es = concat (merge_with ev (: []) emul xs ys)
 
-ppow :: (Num a, Mod a, RealFloat a, Ord a, ClosedComparable a) => Sym a -> Sym a -> Sym a
+        emul (x :** m) (y :** n) | x /= y     = sort [x :** m, y :** n]
+                                 | m + n /= 0 = [x :** (m + n)]
+                                 | otherwise  = []
+
+ppow :: SymConstraints a => Sym a -> Sym a -> Sym a
 ppow _                0         = 1
 ppow ([]        :+ x) ([] :+ n) = [] :+ x ** n
 ppow ([a :* es] :+ 0) ([] :+ n) = [a**n :* map (\(v:**e) -> v:**(e*n)) es] :+ 0
 ppow a                b         = fn2 Pow a b
 
-tmul :: (Num a, Mod a, RealFloat a, Ord a) => SymTerm a -> SymTerm a -> Sym a
-tmul (a :* xs) (b :* ys) | null es    = []              :+ a * b
-                         | a * b /= 0 = [(a * b) :* es] :+ 0
-                         | otherwise  = 0
-  where es = concat (merge_with ev (: []) emul xs ys)
 
-emul :: (Num a, Mod a, RealFloat a, Ord a) => SymExp a -> SymExp a -> [SymExp a]
-emul (x :** m) (y :** n) | x /= y     = sort [x :** m, y :** n]
-                         | m + n /= 0 = [x :** (m + n)]
-                         | otherwise  = []
-
-
-instance (Ord a, Num a, Mod a, RealFloat a, Floating a) => Num (Sym a) where
-  fromInteger = p0 . fromInteger
+instance SymConstraints a => Num (Sym a) where
+  fromInteger = val . fromInteger
   abs         = fn1 Abs
   signum      = fn1 Signum
   negate      = ((-1) *)
@@ -202,7 +226,8 @@ data SymFn1 = Abs
             | Atanh
   deriving (Show, Ord, Eq, Generic, Binary, Enum)
 
-data SymFn2 = Mod
+data SymFn2 = Quot
+            | Rem
             | Pow
             | Upper
             | Lower
@@ -213,7 +238,7 @@ data SymFn2 = Mod
 class Functionable x t | t -> x where
   fn :: x -> t
 
-instance (Floating a, Mod a) => Functionable SymFn1 (a -> a) where
+instance SymConstraints a => Functionable SymFn1 (a -> a) where
   fn Abs    = abs
   fn Signum = signum
   fn Log    = log
@@ -231,13 +256,13 @@ instance (Floating a, Mod a) => Functionable SymFn1 (a -> a) where
   fn Acosh  = acosh
   fn Atanh  = atanh
 
-instance (Floating a, Mod a, ClosedComparable a, RealFloat a) =>
-         Functionable SymFn2 (a -> a -> a) where
-  fn Mod      = (%)
-  fn Pow      = (**)
-  fn Upper    = nan_upper
-  fn Lower    = nan_lower
-  fn Atan2    = atan2
+instance SymConstraints a => Functionable SymFn2 (a -> a -> a) where
+  fn Pow   = (**)
+  fn Quot  = quot
+  fn Rem   = rem
+  fn Upper = nan_upper
+  fn Lower = nan_lower
+  fn Atan2 = atan2
 
 
 nan_upper x y | isNaN x = x
@@ -259,44 +284,17 @@ vars_in (xs :+ b) = unions (map vars_in_t xs)
         vars_in_v (Fn2 _ v _ _) = v
 
 
--- | Values that support floating-point 'mod', but without using Haskell's
---   numeric type hierarchy to do so.
---
---   The reason we can't use Haskell types for this is that it quantifies a
---   number of operators with 'forall b. Integral b => a -> b' -- requiring us
---   to provide function implementations that would coerce our abstract symbolic
---   quantities to concrete ones if the return type dictates it.
---
---   TODO
---   Use SHA and clown-car Integer embedding to work around this
-
-class Mod a where (%) :: a -> a -> a
-infixl 7 %
-
-instance Mod Double where (%) = c_fmod
-instance Mod Float  where (%) = c_fmodf
-
-foreign import ccall unsafe "math.h fmod"  c_fmod  :: Double -> Double -> Double
-foreign import ccall unsafe "math.h fmodf" c_fmodf :: Float  -> Float  -> Float
-
-
 instance Bounded a => Bounded (Sym a) where
-  minBound = p0 minBound
-  maxBound = p0 maxBound
+  minBound = val minBound
+  maxBound = val maxBound
 
-instance (Ord a, Mod a, RealFloat a, Fractional a) => Fractional (Sym a) where
-  fromRational = p0 . fromRational
+instance SymConstraints a => Fractional (Sym a) where
+  fromRational = val . fromRational
   recip x      = ppow x (-1)
 
-instance (Ord a, Mod a, RealFloat a, Num a) => Mod (Sym a) where
-  a % b | a == b    = 0
-        | otherwise = fn2 Mod a b
-
-instance (Ord a, Mod a, RealFloat a) => Floating (Sym a) where
-  (**) = ppow
-
-  pi = p0 pi
-
+instance SymConstraints a => Floating (Sym a) where
+  (**)  = ppow
+  pi    = val pi
   exp   = fn1 Exp
   log   = fn1 Log
   sin   = fn1 Sin
@@ -312,6 +310,33 @@ instance (Ord a, Mod a, RealFloat a) => Floating (Sym a) where
   acosh = fn1 Acosh
   atanh = fn1 Atanh
 
-instance (Num a, Mod a, RealFloat a, ClosedComparable a) => ClosedComparable (Sym a) where
+instance SymConstraints a => ClosedComparable (Sym a) where
   lower a b = fn2 Lower a b
   upper a b = fn2 Upper a b
+
+
+-- HERE THERE BE PARTIAL INSTANCES
+-- The goal here is to be able to use regular Haskell math functions, even
+-- though many of them require us to pretend to support operations we have no
+-- hope of providing. In my opinion, it's more useful to support these
+-- operations than it is to be type safe.
+
+instance SymConstraints a => Ord (Sym a) where
+  compare ([] :+ a) ([] :+ b) = compare a b
+  compare a b = error $ "can't compare undetermined Syms "
+                        ++ show a ++ " and " ++ show b
+
+instance SymConstraints a => Enum (Sym a) where
+  toEnum     = fromInteger . toInteger
+  fromEnum _ = error "can't collapse Sym to Integer via fromEnum"
+  pred x     = x - 1
+  succ x     = x + 1
+
+instance SymConstraints a => Real (Sym a) where
+  toRational _ = error "can't collapse Sym to Rational via toRational"
+
+instance SymConstraints a => Integral (Sym a) where
+  toInteger _ = error "can't collapse Sym to Integer via toInteger"
+  quotRem a b = (fn2 Quot a b, fn2 Rem a b)
+
+
