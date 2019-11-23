@@ -22,36 +22,3 @@ import GHC.Generics (Generic(..))
 
 import Wumber.Constraint
 import Wumber.Symbolic
-
-
--- TODO
--- Why don't we have 'Sym' represent itself in normal form? Seems silly to have
--- this extra step.
-
-
--- | Normalizes a given 'Sym' by minimizing the number of tree nodes, give or
---   take. For example, 'x + x' becomes '2*x'; 'x * x' becomes 'x**2'. The goal
---   is to make it as easy as possible to isolate 'x'.
---
---   'normalize' works by converting the 'Sym' into a normal form, then decoding
---   that normal form. This is more efficient than locally rewriting.
-
-normalize :: Num a => Sym a -> Sym a
-normalize x = x
-
-
--- | The algebraic normal form for a 'Sym' tree. Really what we're doing here is
---   recognizing certain useful cases and pulling them out into specialized
---   reductions; e.g. 'Poly [a] [x] [n] b' describes the expression 'axⁿ + b'.
---   This form is useful because 'a', 'n', and 'b' are all constants, and we can
---   easily factor linear subsystems down so that each 'x' is a separate
---   variable.
-
-data AlgNF a = Poly [a] [Sym a] [a] a
-  deriving (Show, Eq, Ord, Generic, Binary)
-
-
--- | Converts a 'Sym' to algebraic normal form.
-to_algnf :: Num a => Sym a -> AlgNF a
-to_algnf (N x)   = Poly []  []      []  x
-to_algnf (Arg i) = Poly [1] [Arg i] [1] 0

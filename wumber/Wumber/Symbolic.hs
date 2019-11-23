@@ -9,8 +9,6 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE DeriveFoldable #-}
-{-# LANGUAGE DeriveTraversable #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
@@ -28,12 +26,12 @@
 
 module Wumber.Symbolic (
   Sym(..),
-  ArgID,
+  SymTerm(..),
+  SymExp(..),
+  SymVar(..),
+  VarID,
   SymFn1(..),
   SymFn2(..),
-  FromFloating(..),
-  Constable(..),
-  Roundable(..),
   Mod(..),
   Functionable(..),
   eval,
@@ -48,38 +46,84 @@ import Foreign.Ptr  (FunPtr(..))
 import GHC.Generics (Generic(..))
 import Text.Printf  (printf)
 
+import qualified Data.Set as S
+
 import Wumber.ClosedComparable
 
 
--- | A symbolic expression whose terminal values have the specified type. 'Sym'
---   encapsulates common math operations and is written to be easy to
---   destructure.
+-- | A symbolic expression in a normal form that's reasonably easy to work with.
+--   'Sym' expressions simplify themselves as you build them up. This includes
+--   constant folding, condensing common subexpressions (e.g. 'x + x' becomes
+--   '2*x'), and keeping track of variable dependencies and invertibility.
 --
 --   TODO: add callbacks to Haskell and/or C functions
 --   TODO: add cond/piecewise
 
-data Sym a = N !a
-           | Arg !ArgID
-           | Fn1 !SymFn1 (Sym a)
-           | Fn2 !SymFn2 (Sym a) (Sym a)
-  deriving (Show, Ord, Eq, Functor, Foldable, Traversable, Generic, Binary)
+data Sym a = [SymTerm a] :+ a
+  deriving (Show, Ord, Eq, Generic, Binary)
 
-type ArgID = Int
+data SymTerm a = a :* [SymExp a]
+  deriving (Show, Eq, Generic, Binary)
+
+data SymExp a = SymVar a :** a
+  deriving (Show, Ord, Eq, Generic, Binary)
+
+data SymVar a = Var !VarID
+              | Fn1 !SymFn1 (Set VarID) (Sym a)
+              | Fn2 !SymFn2 (Set VarID) (Sym a) (Sym a)
+  deriving (Show, Ord, Eq, Generic, Binary)
+
+type VarID = Int
 
 
--- | The class of things coercible either to numbers or 'Sym' instances. This
---   makes it easier to write polymorphic code.
-class FromFloating n a where from_floating :: n -> a
+infixl 6 :+
+infixl 7 :*
+infixl 8 :**
 
-instance FromFloating a (Sym a) where from_floating = N . from_floating
-instance FromFloating a a       where from_floating = id
-instance Num a => FromFloating Integer a where from_floating = fromInteger
+
+instance Ord a => Ord (SymTerm a) where
+  (_ :* a) `compare` (_ :* b) = a `compare` b
+
+
+p0 :: a -> Sym a
+p0 = (:+ [])
+
+pnull :: (Eq a, Num a) => Sym a -> Bool
+pnull ([] :+ 0) = True
+pnull _         = False
+
+
+merge_with :: Ord a => (a -> b) -> (a -> a -> b) -> [a] -> [a] -> [b]
+merge_with i f xs [] = map i xs
+merge_with i f [] ys = map i ys
+merge_with i f (x:xs) (y:ys) | x < y     = i x   : merge_with i f xs (y:ys)
+                             | y < x     = i y   : merge_with i f (x:xs) ys
+                             | otherwise = f x y : merge_with i f xs ys
+
+
+padd :: (Eq a, Num a, Ord a) => Sym a -> Sym a -> Sym a
+padd (xs :+ a) (ys :+ b) = concat (merge_with (: []) tadd xs ys) :+ (a + b)
+  where tadd (a :* x) (b :* _) | a + b /= 0 = [(a + b) :* x]
+                               | otherwise  = []
+
+pmul :: (Eq a, Num a, Ord a) => Sym a -> Sym a -> Sym a
+pmul (xs :+ a) (ys :+ b) = sum (p0 (a * b) : [tmul x y :+ 0 | x <- xs, y <- ys])
+
+
+  
+-- tmul :: 
+
+
+instance (Ord a, Num a) => Num (Sym a) where
+  fromInteger = p0 . fromInteger
+  (+)   = padd
+  a - b = a + (-1) * b
+  (*)   = pmul
 
 
 -- | Unary transcendental functions that would otherwise clutter up 'Sym'.
 data SymFn1 = Abs
             | Signum
-            | Sqrt
             | Log
             | Exp
             | Sin
@@ -94,17 +138,9 @@ data SymFn1 = Abs
             | Asinh
             | Acosh
             | Atanh
-            | Ceil
-            | Floor
-            | Round
   deriving (Show, Ord, Eq, Generic, Binary, Enum)
 
-data SymFn2 = Add
-            | Subtract
-            | Multiply
-            | Divide
-            | Mod
-            | Pow
+data SymFn2 = Mod
             | Upper
             | Lower
             | Atan2
@@ -113,21 +149,27 @@ data SymFn2 = Add
 
 -- | Evaluate a symbolic quantity using Haskell math. To do this, we need a
 --   function that handles 'Arg' values.
-eval :: (Floating a, RealFloat a, Mod a, Roundable a, ClosedComparable a)
-     => (ArgID -> a) -> Sym a -> a
-eval f (N a)        = a
-eval f (Arg n)      = f n
-eval f (Fn1 op a)   = fn op (eval f a)
-eval f (Fn2 op a b) = fn op (eval f a) (eval f b)
+--
+--   TODO: remove RealFloat constraint, or have Sym implement RealFloat. I want
+--   to be able to use 'eval' to rewrite things.
+
+eval :: (Floating a, RealFloat a, Mod a, ClosedComparable a)
+     => (VarID -> a) -> Sym a -> a
+
+eval f (ts :+ b) = b + sum (map eval_t ts)
+  where eval_t (Term a x n)    = a * eval_symt x ** n
+
+        eval_symt (Var i)      = f i
+        eval_symt (Fn1 op x)   = fn op (eval f x)
+        eval_symt (Fn2 op x y) = fn op (eval f x) (eval f y)
 
 
 class Functionable x t | t -> x where
   fn :: x -> t
 
-instance (Floating a, Roundable a, Mod a) => Functionable SymFn1 (a -> a) where
+instance (Floating a, Mod a) => Functionable SymFn1 (a -> a) where
   fn Abs    = abs
   fn Signum = signum
-  fn Sqrt   = sqrt
   fn Log    = log
   fn Exp    = exp
   fn Sin    = sin
@@ -142,18 +184,10 @@ instance (Floating a, Roundable a, Mod a) => Functionable SymFn1 (a -> a) where
   fn Asinh  = asinh
   fn Acosh  = acosh
   fn Atanh  = atanh
-  fn Ceil   = ceil'
-  fn Floor  = floor'
-  fn Round  = round'
 
 instance (Floating a, Mod a, ClosedComparable a, RealFloat a) =>
          Functionable SymFn2 (a -> a -> a) where
-  fn Add      = (+)
-  fn Subtract = (-)
-  fn Multiply = (*)
-  fn Divide   = (/)
   fn Mod      = (%)
-  fn Pow      = (**)
   fn Upper    = nan_upper
   fn Lower    = nan_lower
   fn Atan2    = atan2
@@ -168,12 +202,12 @@ nan_lower x y | isNaN x = x
               | otherwise = lower x y
 
 
--- | Returns a set of all 'Arg' indexes used by an expression.
-args_in :: Sym a -> Set ArgID
-args_in (N _)       = empty
-args_in (Arg x)     = singleton x
-args_in (Fn1 _ a)   = args_in a
-args_in (Fn2 _ a b) = args_in a `union` args_in b
+-- | Returns a set of all 'Var' indexes used by an expression.
+vars_in :: Sym a -> Set VarID
+vars_in (Poly _ xs _ _) = unions (map vars_in_t xs)
+  where vars_in_t (Term _ (Var x)      _) = singleton x
+        vars_in_t (Term _ (Fn1 vs _)   _) = vs
+        vars_in_t (Term _ (Fn2 vs _ _) _) = vs
 
 
 -- | Values that support floating-point 'mod', but without using Haskell's
@@ -197,71 +231,18 @@ foreign import ccall unsafe "math.h fmod"  c_fmod  :: Double -> Double -> Double
 foreign import ccall unsafe "math.h fmodf" c_fmodf :: Float  -> Float  -> Float
 
 
--- | Same story as 'Mod'; Haskell's 'RealFrac' demands more concreteness than we
---   can provide.
-class Roundable a where
-  ceil'  :: a -> a
-  floor' :: a -> a
-  round' :: a -> a
-
-instance Roundable Double where
-  ceil'  = c_ceil
-  floor' = c_floor
-  round' = c_round
-
-instance Roundable Float where
-  ceil'  = c_ceilf
-  floor' = c_floorf
-  round' = c_roundf
-
-foreign import ccall unsafe "math.h ceil"   c_ceil   :: Double -> Double
-foreign import ccall unsafe "math.h ceilf"  c_ceilf  :: Float  -> Float
-foreign import ccall unsafe "math.h floor"  c_floor  :: Double -> Double
-foreign import ccall unsafe "math.h floorf" c_floorf :: Float  -> Float
-foreign import ccall unsafe "math.h round"  c_round  :: Double -> Double
-foreign import ccall unsafe "math.h roundf" c_roundf :: Float  -> Float
-
-
--- | Values that can tell you whether they are constants -- i.e. whether 'Sym'
---   should try to collapse them at construction-time.
-class Constable a where is_const :: a -> Bool
-
-instance Constable a => Constable (Sym a) where
-  is_const (N a) = is_const a
-  is_const _     = False
-
-instance Constable Double where is_const _ = True
-instance Constable Float  where is_const _ = True
-
-
--- Constant folding helpers
-cf_unary f _  (N a) | is_const a = N (f a)
-cf_unary _ op x                  = op x
-
-cf_binary f _  (N a) (N b) | is_const a && is_const b = N (f a b)
-cf_binary _ op x     y                                = op x y
-
-
 instance Bounded a => Bounded (Sym a) where
   minBound = N minBound
   maxBound = N maxBound
 
-instance (Constable a, Num a) => Num (Sym a) where
-  fromInteger = N . fromInteger
-  (+)    = cf_binary (+) (Fn2 Add)
-  (-)    = cf_binary (-) (Fn2 Subtract)
-  (*)    = cf_binary (*) (Fn2 Multiply)
-  abs    = cf_unary abs    (Fn1 Abs)
-  signum = cf_unary signum (Fn1 Signum)
-
-instance (Constable a, Fractional a) => Fractional (Sym a) where
+instance Fractional a => Fractional (Sym a) where
   fromRational = N . fromRational
   (/) = cf_binary (/) (Fn2 Divide)
 
-instance (Constable a, Mod a) => Mod (Sym a) where
+instance Mod a => Mod (Sym a) where
   (%) = cf_binary (%) (Fn2 Mod)
 
-instance (Constable a, Floating a) => Floating (Sym a) where
+instance Floating a => Floating (Sym a) where
   pi = N pi
 
   (**) = cf_binary (**) (Fn2 Pow)
@@ -282,6 +263,6 @@ instance (Constable a, Floating a) => Floating (Sym a) where
   acosh = cf_unary acosh (Fn1 Acosh)
   atanh = cf_unary atanh (Fn1 Atanh)
 
-instance (Constable a, ClosedComparable a) => ClosedComparable (Sym a) where
+instance ClosedComparable a => ClosedComparable (Sym a) where
   lower = cf_binary lower (Fn2 Lower)
   upper = cf_binary upper (Fn2 Upper)
