@@ -45,8 +45,8 @@ subsystems cs = cs & map (\c -> ([c], constraint_deps c))
 --
 --   'Subsystem' also collects the initial value of each variable and removes
 --   those elements from the 'Constraint' list.
-data Subsystem = Subsystem [Constraint] (V.Vector ArgID) (VS.Vector R)
-  deriving (Show, Eq, Generic)
+data Subsystem = Subsystem [Constraint] (V.Vector VarID) (VS.Vector R)
+  deriving (Show, Generic)
 
 
 -- | Reduces a set of constraints to a subsystem with compactly-identified
@@ -71,7 +71,7 @@ subsystem cs = Subsystem cs (V.generate (maxid + 1) id) inits
 --   for constraint systems to get partitioned into multiple subproblems and
 --   recombined after the fact (which isn't an operation that vectors are
 --   particularly good at).
-remap_solution :: V.Vector ArgID -> VS.Vector R -> [(ArgID, R)]
+remap_solution :: V.Vector VarID -> VS.Vector R -> [(VarID, R)]
 remap_solution mi xs = V.toList mi `zip` VS.toList xs
 
 
@@ -89,7 +89,7 @@ group_by_overlap ((l, s) : r)
 
 
 -- | The full set of variables referred to by a constraint.
-constraint_deps :: Constraint -> S.Set ArgID
-constraint_deps (CEqual a b)      = args_in a `S.union` args_in b
-constraint_deps (CMinimize v)     = args_in v
+constraint_deps :: Constraint -> S.Set VarID
+constraint_deps (CEqual a b)      = vars_in a `S.union` vars_in b
+constraint_deps (CMinimize v)     = vars_in v
 constraint_deps (CInitialize i _) = S.singleton i
