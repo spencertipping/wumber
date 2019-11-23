@@ -1,6 +1,9 @@
+{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE IncoherentInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -40,7 +43,7 @@ module Wumber.Symbolic (
 
 
 import Data.Binary  (Binary(..))
-import Data.List    (intercalate, sort)
+import Data.List    (intercalate, sort, sortBy)
 import Data.Set     (Set(..), empty, singleton, union, unions)
 import Data.Vector  (Vector, (!))
 import Foreign.Ptr  (FunPtr(..))
@@ -76,7 +79,7 @@ data SymVar a  = Var !VarID
 
 -- | The workaround we use to add an ordering to 'Sym' without exporting it
 --   outside this module.
-newtype OrdSym a = OS (Sym a) deriving (Show, Eq, Generic, Binary)
+newtype OrdSym a = OS (Sym a) deriving (Eq, Generic, Binary)
 
 type VarID = Int
 
@@ -86,7 +89,7 @@ infixl 8 :**
 
 -- | All of the typeclasses 'a' will end up belonging to for 'Sym'. I'm aliasing
 --   it because otherwise we'd end up writing it out a bunch of times.
-type SymConstraints a = (Show a, OtherOrd a, Num a, RealFloat a, Floating a,
+type SymConstraints a = (Show a, StaticOrd a, Num a, RealFloat a, Floating a,
                          Integral a, ClosedComparable a)
 
 instance Ord a => Ord (OrdSym a) where
@@ -94,10 +97,24 @@ instance Ord a => Ord (OrdSym a) where
   compare (OS (xs :+ _)) (OS (ys :+ _)) = compare xs ys
 
 
-class    Eq a          => OtherOrd a       where (<<) :: a -> a -> Bool
-instance (Eq a, Ord a) => OtherOrd (Sym a) where a << b = OS a << OS b
-instance (Eq a, Ord a) => OtherOrd a       where (<<)   = (<)
+-- | An 'Ord' replacement that works with our hidden 'Ord' thing. 'Sym'
+--   implements 'Ord' separately in order to provide 'Real', but its ordering is
+--   different and will fail at runtime if you try to compare undetermined
+--   quantities.
+class Eq a => StaticOrd a where
+  compare' :: a -> a -> Ordering
+  (<<)     :: a -> a -> Bool
+  a << b = compare' a b == LT
 
+instance {-# OVERLAPPING #-} (Eq a, Ord a) => StaticOrd (Sym a) where
+  compare' a b = compare' (OS a) (OS b)
+
+instance {-# OVERLAPPING #-} (Eq a, Ord a) => StaticOrd a where
+  compare' = compare
+
+
+instance (Num a, Eq a, Show a) => Show (OrdSym a) where
+  show (OS x) = show x
 
 instance (Num a, Eq a, Show a) => Show (Sym a) where
   show (xs :+ 0) = intercalate " + " (map show xs)
@@ -163,7 +180,8 @@ fn2 f x y                 = sym $ Fn2 f (vars_in x `union` vars_in y) (OS x) (OS
 --   or variables. You can use a view function to view each element, e.g. to
 --   merge on term variables ignoring coefficients. This function gives us an
 --   efficient way to keep polynomials factored.
-merge_with :: OtherOrd o => (a -> o) -> (a -> b) -> (a -> a -> b) -> [a] -> [a] -> [b]
+merge_with :: StaticOrd o
+           => (a -> o) -> (a -> b) -> (a -> a -> b) -> [a] -> [a] -> [b]
 merge_with _ i _ xs [] = map i xs
 merge_with _ i _ [] ys = map i ys
 merge_with v i f (x:xs) (y:ys) | v x << v y = i x   : merge_with v i f xs (y:ys)
@@ -178,6 +196,7 @@ padd (xs :+ a) (ys :+ b) = concat (merge_with te (: []) tadd xs ys) :+ (a + b)
         tadd (a :* x) (b :* _) | a + b /= 0 = [(a + b) :* x]
                                | otherwise  = []
 
+-- | Polynomial multiplication with term grouping.
 pmul :: SymConstraints a => Sym a -> Sym a -> Sym a
 pmul (xs :+ a) (ys :+ b) = sum [tmul x y | x <- a :* [] : xs,
                                            y <- b :* [] : ys]
@@ -187,15 +206,22 @@ pmul (xs :+ a) (ys :+ b) = sum [tmul x y | x <- a :* [] : xs,
           where ev (v :** _) = v
                 es = concat (merge_with ev (: []) emul xs ys)
 
-        emul (x :** m) (y :** n) | x /= y     = sort [x :** m, y :** n]
+        emul (x :** m) (y :** n) | x /= y     = sortBy compare' [x :** m, y :** n]
                                  | m + n /= 0 = [x :** (m + n)]
                                  | otherwise  = []
 
+-- | Polynomial exponentiation with term grouping. Uses repeated squaring if the
+--   exponent is a positive integer constant.
 ppow :: SymConstraints a => Sym a -> Sym a -> Sym a
-ppow _                0         = 1
-ppow ([]        :+ x) ([] :+ n) = [] :+ x ** n
+ppow _ 0 = 1
+ppow ([] :+ x) ([] :+ n) = val (x ** n)
+
+ppow a ([] :+ n) | n == truncate n && n > 0 =
+                   half * half * (if n `mod` 2 == 0 then 1 else a)
+  where half = ppow a (val (n `quot` 2))
+
 ppow ([a :* es] :+ 0) ([] :+ n) = [a**n :* map (\(v:**e) -> v:**(e*n)) es] :+ 0
-ppow a                b         = fn2 Pow a b
+ppow a b = fn2 Pow a b
 
 
 instance SymConstraints a => Num (Sym a) where
@@ -315,6 +341,17 @@ instance SymConstraints a => ClosedComparable (Sym a) where
   upper a b = fn2 Upper a b
 
 
+-- HERE THERE BE GENERAL WEIRDNESS
+-- We need to lie a little about the nature of 'Double' and 'Float'. Basically,
+-- these types need to be 'Integral' so they satisfy our 'SymConstraints'.
+
+qr a b = (q, r) where q = truncate (a / b)
+                      r = a - q*b
+
+instance Integral Double where toInteger = truncate; quotRem = qr
+instance Integral Float  where toInteger = truncate; quotRem = qr
+
+
 -- HERE THERE BE PARTIAL INSTANCES
 -- The goal here is to be able to use regular Haskell math functions, even
 -- though many of them require us to pretend to support operations we have no
@@ -324,7 +361,8 @@ instance SymConstraints a => ClosedComparable (Sym a) where
 instance SymConstraints a => Ord (Sym a) where
   compare ([] :+ a) ([] :+ b) = compare a b
   compare a b = error $ "can't compare undetermined Syms "
-                        ++ show a ++ " and " ++ show b
+                        ++ show a ++ " and " ++ show b ++ " (did you want "
+                        ++ "to use upper/lower instead of max/min?)"
 
 instance SymConstraints a => Enum (Sym a) where
   toEnum     = fromInteger . toInteger
@@ -339,4 +377,19 @@ instance SymConstraints a => Integral (Sym a) where
   toInteger _ = error "can't collapse Sym to Integer via toInteger"
   quotRem a b = (fn2 Quot a b, fn2 Rem a b)
 
+instance SymConstraints a => RealFrac (Sym a) where
+  properFraction a = error "properFraction is currenty undefined on Syms"
 
+instance SymConstraints a => RealFloat (Sym a) where
+  -- Yes, I am implementing this whole typeclass just to get atan2.
+  floatRadix _     = error "floatRadix is undefined on Syms"
+  floatDigits _    = error "floatDigits is undefined on Syms"
+  floatRange _     = error "floatRange is undefined on Syms"
+  decodeFloat _    = error "decodeFloat is undefined on Syms"
+  encodeFloat _ _  = error "decodeFloat is undefined on Syms"
+  isNaN _          = error "isNaN is undefined on Syms"
+  isInfinite _     = error "isInfinite is undefined on Syms"
+  isDenormalized _ = error "isDenormalized is undefined on Syms"
+  isNegativeZero _ = error "isNegativeZero is undefined on Syms"
+  isIEEE _         = error "isIEEE is undefined on Syms"
+  atan2 a b        = fn2 Atan2 a b
