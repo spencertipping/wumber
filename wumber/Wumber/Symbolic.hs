@@ -130,8 +130,11 @@ t0   = (:* [])
 vp x = [1 :* [x :** 1]] :+ 0
 var  = vp . Var
 
-fn1 f x   = Fn1 f (vars_in x) x
-fn2 f x y = Fn2 f (vars_in x `union` vars_in y) x y
+fn1 f ([] :+ x) = [] :+ fn f x
+fn1 f x         = vp $ Fn1 f (vars_in x) x
+
+fn2 f ([] :+ x) ([] :+ y) = [] :+ fn f x y
+fn2 f x y                 = vp $ Fn2 f (vars_in x `union` vars_in y) x y
 
 pt (xs :+ _) = xs
 te (_ :* es) = es
@@ -146,30 +149,36 @@ merge_with v i f (x:xs) (y:ys) | v x < v y = i x   : merge_with v i f xs (y:ys)
                                | otherwise = f x y : merge_with v i f xs ys
 
 
-padd :: (Eq a, Num a, Ord a) => Sym a -> Sym a -> Sym a
+padd :: (Eq a, Num a, RealFloat a, Ord a) => Sym a -> Sym a -> Sym a
 padd (xs :+ a) (ys :+ b) = concat (merge_with te (: []) tadd xs ys) :+ (a + b)
   where tadd (a :* x) (b :* _) | a + b /= 0 = [(a + b) :* x]
                                | otherwise  = []
 
-pmul :: (Num a, Ord a) => Sym a -> Sym a -> Sym a
+pmul :: (Num a, Mod a, RealFloat a, Ord a) => Sym a -> Sym a -> Sym a
 pmul (xs :+ a) (ys :+ b) = sum [tmul x y | x <- t0 a : xs, y <- t0 b : ys]
 
-tmul :: (Num a, Ord a) => SymTerm a -> SymTerm a -> Sym a
+ppow :: (Num a, Mod a, RealFloat a, Ord a, ClosedComparable a) => Sym a -> Sym a -> Sym a
+ppow _                0         = 1
+ppow ([]        :+ x) ([] :+ n) = [] :+ x ** n
+ppow ([a :* es] :+ 0) ([] :+ n) = [a**n :* map (\(v:**e) -> v:**(e*n)) es] :+ 0
+ppow a                b         = fn2 Pow a b
+
+tmul :: (Num a, Mod a, RealFloat a, Ord a) => SymTerm a -> SymTerm a -> Sym a
 tmul (a :* xs) (b :* ys) | null es    = []              :+ a * b
                          | a * b /= 0 = [(a * b) :* es] :+ 0
                          | otherwise  = 0
   where es = concat (merge_with ev (: []) emul xs ys)
 
-emul :: (Num a, Ord a) => SymExp a -> SymExp a -> [SymExp a]
+emul :: (Num a, Mod a, RealFloat a, Ord a) => SymExp a -> SymExp a -> [SymExp a]
 emul (x :** m) (y :** n) | x /= y     = sort [x :** m, y :** n]
                          | m + n /= 0 = [x :** (m + n)]
                          | otherwise  = []
 
 
-instance (Ord a, Num a) => Num (Sym a) where
+instance (Ord a, Num a, Mod a, RealFloat a, Floating a) => Num (Sym a) where
   fromInteger = p0 . fromInteger
-  abs         = vp . fn1 Abs
-  signum      = vp . fn1 Signum
+  abs         = fn1 Abs
+  signum      = fn1 Signum
   negate      = ((-1) *)
   (+)         = padd
   (*)         = pmul
@@ -276,36 +285,35 @@ instance Bounded a => Bounded (Sym a) where
   minBound = p0 minBound
   maxBound = p0 maxBound
 
-instance (Ord a, Floating a, Fractional a) => Fractional (Sym a) where
+instance (Ord a, Mod a, RealFloat a, Fractional a) => Fractional (Sym a) where
   fromRational = p0 . fromRational
-  recip        = (** (-1))
+  recip x      = ppow x (-1)
+  a / b        = a * ppow b (-1)
 
-instance (Ord a, Mod a, Num a) => Mod (Sym a) where
+instance (Ord a, Mod a, RealFloat a, Num a) => Mod (Sym a) where
   a % b | a == b    = 0
-        | otherwise = vp $ fn2 Mod a b
+        | otherwise = fn2 Mod a b
 
-instance (Ord a, Floating a) => Floating (Sym a) where
+instance (Ord a, Mod a, RealFloat a) => Floating (Sym a) where
+  (**) = ppow
+
   pi = p0 pi
 
-  ([]        :+ x) ** ([] :+ n) = [] :+ x ** n
-  ([a :* es] :+ 0) ** ([] :+ n) = [a**n :* map (\(v:**e) -> v:**(e*n)) es] :+ 0
-  a                ** b         = vp $ fn2 Pow a b
+  exp   = fn1 Exp
+  log   = fn1 Log
+  sin   = fn1 Sin
+  cos   = fn1 Cos
+  tan   = fn1 Tan
+  asin  = fn1 Asin
+  acos  = fn1 Acos
+  atan  = fn1 Atan
+  sinh  = fn1 Sinh
+  cosh  = fn1 Cosh
+  tanh  = fn1 Tanh
+  asinh = fn1 Asinh
+  acosh = fn1 Acosh
+  atanh = fn1 Atanh
 
-  exp   = vp . fn1 Exp
-  log   = vp . fn1 Log
-  sin   = vp . fn1 Sin
-  cos   = vp . fn1 Cos
-  tan   = vp . fn1 Tan
-  asin  = vp . fn1 Asin
-  acos  = vp . fn1 Acos
-  atan  = vp . fn1 Atan
-  sinh  = vp . fn1 Sinh
-  cosh  = vp . fn1 Cosh
-  tanh  = vp . fn1 Tanh
-  asinh = vp . fn1 Asinh
-  acosh = vp . fn1 Acosh
-  atanh = vp . fn1 Atanh
-
-instance (Num a, ClosedComparable a) => ClosedComparable (Sym a) where
-  lower a b = vp $ fn2 Lower a b
-  upper a b = vp $ fn2 Upper a b
+instance (Num a, Mod a, RealFloat a, ClosedComparable a) => ClosedComparable (Sym a) where
+  lower a b = fn2 Lower a b
+  upper a b = fn2 Upper a b
