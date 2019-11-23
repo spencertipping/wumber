@@ -24,6 +24,11 @@ import Wumber.Constraint
 import Wumber.Symbolic
 
 
+-- TODO
+-- Why don't we have 'Sym' represent itself in normal form? Seems silly to have
+-- this extra step.
+
+
 -- | Normalizes a given 'Sym' by minimizing the number of tree nodes, give or
 --   take. For example, 'x + x' becomes '2*x'; 'x * x' becomes 'x**2'. The goal
 --   is to make it as easy as possible to isolate 'x'.
@@ -42,5 +47,11 @@ normalize x = x
 --   easily factor linear subsystems down so that each 'x' is a separate
 --   variable.
 
--- TODO: the rest of this
-data AlgNF a = Poly [a] [AlgNF a] [a] a
+data AlgNF a = Poly [a] [Sym a] [a] a
+  deriving (Show, Eq, Ord, Generic, Binary)
+
+
+-- | Converts a 'Sym' to algebraic normal form.
+to_algnf :: Num a => Sym a -> AlgNF a
+to_algnf (N x)   = Poly []  []      []  x
+to_algnf (Arg i) = Poly [1] [Arg i] [1] 0
