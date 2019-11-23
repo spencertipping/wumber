@@ -1,14 +1,13 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
@@ -40,7 +39,7 @@ module Wumber.Symbolic (
 
 
 import Data.Binary  (Binary(..))
-import Data.List    (sort)
+import Data.List    (intercalate, sort)
 import Data.Set     (Set(..), empty, singleton, union, unions)
 import Data.Vector  (Vector, (!))
 import Foreign.Ptr  (FunPtr(..))
@@ -61,20 +60,47 @@ import Wumber.ClosedComparable
 --   TODO: add cond/piecewise
 
 data Sym a = [SymTerm a] :+ a
-  deriving (Show, Ord, Eq, Generic, Binary)
+  deriving (Ord, Eq, Generic, Binary)
 
 data SymTerm a = a :* [SymExp a]
-  deriving (Show, Ord, Eq, Generic, Binary)
+  deriving (Ord, Eq, Generic, Binary)
 
 data SymExp a = SymVar a :** a
-  deriving (Show, Ord, Eq, Generic, Binary)
+  deriving (Ord, Eq, Generic, Binary)
 
 data SymVar a = Var !VarID
               | Fn1 !SymFn1 (Set VarID) (Sym a)
               | Fn2 !SymFn2 (Set VarID) (Sym a) (Sym a)
-  deriving (Show, Ord, Eq, Generic, Binary)
+  deriving (Ord, Eq, Generic, Binary)
 
 type VarID = Int
+
+
+instance (Num a, Eq a, Show a) => Show (Sym a) where
+  show (xs :+ 0) = intercalate " + " (map show xs)
+  show ([] :+ n) = show n
+  show (xs :+ n) = intercalate " + " (map show xs ++ [show n])
+
+instance (Num a, Eq a, Show a) => Show (SymTerm a) where
+  show (1 :* es) = intercalate "·" (map show es)
+  show (n :* []) = "NONNORM_TERM " ++ show n
+  show (n :* es) = intercalate "·" (show n : map show es)
+
+instance (Num a, Eq a, Show a) => Show (SymExp a) where
+  show (x :** 0) = "NONNORM_EXP 1"
+  show (x :** 1) = show x
+  show (x :** 2) = show x ++ "²"
+  show (x :** 3) = show x ++ "³"
+  show (x :** 4) = show x ++ "⁴"
+  show (x :** n) = "(" ++ show x ++ ")^" ++ show n
+
+instance (Num a, Eq a, Show a) => Show (SymVar a) where
+  show (Var 0)       = "x"
+  show (Var 1)       = "y"
+  show (Var 2)       = "z"
+  show (Var i)       = "v" ++ show i
+  show (Fn1 f _ x)   = show f ++ "(" ++ show x ++ ")"
+  show (Fn2 f _ x y) = show f ++ "(" ++ show x ++ ", " ++ show y ++ ")"
 
 
 infixl 6 :+
@@ -102,6 +128,7 @@ eval f (ts :+ b) = b + sum (map eval_t ts)
 p0   = ([] :+)
 t0   = (:* [])
 vp x = [1 :* [x :** 1]] :+ 0
+var  = vp . Var
 
 fn1 f x   = Fn1 f (vars_in x) x
 fn2 f x y = Fn2 f (vars_in x `union` vars_in y) x y
