@@ -92,15 +92,22 @@ type ThreadStep a = Either (ThreadSource a) (ThreadSource a, Insn a, Thread a)
 schedule :: Vector RegisterState -> Thread a -> Maybe (ThreadStep a, Thread a)
 schedule rs t = schedule_ready rs t <|> schedule_new rs t
 
-schedule_ready rs t@(Thr (Reg i) _) = case c of
-  Left _                                                      -> Nothing
+schedule_ready rs t@(Thr (Reg i) is) = case c of
   Right (Reg r,  I1 f, t')                   | ready [r]      -> Just (c, t')
   Right (Reg r1, I2 f (Thr (Reg r2) []), t') | ready [r1, r2] -> Just (c, t')
+  _ -> any_insn (schedule_ready rs) t
 
   where c     = continuation i t
         ready = all (\r -> rs ! r == Ready)
 
 schedule_new   _ _ = Nothing
+
+
+any_insn :: Thread a -> (Thread a -> Maybe (ThreadStep a, Thread a))
+                     -> Maybe (ThreadStep a, Thread a)
+any_insn _ (Thr _ []) = Nothing
+any_insn f (Thr s (I1 i : is)) =
+  -- NO NO NO NO NO THIS IS AWFUL
 
 
 -- | Describes the state of a register: 'Free' (the scheduler can allocate it),
