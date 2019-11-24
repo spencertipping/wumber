@@ -4,6 +4,21 @@
 -- | SSA-style intermediate representation for JITable expressions. This is the
 --   bulk of the compile step for 'Sym' trees; after this, backend modules like
 --   'AMD64Asm' take over and emit machine code.
+--
+--   This IR is designed with vectorization and instruction latencies in mind.
+--   The main challenge with vectorization in particular is that we need to get
+--   enough shared computation to overcome the register packing overhead. This
+--   means we don't want to try to vectorize short chains of stuff, like two
+--   'add' operations; we need long chains.
+--
+--   Most code doesn't have any long chains of shared operations outside of
+--   loops, but we're quite likely to because many of our 'Sym' expressions come
+--   from vector quantities.
+--
+--   OK, so let's talk about the object model. Any IR is likely to provide a
+--   fairly linear way to produce the result we want, and any out-of-order-ness
+--   is a break from this linearity.
+
 module Wumber.JITIR where
 
 import Control.Monad.State (State, runState, get, modify')
