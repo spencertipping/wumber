@@ -5,11 +5,11 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE BangPatterns #-}
 
-{-# OPTIONS_GHC -funbox-strict-fields #-}
+{-# OPTIONS_GHC -funbox-strict-fields -Wincomplete-patterns #-}
 
 -- | Platform-independent JIT logic. This module has what you need to take a
 --   'ByteString' of machine code and get a callable function from it
---   ('with_jit').
+--   ('compile_machinecode').
 module Wumber.JIT where
 
 
@@ -71,8 +71,9 @@ instance ForeignPtrClosure b => ForeignPtrClosure (a -> b) where
 -- | Copies a 'ByteString' into an executable section of memory and returns a
 --   function that uses Haskell's calling convention. Memory is managed by a
 --   'ForeignPtr' closed over by the resulting function.
-compile :: ForeignPtrClosure a => (FunPtr a -> a) -> ByteString -> IO a
-compile funptr_converter bs = do
+compile_machinecode :: ForeignPtrClosure a
+                    => (FunPtr a -> a) -> ByteString -> IO a
+compile_machinecode funptr_converter bs = do
   m    <- codeptr bs
   fptr <- newForeignPtr m (finalize (BS.length bs) m)
   return $ functify fptr (funptr_converter . castPtrToFunPtr)
@@ -90,48 +91,50 @@ codeptr bs = do
 
 
 instance Functionable SymFn1 (FunPtr (Double -> IO Double)) where
-  fn Abs    = p_fabs
-  fn Signum = p_signum
-  fn Log    = p_log
-  fn Exp    = p_exp
-  fn Sqrt   = p_sqrt
-  fn Sin    = p_sin
-  fn Cos    = p_cos
-  fn Tan    = p_tan
-  fn Asin   = p_asin
-  fn Acos   = p_acos
-  fn Atan   = p_atan
-  fn Sinh   = p_sinh
-  fn Cosh   = p_cosh
-  fn Tanh   = p_tanh
-  fn Asinh  = p_asinh
-  fn Acosh  = p_acosh
-  fn Atanh  = p_atanh
-  fn Ceil   = p_ceil
-  fn Floor  = p_floor
-  fn Round  = p_round
+  fn Abs      = p_fabs
+  fn Signum   = p_signum
+  fn Log      = p_log
+  fn Exp      = p_exp
+  fn Sqrt     = p_sqrt
+  fn Sin      = p_sin
+  fn Cos      = p_cos
+  fn Tan      = p_tan
+  fn Asin     = p_asin
+  fn Acos     = p_acos
+  fn Atan     = p_atan
+  fn Sinh     = p_sinh
+  fn Cosh     = p_cosh
+  fn Tanh     = p_tanh
+  fn Asinh    = p_asinh
+  fn Acosh    = p_acosh
+  fn Atanh    = p_atanh
+  fn Ceiling  = p_ceil
+  fn Floor    = p_floor
+  fn Round    = p_round
+  fn Truncate = p_truncate
 
 instance Functionable SymFn1 (FunPtr (Float -> IO Float)) where
-  fn Abs    = p_fabsf
-  fn Signum = p_signumf
-  fn Log    = p_logf
-  fn Exp    = p_expf
-  fn Sqrt   = p_sqrtf
-  fn Sin    = p_sinf
-  fn Cos    = p_cosf
-  fn Tan    = p_tanf
-  fn Asin   = p_asinf
-  fn Acos   = p_acosf
-  fn Atan   = p_atanf
-  fn Sinh   = p_sinhf
-  fn Cosh   = p_coshf
-  fn Tanh   = p_tanhf
-  fn Asinh  = p_asinhf
-  fn Acosh  = p_acoshf
-  fn Atanh  = p_atanhf
-  fn Ceil   = p_ceilf
-  fn Floor  = p_floorf
-  fn Round  = p_roundf
+  fn Abs      = p_fabsf
+  fn Signum   = p_signumf
+  fn Log      = p_logf
+  fn Exp      = p_expf
+  fn Sqrt     = p_sqrtf
+  fn Sin      = p_sinf
+  fn Cos      = p_cosf
+  fn Tan      = p_tanf
+  fn Asin     = p_asinf
+  fn Acos     = p_acosf
+  fn Atan     = p_atanf
+  fn Sinh     = p_sinhf
+  fn Cosh     = p_coshf
+  fn Tanh     = p_tanhf
+  fn Asinh    = p_asinhf
+  fn Acosh    = p_acoshf
+  fn Atanh    = p_atanhf
+  fn Ceiling  = p_ceilf
+  fn Floor    = p_floorf
+  fn Round    = p_roundf
+  fn Truncate = p_truncatef
 
 
 foreign import ccall unsafe "sys/mman.h mmap"
@@ -146,6 +149,9 @@ foreign import ccall unsafe "sys/mman.h munmap"
 
 p_signum  = unsafePerformIO $ fn1_dbl_p   (return . signum)
 p_signumf = unsafePerformIO $ fn1_float_p (return . signum)
+
+p_truncate  = unsafePerformIO $ fn1_dbl_p (return . truncate)
+p_truncatef = unsafePerformIO $ fn1_float_p (return . truncate)
 
 foreign import ccall "math.h &pow"   p_pow   :: FunPtr (Double -> Double -> IO Double)
 foreign import ccall "math.h &fmod"  p_fmod  :: FunPtr (Double -> Double -> IO Double)

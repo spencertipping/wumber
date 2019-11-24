@@ -8,8 +8,13 @@
 --
 --   If you aren't on a platform we support JIT for, then your 'Sym' expressions
 --   will still run but they'll be interpreted-speed.
+--
+--   TODO: provide a bytecode interpreter to make the fallback case less awful
 
-module Wumber.SymbolicJIT where
+module Wumber.SymbolicJIT (
+  is_jit_supported,
+  jit
+) where
 
 
 import System.IO.Unsafe (unsafePerformIO)
@@ -50,7 +55,7 @@ is_jit_supported = True
 jit sym = unsafePerformIO do
   let asm = assemble_ssa $ linearize sym
   f <- compile dblfn asm
-  return $! unsafePerformIO . flip VS.unsafeWith f
+  return $ unsafePerformIO . flip VS.unsafeWith f
 
 #else
 

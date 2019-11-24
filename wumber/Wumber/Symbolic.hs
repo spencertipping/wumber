@@ -18,13 +18,40 @@
 -- NOTE: this is required to avoid infinite loops when defining recip and negate
 {-# LANGUAGE NegativeLiterals #-}
 
-{-# OPTIONS_GHC -funbox-strict-fields #-}
+{-# OPTIONS_GHC -funbox-strict-fields -Wincomplete-patterns #-}
 
 
--- | Symbolic representation of closed-form numeric expressions. 'Sym f a' is an
---   expression grammar whose terminals have type 'a'. 'Sym' is used both to
---   simplify linear equations for constraints, and to JIT-compile cost and
---   isosurface functions.
+-- | Symbolic numerical quantities. 'Sym f a' is a symbolic quantity with
+--   'Functionable' type 'f' (or '()' if you don't need custom functions) and
+--   numeric type 'a'.
+--
+--   'Sym's behave like numbers in that they implement Haskell's full numeric
+--   stack, sometimes incompletely. Internally they constant-fold when possible
+--   and otherwise maintain polynomial normal form around variables.
+--
+--   Two functions, 'var' and 'val', are useful if you want to construct 'Sym's.
+--   For example:
+--
+--   @
+--   circle_fn :: Double -> Sym () Double
+--   circle_fn r = r**2 - (var 0 ** 2 + var 1 ** 2)
+--   @
+--
+--   The meaning of 'var's depends on context. As far as 'Sym' is concerned,
+--   they're just indexed arguments to the function that will be JIT-compiled,
+--   and it doesn't really matter whether the function will be used as an
+--   isosurface or for constraint minimization. Within an isosurface/implicit
+--   context, vars 0..3 are 'x', 'y', 'z', and 't' (reflected by their 'Show'
+--   output). The above 'circle_fn' definition renders like this:
+--
+--   > -1.0·x² + -1.0·y² + 9.0
+--
+--   NOTE: avoid using 'RealFrac' and 'RealFloat' methods, except for 'atan2'.
+--   Many of the implementations either use 'unsafeCoerce' to work around
+--   'forall' type quantifiers, or will produce errors at runtime. Intuitively:
+--   any function whose signature is 'Sym -> not-Sym' is likely to fail because
+--   'Sym' quantities aren't determinable until we have values for their
+--   variables.
 
 module Wumber.Symbolic (
   Sym(..),
@@ -40,9 +67,15 @@ module Wumber.Symbolic (
   Functionable(..),
   eval,
   vars_in,
-  sym
+  var,
+  val,
+  is_val
 ) where
 
+
+-- TODO
+-- Replace 'Data.Set' with an intset implementation. Normal 'Set' for small
+-- variable index ints is obscenely inefficient.
 
 import Data.Binary   (Binary(..))
 import Data.List     (intercalate, sort, sortBy)
@@ -62,13 +95,13 @@ import Wumber.ClosedComparable
 --   constant folding, condensing common subexpressions (e.g. 'x + x' becomes
 --   '2*x'), and keeping track of variable dependencies and invertibility.
 --
---   NOTE: 'Sym's aren't 'Ord' in the sense you expect, so I've taken some
---   effort to make sure they don't claim to be (this way you can't use 'max'
---   and 'min' instead of 'upper' and 'lower'). The short version of this story
---   is that we use 'Ord' internally to do efficient term factoring, but this
---   definition has nothing to do with numerical comparisons.
+--   NOTE: 'Sym' needs to be 'Ord' to implement 'Real', but unknown quantities
+--   will fail at runtime if you try to compare them. 'SymTerm' etc are 'Ord'
+--   because we use orderings to maintain sorted factor lists. 'Sym' instances
+--   are ordered with 'OrdSym' for this purpose, but that isn't exposed to the
+--   user.
 
-data Sym f a     = [SymTerm f a] :+ a deriving (Eq, Generic, Binary)
+data Sym f a     = [SymTerm f a] :+ a deriving (     Eq, Generic, Binary)
 data SymTerm f a = a :* [SymExp f a]  deriving (Ord, Eq, Generic, Binary)
 data SymExp f a  = SymVar f a :** a   deriving (Ord, Eq, Generic, Binary)
 data SymVar f a  = Var !VarID
@@ -77,15 +110,21 @@ data SymVar f a  = Var !VarID
                  | FnN !f      (Set VarID) [OrdSym f a]
   deriving (Ord, Eq, Generic, Binary)
 
+infixl 6 :+
+infixl 7 :*
+infixl 8 :**
+
+type VarID = Int
+
+
 -- | The workaround we use to add an ordering to 'Sym' without exporting it
 --   outside this module.
 newtype OrdSym f a = OS { unOS :: Sym f a } deriving (Eq, Generic, Binary)
 
-type VarID = Int
+instance (Ord f, Ord a) => Ord (OrdSym f a) where
+  -- Details don't matter here, as long as it's consistent.
+  compare (OS (a :+ b)) (OS (c :+ d)) = compare (a, b) (c, d)
 
-infixl 6 :+
-infixl 7 :*
-infixl 8 :**
 
 -- | All of the typeclasses 'a' will end up belonging to for 'Sym'. I'm aliasing
 --   it because otherwise we'd end up writing it out a bunch of times.
@@ -101,11 +140,6 @@ type NumConstraints a = (Show a,
                          RealFloat a,
                          Integral a,
                          ClosedComparable a)
-
-
-instance (Ord f, Ord a) => Ord (OrdSym f a) where
-  -- Details don't matter here, as long as it's consistent.
-  compare (OS (a :+ b)) (OS (c :+ d)) = compare (a, b) (c, d)
 
 
 -- | An 'Ord' replacement that works with our hidden 'Ord' thing. 'Sym'
@@ -224,6 +258,7 @@ padd (xs :+ a) (ys :+ b) = concat (merge_with te (: []) tadd xs ys) :+ (a + b)
         tadd (a :* x) (b :* _) | a + b /= 0 = [(a + b) :* x]
                                | otherwise  = []
 
+
 -- | Polynomial multiplication with term grouping.
 pmul :: SymConstraints f a => Sym f a -> Sym f a -> Sym f a
 pmul (xs :+ a) (ys :+ b) = sum [tmul x y | x <- a :* [] : xs,
@@ -238,6 +273,7 @@ pmul (xs :+ a) (ys :+ b) = sum [tmul x y | x <- a :* [] : xs,
                                  | m + n /= 0 = [x :** (m + n)]
                                  | otherwise  = []
 
+
 -- | Polynomial exponentiation with term grouping. Uses repeated squaring if the
 --   exponent is a positive integer constant.
 ppow :: SymConstraints f a => Sym f a -> Sym f a -> Sym f a
@@ -250,15 +286,6 @@ ppow a ([] :+ n) | n == truncate n && n > 0 =
 
 ppow ([a :* es] :+ 0) ([] :+ n) = [a**n :* map (\(v:**e) -> v:**(e*n)) es] :+ 0
 ppow a b = fn2 Pow a b
-
-
-instance SymConstraints f a => Num (Sym f a) where
-  fromInteger = val . fromInteger
-  abs         = fn1 Abs
-  signum      = fn1 Signum
-  negate      = ((-1) *)
-  (+)         = padd
-  (*)         = pmul
 
 
 -- | Unary transcendental functions that would otherwise clutter up 'Sym'.
@@ -282,6 +309,11 @@ data SymFn1 = Abs
             | Round
             | Ceiling
             | Floor
+
+            -- These functions aren't used directly by Sym, but may be emitted
+            -- during JIT compilation (and have corresponding C math functions).
+            | Sqrt
+
   deriving (Show, Ord, Eq, Generic, Binary, Enum)
 
 data SymFn2 = Quot
@@ -304,6 +336,7 @@ instance NumConstraints a => Functionable SymFn1 (a -> a) where
   fn Signum   = signum
   fn Log      = log
   fn Exp      = exp
+  fn Sqrt     = sqrt
   fn Sin      = sin
   fn Cos      = cos
   fn Tan      = tan
@@ -338,11 +371,20 @@ vars_in (xs :+ b) = unions (map vars_in_t xs)
         vars_in_v (Var i)       = singleton i
         vars_in_v (Fn1 _ v _)   = v
         vars_in_v (Fn2 _ v _ _) = v
+        vars_in_v (FnN _ v _)   = v
 
 
 instance Bounded a => Bounded (Sym f a) where
   minBound = val minBound
   maxBound = val maxBound
+
+instance SymConstraints f a => Num (Sym f a) where
+  fromInteger = val . fromInteger
+  abs         = fn1 Abs
+  signum      = fn1 Signum
+  negate      = ((-1) *)
+  (+)         = padd
+  (*)         = pmul
 
 instance SymConstraints f a => Fractional (Sym f a) where
   fromRational = val . fromRational
@@ -376,7 +418,14 @@ instance SymConstraints f a => ClosedComparable (Sym f a) where
 -- these types need to be 'Integral' so they satisfy our 'SymConstraints'.
 
 -- | A quotient/remainder function we reuse in several places.
---   NOTE: this results in 'divMod' and 'quotRem' that behave identically.
+--
+--   NOTE: this results in 'divMod' and 'quotRem' that behave identically,
+--   including for negative divisors. This is technically not the way 'mod' and
+--   'rem' should be defined, but it lets us keep things simple for now.
+--
+--   TODO: is the fix as simple as having 'qr' use 'truncate' and 'divmod' use
+--   'floor'?
+
 qr a b = (q, r) where q = truncate (a / b)
                       r = a - q*b
 
@@ -403,9 +452,13 @@ instance SymConstraints f a => Enum (Sym f a) where
   succ x     = x + 1
 
 instance SymConstraints f a => Real (Sym f a) where
+  -- TODO
+  -- toRational is fine when 'is_val' is true
   toRational _ = error "can't collapse Sym to Rational via toRational"
 
 instance SymConstraints f a => Integral (Sym f a) where
+  -- TODO
+  -- toInteger is fine when 'is_val' is true
   toInteger _ = error "can't collapse Sym to Integer via toInteger"
   quotRem a b = (fn2 Quot a b, fn2 Rem a b)
 
@@ -421,7 +474,11 @@ instance SymConstraints f a => RealFrac (Sym f a) where
   floor            = unsafeCoerce . fn1 Floor
 
 instance SymConstraints f a => RealFloat (Sym f a) where
-  -- Yes, I am implementing this whole typeclass just to get atan2.
+  -- TODO
+  -- Most of these methods are fine if we know the 'Sym' is a constant. We
+  -- should allow that to be consistent with some of the other hackery above.
+
+  -- ...and yes, I am implementing this whole typeclass just to get atan2.
   floatRadix _     = error "floatRadix is undefined on Syms"
   floatDigits _    = error "floatDigits is undefined on Syms"
   floatRange _     = error "floatRange is undefined on Syms"

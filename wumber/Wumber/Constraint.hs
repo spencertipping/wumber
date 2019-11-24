@@ -8,8 +8,14 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
+-- | Numerically specified constraint equations. These are solved with a hybrid
+--   strategy: first we partition the equation set into independent subsystems,
+--   then we take each of those and isolate/substitute variables, and finally we
+--   JIT a cost function with whichever variables remain and pass that to the
+--   GSL BGFS solver.
 
 module Wumber.Constraint where
+
 
 import Control.Monad.RWS (RWS, get, tell, modify)
 import Data.Binary       (Binary)

@@ -9,7 +9,7 @@
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
--- | A hybrid algebraic and numerical constraint system solver.
+-- | The numeric end of the constraint solver.
 module Wumber.ConstraintSolver (
   solve,
   solve_full,
@@ -65,11 +65,7 @@ solve_full δ n m = (rewrite (eval (solution !)) a, solution, cs)
 class Rewritable a b | a -> b where rewrite :: (CVal -> R) -> a -> b
 
 instance Rewritable CVal R where rewrite = id
-
--- TODO
--- Fully generalize this; if I try now, I get fundep collisions because Sym is
--- itself a functor.
-instance Functor f => Rewritable (f CVal) (f R) where
+instance (Rewritable a b, Functor f) => Rewritable (f a) (f b) where
   rewrite = fmap . rewrite
 
 
@@ -82,7 +78,8 @@ solve' δ n (Subsystem cs mi start) = remap_solution mi xs
         search_size = VS.replicate (V.length mi) 1
 
 -- TODO: bypass minimizeV and call the C function directly. This will save some
--- Haskell/C FFI overhead, although the total impact isn't high.
+-- Haskell/C FFI overhead, although the total impact isn't high (on the order of
+-- ~100ns/iteration)
 
 
 -- | The total cost for a set of constraints. It's ok for this to be slow; the
