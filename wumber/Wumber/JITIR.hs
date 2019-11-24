@@ -50,3 +50,9 @@ thread s = case s of [t] :+ 0 -> tt t
     vt (Fn1 f _ (OS a))        = Thr (Left 0) [I2R Add (thread a), I1 f]
     vt (Fn2 f _ (OS a) (OS b)) = Thr (Left 0) [I2R Add (thread a), I2L f (thread b)]
     vt (FnN _ _ _)             = error "FnN isn't supported in IR yet"
+
+
+-- TODO
+-- We need a thread traversal thing that can keep track of register allocations,
+-- or at the very least can DFS-with-lookahead. A lot of this logic will be
+-- shared across multiple JIT backends.
