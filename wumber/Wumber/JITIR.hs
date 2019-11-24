@@ -19,23 +19,25 @@
 module Wumber.JITIR where
 
 
-import qualified Data.Vector as V
+import Control.Applicative ((<|>))
+import Data.Vector         (Vector, (!))
 
 import Wumber.Symbolic
 
 
 -- | A series of transformations to a single initial value.
 data Thread a = Thr !(ThreadSource a) [Insn a] deriving (Eq, Show)
-data ThreadSource a = Val      !a
-                    | ReadVar  !VarID
-                    | Register !RegID
+data ThreadSource a = Val  !a
+                    | Read !VarID
+                    | Reg  !RegID
   deriving (Eq, Show)
 
 type RegID = Int
 
 -- | A single transformation within a thread.
-data Insn a = I1 !SymFn1
-            | I2 !SymFn2 !(Thread a)
+data Insn a = Assign !(ThreadSource a)
+            | I1     !SymFn1
+            | I2     !SymFn2 !(Thread a)
   deriving (Eq, Show)
 
 
@@ -52,7 +54,7 @@ thread s = case s of
         et (x :** 1)  = vt x
         et (x :** n)  = vt x $+ [I2 Pow (Thr (Val n) [])]
 
-        vt (Var i)                 = Thr (ReadVar i) []
+        vt (Var i)                 = Thr (Read i) []
         vt (Fn1 f _ (OS a))        = thread a $+ [I1 f]
         vt (Fn2 f _ (OS a) (OS b)) = thread a $+ [I2 f (thread b)]
         -- TODO: FnN
@@ -60,25 +62,51 @@ thread s = case s of
         Thr i xs $+ ys = Thr i (xs ++ ys)
 
 
+thread_started :: Thread a -> Bool
+thread_started (Thr (Reg _) _) = True
+thread_started _               = False
+
+
 -- | Returns the next step and continuation for a thread, or the location of the
 --   data if the thread is done.
 continuation :: RegID -> Thread a -> ThreadStep a
-continuation _ (Thr s [])     = Left s
-continuation r (Thr s (i:is)) = Right (s, i, Thr (Register r) is)
+continuation r t@(Thr s is)
+  | not (thread_started t) = Right (Reg r, Assign s, Thr (Reg r) is)
+  | otherwise              = case is of i:is' -> Right (s, i, Thr (Reg r) is')
+                                        _     -> Left s
 
 type ThreadStep a = Either (ThreadSource a) (ThreadSource a, Insn a, Thread a)
 
 
 -- | Schedules the next instruction given the specified register constraints.
---   The register index is indicated by the 'ThreadSource' in 'Step' or 'Done'.
-schedule :: V.Vector RegisterState -> Thread a -> Maybe (ThreadStep a, Thread a)
-schedule rs t = Nothing
+--   The register index is indicated by the 'ThreadSource' in 'Step'.
+--
+--   'schedule' runs instructions whose operands are 'Ready' if possible. If no
+--   such instructions exist, it will then try to start a new thread on a free
+--   register. Failing that, it returns 'Nothing'.
+--
+--   When a new thread is started, we prefer threads whose instructions'
+--   operands are available. This way we minimize the amount of time spent
+--   holding onto a register value without being able to free it.
+
+schedule :: Vector RegisterState -> Thread a -> Maybe (ThreadStep a, Thread a)
+schedule rs t = schedule_ready rs t <|> schedule_new rs t
+
+schedule_ready rs t@(Thr (Reg i) _) = case c of
+  Left _                                                      -> Nothing
+  Right (Reg r,  I1 f, t')                   | ready [r]      -> Just (c, t')
+  Right (Reg r1, I2 f (Thr (Reg r2) []), t') | ready [r1, r2] -> Just (c, t')
+
+  where c     = continuation i t
+        ready = all (\r -> rs ! r == Ready)
+
+schedule_new   _ _ = Nothing
 
 
 -- | Describes the state of a register: 'Free' (the scheduler can allocate it),
---   'Running' (it's running an instruction that hasn't finished yet), or
---   'Ready' (it contains a result).
+--   'Busy' (it's running an instruction, and accessing it would cause a stall),
+--   or 'Ready' (it contains a result).
 data RegisterState = Free
-                   | Running !Double
+                   | Busy !Double
                    | Ready
   deriving (Eq, Show)
