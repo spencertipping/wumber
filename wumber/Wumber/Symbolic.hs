@@ -322,6 +322,13 @@ data SymFn2 = Quot
             | Upper
             | Lower
             | Atan2
+
+            -- Not used directly by Sym, but are useful when emitting JIT.
+            | Add
+            | Subtract
+            | Multiply
+            | Divide
+
   deriving (Show, Ord, Eq, Generic, Binary, Enum)
 
 
@@ -355,12 +362,16 @@ instance NumConstraints a => Functionable SymFn1 (a -> a) where
   fn Floor    = floor
 
 instance NumConstraints a => Functionable SymFn2 (a -> a -> a) where
-  fn Pow   = (**)
-  fn Quot  = quot
-  fn Rem   = rem
-  fn Upper = upper
-  fn Lower = lower
-  fn Atan2 = atan2
+  fn Add      = (+)
+  fn Subtract = (-)
+  fn Multiply = (*)
+  fn Divide   = (/)
+  fn Pow      = (**)
+  fn Quot     = quot
+  fn Rem      = rem
+  fn Upper    = upper
+  fn Lower    = lower
+  fn Atan2    = atan2
 
 
 -- | Returns a set of all 'Var' indexes used by an expression.

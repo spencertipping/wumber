@@ -33,21 +33,11 @@ import qualified Data.ByteString as BS
 import Wumber.Symbolic
 
 
--- TODO: something with these
-type F1 r = r -> IO r
-type F2 r = r -> r -> IO r
-type F3 r = r -> r -> r -> IO r
-type F4 r = r -> r -> r -> r -> IO r
+foreign import ccall unsafe "sys/mman.h mmap"
+  mmap :: Ptr () -> CSize -> CInt -> CInt -> Fd -> COff -> IO (Ptr a)
 
-foreign import ccall "wrapper" fn1_dbl_p :: F1 Double -> IO (FunPtr (F1 Double))
-foreign import ccall "wrapper" fn2_dbl_p :: F2 Double -> IO (FunPtr (F2 Double))
-foreign import ccall "wrapper" fn3_dbl_p :: F3 Double -> IO (FunPtr (F3 Double))
-foreign import ccall "wrapper" fn4_dbl_p :: F4 Double -> IO (FunPtr (F4 Double))
-
-foreign import ccall "wrapper" fn1_float_p :: F1 Float -> IO (FunPtr (F1 Float))
-foreign import ccall "wrapper" fn2_float_p :: F2 Float -> IO (FunPtr (F2 Float))
-foreign import ccall "wrapper" fn3_float_p :: F3 Float -> IO (FunPtr (F3 Float))
-foreign import ccall "wrapper" fn4_float_p :: F4 Float -> IO (FunPtr (F4 Float))
+foreign import ccall unsafe "sys/mman.h munmap"
+  munmap :: Ptr () -> CSize -> IO CInt
 
 
 foreign import ccall "dynamic"
@@ -90,7 +80,36 @@ codeptr bs = do
   return $ castPtr m
 
 
-instance Functionable SymFn1 (FunPtr (Double -> IO Double)) where
+instance Functionable SymFn2 (FunPtr (F2 Double)) where
+  fn Quot  = p_quot
+  fn Rem   = p_rem    -- FIXME: use fmod if we can
+  fn Pow   = p_pow
+  fn Upper = p_fmax
+  fn Lower = p_fmin
+  fn Atan2 = p_atan2
+
+  -- NOTE: there's no reason to use these; they're just here for completeness.
+  fn Add      = p_add
+  fn Subtract = p_subtract
+  fn Multiply = p_multiply
+  fn Divide   = p_divide
+
+instance Functionable SymFn2 (FunPtr (F2 Float)) where
+  fn Quot  = p_quotf
+  fn Rem   = p_remf    -- FIXME: use fmod if we can
+  fn Pow   = p_powf
+  fn Upper = p_fmaxf
+  fn Lower = p_fminf
+  fn Atan2 = p_atan2f
+
+  -- NOTE: there's no reason to use these; they're just here for completeness.
+  fn Add      = p_addf
+  fn Subtract = p_subtractf
+  fn Multiply = p_multiplyf
+  fn Divide   = p_dividef
+
+
+instance Functionable SymFn1 (FunPtr (F1 Double)) where
   fn Abs      = p_fabs
   fn Signum   = p_signum
   fn Log      = p_log
@@ -113,7 +132,7 @@ instance Functionable SymFn1 (FunPtr (Double -> IO Double)) where
   fn Round    = p_round
   fn Truncate = p_truncate
 
-instance Functionable SymFn1 (FunPtr (Float -> IO Float)) where
+instance Functionable SymFn1 (FunPtr (F1 Float)) where
   fn Abs      = p_fabsf
   fn Signum   = p_signumf
   fn Log      = p_logf
@@ -137,21 +156,40 @@ instance Functionable SymFn1 (FunPtr (Float -> IO Float)) where
   fn Truncate = p_truncatef
 
 
-foreign import ccall unsafe "sys/mman.h mmap"
-  mmap :: Ptr () -> CSize -> CInt -> CInt -> Fd -> COff -> IO (Ptr a)
-
-foreign import ccall unsafe "sys/mman.h munmap"
-  munmap :: Ptr () -> CSize -> IO CInt
-
-
 -- Math function pointers available to JIT assemblers. These are
 -- platform-independent.
 
-p_signum  = unsafePerformIO $ fn1_dbl_p   (return . signum)
-p_signumf = unsafePerformIO $ fn1_float_p (return . signum)
+type F1 r = r -> IO r
+type F2 r = r -> r -> IO r
 
-p_truncate  = unsafePerformIO $ fn1_dbl_p (return . truncate)
+
+foreign import ccall "wrapper" fn1_dbl_p :: F1 Double -> IO (FunPtr (F1 Double))
+foreign import ccall "wrapper" fn2_dbl_p :: F2 Double -> IO (FunPtr (F2 Double))
+
+p_add      = unsafePerformIO $ fn2_dbl_p \x y -> return (x + y)
+p_subtract = unsafePerformIO $ fn2_dbl_p \x y -> return (x - y)
+p_multiply = unsafePerformIO $ fn2_dbl_p \x y -> return (x * y)
+p_divide   = unsafePerformIO $ fn2_dbl_p \x y -> return (x / y)
+p_quot     = unsafePerformIO $ fn2_dbl_p \x y -> return (x `quot` y)
+p_rem      = unsafePerformIO $ fn2_dbl_p \x y -> return (x `rem` y)
+
+p_signum   = unsafePerformIO $ fn1_dbl_p (return . signum)
+p_truncate = unsafePerformIO $ fn1_dbl_p (return . truncate)
+
+
+foreign import ccall "wrapper" fn1_float_p :: F1 Float  -> IO (FunPtr (F1 Float))
+foreign import ccall "wrapper" fn2_float_p :: F2 Float  -> IO (FunPtr (F2 Float))
+
+p_addf      = unsafePerformIO $ fn2_float_p \x y -> return (x + y)
+p_subtractf = unsafePerformIO $ fn2_float_p \x y -> return (x - y)
+p_multiplyf = unsafePerformIO $ fn2_float_p \x y -> return (x * y)
+p_dividef   = unsafePerformIO $ fn2_float_p \x y -> return (x / y)
+p_quotf     = unsafePerformIO $ fn2_float_p \x y -> return (x `quot` y)
+p_remf      = unsafePerformIO $ fn2_float_p \x y -> return (x `rem` y)
+
+p_signumf   = unsafePerformIO $ fn1_float_p (return . signum)
 p_truncatef = unsafePerformIO $ fn1_float_p (return . truncate)
+
 
 foreign import ccall "math.h &pow"   p_pow   :: FunPtr (Double -> Double -> IO Double)
 foreign import ccall "math.h &fmod"  p_fmod  :: FunPtr (Double -> Double -> IO Double)
