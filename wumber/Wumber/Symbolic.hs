@@ -61,6 +61,7 @@ module Wumber.Symbolic (
   SymTerm(..),
   SymExp(..),
   SymVar(..),
+  OrdSym(..),
   VarID,
   SymFn1(..),
   SymFn2(..),
