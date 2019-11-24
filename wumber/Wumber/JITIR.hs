@@ -38,20 +38,23 @@ data Insn a = I1  SymFn1
 
 -- | Constructs a thread graph from a 'Sym' object.
 thread :: SymConstraints f a => Sym f a -> Thread a
-thread s = case s of [t] :+ 0 -> tt t
-                     ts  :+ n -> Thr (Left n) (map (I2L Add . tt) ts)
-  where
-    Thr i xs $+ ys = Thr i (xs ++ ys)
+thread s = case s of
+  [t] :+ 0 -> tt t
+  [t] :+ n -> tt t $+ [I2L Add (Thr (Left n) [])]
+  ts  :+ n -> Thr (Left n) (map (I2L Add . tt) ts)
 
-    tt (1 :* [e]) = et e
-    tt (a :* es)  = Thr (Left a) (map (I2L Multiply . et) es)
-    et (x :** 1)  = vt x
-    et (x :** n)  = Thr (Left n) [I2R Pow (vt x)]
+  where tt (1 :* [e]) = et e
+        tt (a :* [e]) = et e $+ [I2L Multiply (Thr (Left a) [])]
+        tt (a :* es)  = Thr (Left a) (map (I2L Multiply . et) es)
+        et (x :** 1)  = vt x
+        et (x :** n)  = Thr (Left n) [I2R Pow (vt x)]
 
-    vt (Var i)                 = Thr (Right i) []
-    vt (Fn1 f _ (OS a))        = thread a $+ [I1 f]
-    vt (Fn2 f _ (OS a) (OS b)) = thread a $+ [I2L f (thread b)]
-    -- TODO: FnN
+        vt (Var i)                 = Thr (Right i) []
+        vt (Fn1 f _ (OS a))        = thread a $+ [I1 f]
+        vt (Fn2 f _ (OS a) (OS b)) = thread a $+ [I2L f (thread b)]
+        -- TODO: FnN
+
+        Thr i xs $+ ys = Thr i (xs ++ ys)
 
 
 -- TODO
