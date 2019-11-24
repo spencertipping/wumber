@@ -41,15 +41,17 @@ thread :: SymConstraints f a => Sym f a -> Thread a
 thread s = case s of [t] :+ 0 -> tt t
                      ts  :+ n -> Thr (Left n) (map (I2L Add . tt) ts)
   where
+    Thr i xs $+ ys = Thr i (xs ++ ys)
+
     tt (1 :* [e]) = et e
     tt (a :* es)  = Thr (Left a) (map (I2L Multiply . et) es)
     et (x :** 1)  = vt x
     et (x :** n)  = Thr (Left n) [I2R Pow (vt x)]
 
     vt (Var i)                 = Thr (Right i) []
-    vt (Fn1 f _ (OS a))        = Thr (Left 0) [I2R Add (thread a), I1 f]
-    vt (Fn2 f _ (OS a) (OS b)) = Thr (Left 0) [I2R Add (thread a), I2L f (thread b)]
-    vt (FnN _ _ _)             = error "FnN isn't supported in IR yet"
+    vt (Fn1 f _ (OS a))        = thread a $+ [I1 f]
+    vt (Fn2 f _ (OS a) (OS b)) = thread a $+ [I2L f (thread b)]
+    -- TODO: FnN
 
 
 -- TODO
