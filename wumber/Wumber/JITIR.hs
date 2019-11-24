@@ -18,6 +18,22 @@
 --   OK, so let's talk about the object model. Any IR is likely to provide a
 --   fairly linear way to produce the result we want, and any out-of-order-ness
 --   is a break from this linearity.
+--
+--   One possibility is to form multiple parallel linear instruction streams,
+--   leaving the JIT backend to round-robin and/or vectorize its way through as
+--   many as it has registers to manage. This sounds simple enough, but is a
+--   little more complicated in practice because not every linearized
+--   subexpression uses a small number of registers (e.g.
+--   'xy²z⁴ + 3y³z + √(xz + y³ + 1)'). This means each linear segment needs to
+--   indicate how many scalar registers are required to evaluate it.
+--   (Realistically the number is likely to be small because we don't have that
+--   many levels of operator precedence -- although nested transcendentals
+--   complicate things.)
+--
+--   Quick sidenote: any function call we make (1) isn't vectorized, and (2)
+--   requires us to spill all of our active registers to the stack. This
+--   obviously complicates things too, especially because not every processor
+--   architecture provides the same set of intrinsics.
 
 module Wumber.JITIR where
 
