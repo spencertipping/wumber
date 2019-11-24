@@ -1,64 +1,42 @@
 {-# LANGUAGE BlockArguments #-}
-{-# OPTIONS_GHC -funbox-strict-fields #-}
+{-# OPTIONS_GHC -funbox-strict-fields -Wincomplete-patterns #-}
 
--- | SSA-style intermediate representation for JITable expressions. This is the
---   bulk of the compile step for 'Sym' trees; after this, backend modules like
+-- | Intermediate representation for JITable expressions. This is the bulk of
+--   the compile step for 'Sym' trees; after this, backend modules like
 --   'AMD64Asm' take over and emit machine code.
 --
---   I haven't figured out how I want to handle auto-vectorization yet, but I do
---   want to tackle instruction latency. Basically, the idea is that we want to
---   give each register some time to settle before using the result. The
---   processor can do a lot at once if we don't have serial instruction chains.
+--   I'm not worried about vectorization yet; a much bigger optimization is to
+--   get full throughput from arithmetic operations by running multiple
+--   independent subexpressions in parallel (by having them refer to disjoint
+--   registers). There's a tradeoff: too few threads and we block on instruction
+--   latencies, too many and we're IO-bound against L1 cache. We need to let the
+--   JIT backend dictate how many threads it's running at any given moment.
 --
---   TODO: something clever
+--   So, what's a thread? It's a serial computation that accumulates into one
+--   register and intermittently uses a second register for operands. In theory,
+--   a processor with /n/ registers can run /n - 1/ threads without spilling.
 
 module Wumber.JITIR (
-  linearize,
-  reg_of,
-  SSAReg,
-  SSA(..)
+  Thread(..),
+  Insn(..),
+  ThreadID,
 ) where
 
-import Control.Monad.State (State, runState, get, modify')
 
 import Wumber.Symbolic
 
 
--- TODO
--- Figure out what kind of IR makes sense here. For example, IR shouldn't know
--- about vectorized instructions but it should provide information that's useful
--- for a vectorizing assembler: e.g. "here are two subexpressions that share an
--- operation chain".
---
--- For now, this SSA stuff is throwaway code.
+-- | A series of transformations to a single initial value.
+data Thread a = Thr ThreadID !a [Insn a] deriving (Eq, Show)
+type ThreadID = Int
+
+-- | A single transformation within a thread.
+data Insn a = I1  SymFn1
+            | I2L SymFn2 !(Thread a)  -- Accumulated value is on the left
+            | I2R SymFn2 !(Thread a)  -- Accumulated value is on the right
+  deriving (Eq, Show)
 
 
--- | Linearizes a 'Sym' into a series of SSA instructions that can be assembled
---   directly. Also returns the number of SSA registers required to evaluate the
---   resulting code.
---
---   The final SSA instruction is always a 'Return', and 'Return' occurs only in
---   the final position since we don't support control flow.
-
-linearize :: SymConstraints f a => Sym f a -> (SSAReg, [SSA a])
-linearize s = (n, l ++ [Return r]) where ((r, l), n) = runState (dfs s) 0
-
-type SSAReg = Int
-data SSA a = Const  SSAReg a
-           | PtrArg SSAReg Int
-           | Op1    SSAReg SymFn1 SSAReg
-           | Op2    SSAReg SymFn2 SSAReg SSAReg
-           | Return SSAReg
-  deriving (Show, Eq)
-
-reg_of :: SSA a -> SSAReg
-reg_of (Const r _)   = r
-reg_of (PtrArg r _)  = r
-reg_of (Op1 r _ _)   = r
-reg_of (Op2 r _ _ _) = r
-reg_of (Return r)    = r
-
-reg :: State SSAReg SSAReg
-reg = do r <- get
-         modify' (+ 1)
-         return r
+-- | Constructs a thread graph from a 'Sym' object.
+thread :: SymConstraints f a => Sym f a -> Thread a
+thread _ = Thr 0 undefined []
