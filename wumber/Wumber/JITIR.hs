@@ -22,8 +22,8 @@ module Wumber.JITIR where
 
 import Control.Applicative ((<|>))
 import Control.Monad.State (State, gets, modify', runState)
-import Data.Map.Strict     (Map, (!), (!?), adjust, delete, empty, insert,
-                            lookupMax, update)
+import Data.IntMap.Strict  (IntMap, (!), (!?), adjust, assocs, delete, elems,
+                            empty, keys, insert, lookupMax)
 import Data.Maybe          (fromJust)
 
 import Wumber.Symbolic
@@ -38,14 +38,20 @@ import Wumber.Symbolic
 --   threads have instructions left to execute.
 --
 --   'tg_reg' contains mappings only for threads that have register allocations.
+--   This is used by scheduling functions like 'startable' and 'runnable' to
+--   prioritize thread advancement.
+--
+--   NOTE: 'tg_reg' and register states are coordinated: a register is
+--   'Nothing' if and only if it isn't bound by 'tg_reg'.
 
 data ThreadGraph a = TG { tg_ret :: !ThreadID,
-                          tg_reg :: Map ThreadID RegID,
-                          tg_thr :: Map ThreadID [Insn a] }
+                          tg_reg :: IntMap RegID,
+                          tg_thr :: IntMap [Insn a] }
   deriving (Show, Eq)
 
 type ThreadID = Int
 type RegID    = Int
+
 
 -- | A single transformation within a thread. 'LoadVal' and 'LoadVar' are used
 --   only at the beginning of a thread to initialize the register.
@@ -56,6 +62,14 @@ data Insn a = LoadVal !a
   deriving (Eq, Show)
 
 
+-- | Register read latency, used for scheduling purposes. This is relevant only
+--   for out-of-order processors. If your processor serializes every
+--   instruction, then this will always be zero.
+type RegDelay = Double
+
+
+-- | Takes a 'Sym' expression and reduces it to a thread graph. Every thread
+--   begins with a 'Load' instruction.
 thread :: SymConstraints f a => Sym f a -> ThreadGraph a
 thread s = TG ret empty g
   where
@@ -89,3 +103,18 @@ thread s = TG ret empty g
     t ++= is = do is' <- is
                   modify' (adjust (++ is') t)
                   return t
+
+
+-- | Returns an ordered list of threads that can be started. The list is ordered
+--   by scheduling preference: if you always started the first thread in the
+--   list, you should minimize the amount of time registers spend in a
+--   zero-latency state (i.e. you should keep the processor maximally busy,
+--   which is a good thing).
+startable :: (RegID -> RegDelay) -> ThreadGraph a -> [ThreadID]
+startable rs (TG _ tr tg) = []
+
+
+-- | Returns threads whose next instructions can be executed, sorted by
+--   increasing register access latency.
+runnable :: (RegID -> RegDelay) -> ThreadGraph a -> [ThreadID]
+runnable _ _ = []
