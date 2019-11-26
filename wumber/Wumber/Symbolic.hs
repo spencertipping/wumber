@@ -313,6 +313,7 @@ data SymFn1 = Abs
 
             -- These functions aren't used directly by Sym, but may be emitted
             -- during JIT compilation (and have corresponding C math functions).
+            | Negate
             | Sqrt
 
   deriving (Show, Ord, Eq, Generic, Binary, Enum)
@@ -345,6 +346,7 @@ instance NumConstraints a => Functionable SymFn1 (a -> a) where
   fn Log      = log
   fn Exp      = exp
   fn Sqrt     = sqrt
+  fn Negate   = negate
   fn Sin      = sin
   fn Cos      = cos
   fn Tan      = tan

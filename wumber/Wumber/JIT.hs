@@ -115,6 +115,7 @@ instance Functionable SymFn1 (FunPtr (F1 Double)) where
   fn Log      = p_log
   fn Exp      = p_exp
   fn Sqrt     = p_sqrt
+  fn Negate   = p_negate
   fn Sin      = p_sin
   fn Cos      = p_cos
   fn Tan      = p_tan
@@ -138,6 +139,7 @@ instance Functionable SymFn1 (FunPtr (F1 Float)) where
   fn Log      = p_logf
   fn Exp      = p_expf
   fn Sqrt     = p_sqrtf
+  fn Negate   = p_negatef
   fn Sin      = p_sinf
   fn Cos      = p_cosf
   fn Tan      = p_tanf
@@ -175,6 +177,7 @@ p_rem      = unsafePerformIO $ fn2_dbl_p \x y -> return (x `rem` y)
 
 p_signum   = unsafePerformIO $ fn1_dbl_p (return . signum)
 p_truncate = unsafePerformIO $ fn1_dbl_p (return . truncate)
+p_negate   = unsafePerformIO $ fn1_dbl_p (return . negate)
 
 
 foreign import ccall "wrapper" fn1_float_p :: F1 Float  -> IO (FunPtr (F1 Float))
@@ -189,6 +192,7 @@ p_remf      = unsafePerformIO $ fn2_float_p \x y -> return (x `rem` y)
 
 p_signumf   = unsafePerformIO $ fn1_float_p (return . signum)
 p_truncatef = unsafePerformIO $ fn1_float_p (return . truncate)
+p_negatef   = unsafePerformIO $ fn1_float_p (return . negate)
 
 
 foreign import ccall "math.h &pow"   p_pow   :: FunPtr (Double -> Double -> IO Double)
