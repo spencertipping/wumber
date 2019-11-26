@@ -23,7 +23,8 @@ module Wumber.JITIR where
 import Control.Applicative ((<|>))
 import Control.Monad.State (State, gets, modify', runState)
 import Data.IntMap.Strict  (IntMap, (!), (!?), adjust, assocs, delete, elems,
-                            empty, keys, insert, lookupMax)
+                            empty, keys, insert, lookupMax, member)
+import Data.List           (sortOn)
 import Data.Maybe          (fromJust)
 
 import Wumber.Symbolic
@@ -111,10 +112,14 @@ thread s = TG ret empty g
 --   zero-latency state (i.e. you should keep the processor maximally busy,
 --   which is a good thing).
 startable :: (RegID -> RegDelay) -> ThreadGraph a -> [ThreadID]
-startable rs (TG _ tr tg) = []
+startable rd (TG _ tr tg) = []
 
 
 -- | Returns threads whose next instructions can be executed, sorted by
---   increasing register access latency.
-runnable :: (RegID -> RegDelay) -> ThreadGraph a -> [ThreadID]
-runnable _ _ = []
+--   increasing register access latency. Generally, a JIT backend should try to
+--   advance every thread whose 'RegDelay' is zero.
+runnable :: (RegID -> RegDelay) -> ThreadGraph a -> [(ThreadID, RegDelay)]
+runnable rd (TG _ tr tg) = sortOn snd ts
+  where
+    running = filter (flip member tr) (keys tg)
+    ts      = []
