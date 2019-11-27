@@ -110,30 +110,16 @@ thread s = TG ret empty g
 --   by scheduling preference: if you have /n/ registers available, you should
 --   start the first /n/ or /n - 1/ threads in the list. This should jointly
 --   minimize the time spent in 'startable', and the time registers spend pinned
---   to return values -- although this function only approximates that minimum
---   because I'm a millennial.
+--   to return values -- although this function only approximates the optimal
+--   solution because I'm a millennial.
 --
---   The basic principle at work here is that, without knowing anything about
---   instruction latencies, we want to start threads such that they finish in
---   the order in which their results are needed. This amounts to avoiding two
---   cases:
+--   TODO figure this out
 --
---   1. A thread is holding a register but is stalled waiting for a dependency.
---   2. A thread has finished but its return value has not yet been used (this
---      also holds a register).
---
---   We also need to make sure that the set of threads we've started at any
---   given moment will end up freeing registers as they complete. That is, if
---   two threads are running, one should depend on the other so we can consume
---   its return value. This property makes it possible for us to guarantee
---   progress without knowing how many registers the backend has, and without
---   requiring the backend to spill to memory.
+--   1. No upper bound on #registers required to evaluate a graph
+--   2. How expensive do we assume it is to spill things?
 
 startable :: (RegID -> RegDelay) -> ThreadGraph a -> [ThreadID]
-startable rd (TG _ tr tg) = dependencies ++ new_starts
-  where
-    dependencies = []
-    new_starts   = []
+startable rd (TG _ tr tg) = []
 
 
 -- | Returns threads whose next instructions can be executed, sorted by
