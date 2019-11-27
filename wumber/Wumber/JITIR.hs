@@ -42,8 +42,10 @@ import Wumber.Symbolic
 --   This is used by scheduling functions like 'startable' and 'runnable' to
 --   prioritize thread advancement.
 --
---   NOTE: 'tg_reg' and register states are coordinated: a register is
---   'Nothing' if and only if it isn't bound by 'tg_reg'.
+--   NOTE: a graph may require an arbitrary number of registers to evaluate,
+--   sometimes more than the processor can provide. In this case 'RegID' values
+--   will exceed the number of physical registers and the JIT backend is
+--   expected to spill registers onto the stack or other memory.
 
 data ThreadGraph a = TG { tg_ret :: !ThreadID,
                           tg_reg :: IntMap RegID,
@@ -106,20 +108,29 @@ thread s = TG ret empty g
                   return t
 
 
+-- | Returns the minimum number of /additional/ registers required to evaluate
+--   the specified thread within the graph. Threads that are already bound to
+--   registers don't count against the total.
+required_registers :: ThreadGraph a -> ThreadID -> Int
+required_registers (TG _ tr g) t = 0    -- TODO
+
+
+-- | Returns a list of threads upon whose results the specified thread depends.
+thread_dependencies :: ThreadGraph a -> ThreadID -> [ThreadID]
+thread_dependencies (TG _ _ g) t = concatMap deps (g ! t)
+  where deps (I2 _ t) = [t]
+        deps _        = []
+
+
 -- | Returns an ordered list of threads that can be started. The list is ordered
 --   by scheduling preference: if you have /n/ registers available, you should
 --   start the first /n/ or /n - 1/ threads in the list. This should jointly
 --   minimize the time spent in 'startable', and the time registers spend pinned
 --   to return values -- although this function only approximates the optimal
 --   solution because I'm a millennial.
---
---   TODO figure this out
---
---   1. No upper bound on #registers required to evaluate a graph
---   2. How expensive do we assume it is to spill things?
 
-startable :: (RegID -> RegDelay) -> ThreadGraph a -> [ThreadID]
-startable rd (TG _ tr tg) = []
+startable :: Int -> (RegID -> RegDelay) -> ThreadGraph a -> [ThreadID]
+startable nregs rd (TG _ tr tg) = []
 
 
 -- | Returns threads whose next instructions can be executed, sorted by
