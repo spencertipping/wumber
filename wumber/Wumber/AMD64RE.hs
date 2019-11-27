@@ -1,6 +1,8 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE BangPatterns #-}
 
+{-# OPTIONS_GHC -funbox-strict-fields #-}
+
 -- | Reverse-engineer operation timings on AMD64 processors. This allows us to
 --   generalize optimization logic across multiple processor models, which is a
 --   lot easier than digging through the instruction latency/throughput tables

@@ -97,29 +97,66 @@ thread s = TG ret empty g
                                     at ++= return [I2 f bt]
     -- TODO: FnN
 
+    f <.> g  = fmap f . g
     thr is   = do id <- gets $ \m -> fromJust (fst <$> lookupMax m <|> Just (-1))
                   modify' $ insert (id + 1) is
                   return  $ id + 1
-    f <.> g  = fmap f . g
     t ++= is = do is' <- is
                   modify' (adjust (++ is') t)
                   return t
 
 
 -- | Returns an ordered list of threads that can be started. The list is ordered
---   by scheduling preference: if you always started the first thread in the
---   list, you should minimize the amount of time registers spend in a
---   zero-latency state (i.e. you should keep the processor maximally busy,
---   which is a good thing).
+--   by scheduling preference: if you have /n/ registers available, you should
+--   start the first /n/ or /n - 1/ threads in the list. This should jointly
+--   minimize the time spent in 'startable', and the time registers spend pinned
+--   to return values -- although this function only approximates that minimum
+--   because I'm a millennial.
+--
+--   The basic principle at work here is that, without knowing anything about
+--   instruction latencies, we want to start threads such that they finish in
+--   the order in which their results are needed. This amounts to avoiding two
+--   cases:
+--
+--   1. A thread is holding a register but is stalled waiting for a dependency.
+--   2. A thread has finished but its return value has not yet been used (this
+--      also holds a register).
+--
+--   We also need to make sure that the set of threads we've started at any
+--   given moment will end up freeing registers as they complete. That is, if
+--   two threads are running, one should depend on the other so we can consume
+--   its return value. This property makes it possible for us to guarantee
+--   progress without knowing how many registers the backend has, and without
+--   requiring the backend to spill to memory.
+
 startable :: (RegID -> RegDelay) -> ThreadGraph a -> [ThreadID]
-startable rd (TG _ tr tg) = []
+startable rd (TG _ tr tg) = dependencies ++ new_starts
+  where
+    dependencies = []
+    new_starts   = []
 
 
 -- | Returns threads whose next instructions can be executed, sorted by
 --   increasing register access latency. Generally, a JIT backend should try to
---   advance every thread whose 'RegDelay' is zero.
+--   advance every thread whose 'RegDelay' is zero before calling 'runnable'
+--   again. This should minimize register latencies and time spent in the
+--   scheduler.
 runnable :: (RegID -> RegDelay) -> ThreadGraph a -> [(ThreadID, RegDelay)]
-runnable rd (TG _ tr tg) = sortOn snd ts
+runnable rd (TG _ tr tg) = sortOn snd $ map (adjoin latency) running
   where
-    running = filter (flip member tr) (keys tg)
-    ts      = []
+    adjoin f x  = (x, f x)
+    running     = filter steppable $ filter (flip member tr) $ keys tg
+
+    steppable t = case tg ! t of
+      []            -> False
+      LoadVal _ : _ -> True
+      LoadVar _ : _ -> True
+      I1 _      : _ -> True
+      I2 _ t'   : _ -> null (tg ! t') && member t' tr
+
+    latency t = max (rd (tr ! t)) $ case tg ! t of
+      []            -> error "finished thread has no latency (internal error)"
+      LoadVal _ : _ -> 0
+      LoadVar _ : _ -> 0
+      I1 _      : _ -> 0
+      I2 _ t'   : _ -> rd (tr ! t')
