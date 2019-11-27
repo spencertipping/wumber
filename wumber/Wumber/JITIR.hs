@@ -23,8 +23,8 @@ module Wumber.JITIR where
 import Control.Applicative ((<|>))
 import Control.Monad.State (State, gets, modify', runState)
 import Data.IntMap.Strict  (IntMap, (!), (!?), adjust, assocs, delete, elems,
-                            empty, keys, insert, lookupMax, member)
-import Data.List           (sortOn)
+                            empty, keys, insert, lookupMax, member, size)
+import Data.List           (foldl', sortOn)
 import Data.Maybe          (fromJust)
 
 import Wumber.Symbolic
@@ -111,13 +111,35 @@ thread s = TG ret empty g
 -- | Returns the minimum number of /additional/ registers required to evaluate
 --   the specified thread within the graph. Threads that are already bound to
 --   registers don't count against the total.
+--
+--   The logic here is a bit subtle because we can choose when to start each
+--   thread. For example, suppose we have something like this:
+--
+--   @
+--   t1 : [LoadVal 0, I2 Add t2, I2 Add t3]
+--   t2 : [...]   -- requires 6 registers
+--   t3 : [...]   -- requires 3 registers
+--   @
+--
+--   It might seem like we need seven total registers since we have one pinned
+--   to 't1'. In fact, though, we need only six: we can run the entirety of 't2'
+--   before we even begin executing 't1'.
+--
+--   TODO: is it worthwhile to optimize things this way? Is spilling a register
+--   really that awful?
+
 required_registers :: ThreadGraph a -> ThreadID -> Int
-required_registers (TG _ tr g) t = 0    -- TODO
+required_registers tg@(TG _ tr g) t = this + deps
+  where this = if member t tr then 0 else 1
+        deps = foldl' max 0
+               $ map (required_registers tg)
+               $ thread_dependencies (g ! t)
 
 
--- | Returns a list of threads upon whose results the specified thread depends.
-thread_dependencies :: ThreadGraph a -> ThreadID -> [ThreadID]
-thread_dependencies (TG _ _ g) t = concatMap deps (g ! t)
+-- | Returns a list of threads upon whose results the specified instructions
+--   depend.
+thread_dependencies :: [Insn a] -> [ThreadID]
+thread_dependencies is = concatMap deps is
   where deps (I2 _ t) = [t]
         deps _        = []
 
@@ -128,9 +150,14 @@ thread_dependencies (TG _ _ g) t = concatMap deps (g ! t)
 --   minimize the time spent in 'startable', and the time registers spend pinned
 --   to return values -- although this function only approximates the optimal
 --   solution because I'm a millennial.
+--
+--   TODO: what's the tradeoff between parallelism and register usage? Given
+--   that we have 'required_registers' and 'nregs', how much planning do we need
+--   to do before committing to a thread set?
 
 startable :: Int -> (RegID -> RegDelay) -> ThreadGraph a -> [ThreadID]
 startable nregs rd (TG _ tr tg) = []
+  where free = nregs - size tr
 
 
 -- | Returns threads whose next instructions can be executed, sorted by
