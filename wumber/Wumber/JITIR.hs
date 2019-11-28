@@ -24,7 +24,7 @@ import Control.Applicative ((<|>))
 import Control.Monad.State (State, gets, modify', runState)
 import Data.IntMap.Strict  (IntMap, (!), (!?), adjust, assocs, delete, elems,
                             empty, keys, insert, lookupMax, member, size)
-import Data.List           (foldl', sortOn)
+import Data.List           (foldl', groupBy, inits, sortOn)
 import Data.Maybe          (fromJust)
 import Data.Tuple          (swap)
 import Lens.Micro          ((&))
@@ -37,43 +37,33 @@ import Wumber.Symbolic
 
 
 -- | 'ThreadGraph' is an incremental data structure that keeps track of the
---   current register assignment for each thread, as well as the remaining
---   instruction queue for that thread. Any thread with an empty instruction
---   queue is removed from the graph.
+--   remaining instruction queue for that thread. Any thread with an empty
+--   instruction queue is considered "done" and its result is usable by other
+--   threads.
 --
 --   'tg_ret' indicates which thread contains the value we should return when no
 --   threads have instructions left to execute.
---
---   'tg_reg' contains mappings only for threads that have register allocations.
---   This is used by scheduling functions like 'startable' and 'runnable' to
---   prioritize thread advancement.
---
---   NOTE: a graph may require an arbitrarily large number of registers to
---   evaluate, sometimes more than the processor can provide. In this case
---   'RegID' values will exceed the number of physical registers and the JIT
---   backend is expected to spill registers onto the stack or other memory.
 
 data ThreadGraph a = TG { tg_ret :: !ThreadID,
-                          tg_reg :: IntMap RegID,
                           tg_thr :: IntMap [Insn a] }
   deriving (Eq)
 
 type ThreadID = Int
-type RegID    = Int
 
 instance Show a => Show (ThreadGraph a) where
-  show (TG r tr tg) = concatMap format (keys tg)
-    where format t = printf "% 3d % -4s % 3s %s\n"
+  show (TG r tg) = concatMap format (keys tg)
+    where format t = printf "% 3d %s %s\n"
                      t
                      (if t == r then "R" else " ")
-                     (if member t tr then printf "r=%d" (tr ! t) else "")
                      (concatMap (printf "%-8s" . show) (tg ! t) :: String)
 
 
--- | A single transformation within a thread. 'LoadVal' and 'LoadVar' are used
---   only at the beginning of a thread to initialize the register.
+-- | A single transformation within a thread. 'LoadVal', 'LoadVar', and
+--   'LoadThr' are used only at the beginning of a thread to set an initial
+--   value.
 data Insn a = LoadVal !a
             | LoadVar !VarID
+            | LoadThr !ThreadID
             | I1      !SymFn1
             | I2      !SymFn2 !ThreadID
   deriving (Eq, Ord)
@@ -81,20 +71,27 @@ data Insn a = LoadVal !a
 instance Show a => Show (Insn a) where
   show (LoadVal x) = "=" ++ show x
   show (LoadVar i) = "%" ++ show i
+  show (LoadThr t) = "t" ++ show t
   show (I1 f)      = show f
   show (I2 f t)    = printf "%.3s(%d)" (show f) t
 
 
--- | Register read latency, used for scheduling purposes. This is relevant only
---   for out-of-order processors. If your processor serializes every
---   instruction, then this will always be zero.
-type RegDelay = Double
+-- | Thread read latency, used for scheduling purposes. Usually threads will
+--   have nonzero latency arising from two factors:
+--
+--   1. The register for the thread has been spilled to memory.
+--   2. The thread exists in a register on a superscalar architecture, and
+--      accessing the register would stall the instruction pipeline.
+
+type Latency = Double
 
 
 -- | Takes a 'Sym' expression and reduces it to a thread graph. Every thread
---   begins with a 'Load' instruction.
+--   begins with a 'Load' instruction. The thread graph we return will be
+--   deduplicated, which means the set of thread IDs may not be dense.
+
 thread :: SymConstraints f a => Sym f a -> ThreadGraph a
-thread s = deduplicate $ TG ret empty g
+thread s = TG ret g & split_prefixes & deduplicate
   where
     (ret, g) = runState (pt s) empty
 
@@ -128,13 +125,25 @@ thread s = deduplicate $ TG ret empty g
                   return t
 
 
--- | Unifies threads that are guaranteed to produce the same results. This is
---   equivalent to common subexpression elimination.
+-- | Identifies instruction prefixes shared by multiple threads and splits them
+--   into separate threads. This results in stronger common subexpression
+--   elimination from 'deduplicate'.
+
+split_prefixes :: ThreadGraph a -> ThreadGraph a
+split_prefixes (TG r g) = TG r g'
+  where g' = g
+
+
+-- | Unifies threads that are guaranteed to produce the same results. This is a
+--   weak form of common subexpression elimination ("weak" because we don't also
+--   find shared instruction prefixes, even though every thread is a pure
+--   computation).
+
 deduplicate :: Ord a => ThreadGraph a -> ThreadGraph a
-deduplicate tg@(TG r th g)
-  | size th > 0      = error "can't deduplicate a running thread graph"
-  | size g' < size g = deduplicate (TG r' th g')
+deduplicate tg@(TG r g)
+  | size g' < size g = deduplicate (TG r' g')
   | otherwise        = tg
+
   where rindex = IM.toList g     & map swap & M.fromList
         g'     = M.toList rindex & map swap & map rewrite_all & IM.fromList
         r'     = reindex r
@@ -145,90 +154,31 @@ deduplicate tg@(TG r th g)
         reindex t           = rindex M.! (g ! t)
 
 
--- | Returns the minimum number of /additional/ registers required to evaluate
---   the specified thread within the graph. Threads that are already bound to
---   registers don't count against the total.
---
---   The logic here is a bit subtle because we can choose when to start each
---   thread. For example, suppose we have something like this:
---
---   @
---   t1 : [LoadVal 0, I2 Add t2, I2 Add t3]
---   t2 : [...]   -- requires 6 registers
---   t3 : [...]   -- requires 3 registers
---   @
---
---   Technically we need only six registers to evaluate 't1' because we can
---   evaluate 't2' first, hold the result, and then start 't1' and 't3'.
---   However, the context of this function is "how many registers do we need to
---   evaluate 't1' assuming we start it now" -- so we would return seven.
-
-required_registers :: ThreadGraph a -> ThreadID -> Int
-required_registers tg@(TG _ tr g) t = this + deps
-  where this = if member t tr then 0 else 1
-        deps = foldl' max 0
-               $ map (required_registers tg)
-               $ thread_dependencies (g ! t)
-
-
--- | Returns a list of threads upon whose results the specified instructions
---   depend.
-thread_dependencies :: [Insn a] -> [ThreadID]
-thread_dependencies is = concatMap deps is
-  where deps (I2 _ t) = [t]
-        deps _        = []
-
-
--- | Returns an ordered list of threads that can be started. The list is ordered
---   by scheduling preference: if you have /n/ registers available, you should
---   start the first /n/ or /n - 1/ threads in the list. This should jointly
---   minimize the time spent in 'startable', and the time registers spend pinned
---   to return values -- although this function only approximates the optimal
---   solution because I'm a millennial.
---
---   The basic idea is that we want to start threads that either allow running
---   threads to progress or consume return values from threads that will be done
---   soon. In each case we want to avoid spilling registers by making sure that
---   the set of running threads will produce instructions that reduce the number
---   of register pins as they progress -- although this isn't always possible.
---
---   Structurally, we want something similar to depth-first with limited fanout.
---   We can get a lot of this by starting with the thread we want to return,
---   then descending into dependencies until we have enough registers to start
---   those threads. I doubt this is the right long-term solution, but it's
---   simple and should do what we want for now.
---
---   TODO: optimize
-
-startable :: Int -> ThreadGraph a -> [ThreadID]
-startable nregs tg@(TG r tr g) = go r
-  where free = nregs - size tr
-        go t | required_registers tg t < free = [t]
-             | otherwise = concatMap go (thread_dependencies (g ! t))
-
-
 -- | Returns threads whose next instructions can be executed, sorted by
 --   increasing register access latency. Generally, a JIT backend should try to
---   advance every thread whose 'RegDelay' is zero before calling 'runnable'
+--   advance every thread whose 'Latency' is zero before calling 'runnable'
 --   again. This should minimize register latencies and time spent in the
 --   scheduler.
 
-runnable :: (RegID -> RegDelay) -> ThreadGraph a -> [(ThreadID, RegDelay)]
-runnable rd (TG _ tr tg) = sortOn snd $ map (adjoin latency) running
+runnable :: (ThreadID -> Latency) -> ThreadGraph a -> [(ThreadID, Latency)]
+runnable rd (TG _ g) = keys g & filter steppable
+                              & map (adjoin latency)
+                              & sortOn snd
   where
-    adjoin f x  = (x, f x)
-    running     = filter steppable $ filter (flip member tr) $ keys tg
+    adjoin f x = (x, f x)
 
-    steppable t = case tg ! t of
-      []            -> False
-      LoadVal _ : _ -> True
-      LoadVar _ : _ -> True
-      I1 _      : _ -> True
-      I2 _ t'   : _ -> null (tg ! t') && member t' tr
+    steppable t = case g ! t of
+      []             -> False
+      LoadVal _  : _ -> True
+      LoadVar _  : _ -> True
+      LoadThr t' : _ -> null (g ! t')
+      I1 _       : _ -> True
+      I2 _ t'    : _ -> null (g ! t')
 
-    latency t = max (rd (tr ! t)) $ case tg ! t of
-      []            -> error "finished thread has no latency (internal error)"
-      LoadVal _ : _ -> 0
-      LoadVar _ : _ -> 0
-      I1 _      : _ -> 0
-      I2 _ t'   : _ -> rd (tr ! t')
+    latency t = max (rd t) $ case g ! t of
+      []             -> error "finished thread can't be stepped (internal error)"
+      LoadVal _  : _ -> 0
+      LoadVar _  : _ -> 0
+      LoadThr t' : _ -> rd t'
+      I1 _       : _ -> 0
+      I2 _ t'    : _ -> rd t'
