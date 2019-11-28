@@ -86,12 +86,19 @@ instance Show a => Show (Insn a) where
 type Latency = Double
 
 
+-- | Returns the number of threads referred to by a thread graph. This is an
+--   upper bound on the number of local variable slots you should allocate.
+n_threads :: ThreadGraph a -> Int
+n_threads (TG _ g) = size g
+
+
 -- | Takes a 'Sym' expression and reduces it to a thread graph. Every thread
 --   begins with a 'Load' instruction. The thread graph we return will be
---   deduplicated, which means the set of thread IDs may not be dense.
+--   deduplicated, but will have a dense set of thread IDs. This means thread
+--   IDs can be mapped directly to local variable offsets in an 'alloca' region.
 
 thread :: SymConstraints f a => Sym f a -> ThreadGraph a
-thread s = TG ret g & split_prefixes & deduplicate
+thread s = TG ret g & deduplicate
   where
     (ret, g) = runState (pt s) empty
 
@@ -125,33 +132,30 @@ thread s = TG ret g & split_prefixes & deduplicate
                   return t
 
 
--- | Identifies instruction prefixes shared by multiple threads and splits them
---   into separate threads. This results in stronger common subexpression
---   elimination from 'deduplicate'.
-
-split_prefixes :: ThreadGraph a -> ThreadGraph a
-split_prefixes (TG r g) = TG r g'
-  where g' = g
-
-
 -- | Unifies threads that are guaranteed to produce the same results. This is a
 --   weak form of common subexpression elimination ("weak" because we don't also
 --   find shared instruction prefixes, even though every thread is a pure
 --   computation).
+--
+--   The graph is compacted so there are no holes in the space of thread IDs.
 
 deduplicate :: Ord a => ThreadGraph a -> ThreadGraph a
-deduplicate tg@(TG r g)
-  | size g' < size g = deduplicate (TG r' g')
-  | otherwise        = tg
+deduplicate tg@(TG r g) | size g' < size g = deduplicate (TG r' g')
+                        | otherwise        = TG (k' ! r) compact
 
-  where rindex = IM.toList g     & map swap & M.fromList
-        g'     = M.toList rindex & map swap & map rewrite_all & IM.fromList
-        r'     = reindex r
+  where ri = assocs g & map swap & M.fromList
+        g' = M.toList ri & map swap & IM.fromList & IM.map (rewrite_all reindex)
+        r' = reindex r
 
-        rewrite_all (t, is) = (t, map rewrite is)
-        rewrite (I2 f t)    = I2 f (reindex t)
-        rewrite i           = i
-        reindex t           = rindex M.! (g ! t)
+        k'      = zip (keys g) [0..] & IM.fromList
+        compact = IM.assocs g & map (\(k, is) -> (k' ! k, rewrite_all (k' !) is))
+                              & IM.fromList
+
+        rewrite_all m is = map (rewrite m) is
+        reindex t        = ri M.! (g ! t)
+
+        rewrite m (I2 f t) = I2 f (m t)
+        rewrite _ i        = i
 
 
 -- | Returns threads whose next instructions can be executed, sorted by
@@ -162,11 +166,9 @@ deduplicate tg@(TG r g)
 
 runnable :: (ThreadID -> Latency) -> ThreadGraph a -> [(ThreadID, Latency)]
 runnable rd (TG _ g) = keys g & filter steppable
-                              & map (adjoin latency)
+                              & map (\t -> (t, latency t))
                               & sortOn snd
   where
-    adjoin f x = (x, f x)
-
     steppable t = case g ! t of
       []             -> False
       LoadVal _  : _ -> True
