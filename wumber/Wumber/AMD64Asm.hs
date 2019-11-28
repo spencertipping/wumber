@@ -1,8 +1,13 @@
 {-# LANGUAGE BlockArguments #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
--- | JIT backend for the AMD64 instruction set with SSE2. Consumes SSA from
---   JITIR and returns 'ByteString's of machine code.
+-- | JIT backend for the AMD64 instruction set with SSE2. Consumes
+--   'ThreadGraph's from 'JITIR' and emits machine code.
+--
+--   You can calculate instruction latencies for your processor using 'AMD64RE'.
+--   This should result in more accurate timing predictions, which should
+--   improve instruction scheduling.
+
 module Wumber.AMD64Asm where
 
 
@@ -11,12 +16,14 @@ import Control.Monad.State (StateT, execStateT)
 import Control.Monad.RWS   (tell)
 import Data.Bits           (shiftL, shiftR, (.|.), (.&.))
 import Data.Maybe          (fromJust)
+import Data.IntMap         (IntMap(..))
 import Foreign.Ptr         (FunPtr(..), WordPtr(..))
 import GHC.Word            (Word8(..), Word16(..))
 
 import qualified Data.ByteString         as BS
 import qualified Data.ByteString.Builder as B
 import qualified Data.ByteString.Lazy    as BL
+import qualified Data.IntMap             as IM
 import qualified Foreign.Ptr             as P
 
 import Wumber.Assembler
@@ -25,14 +32,25 @@ import Wumber.JITIR
 import Wumber.Symbolic
 
 
--- TODO
--- Allocate registers, keep track of register dependencies and instruction
--- latencies. You know, real JIT stuff.
+-- | AMD64 assembler monad, which tracks register assignments, deadlines, and
+--   maintains a processor model that can be used to calculate expected
+--   latencies.
+type Asm = Assembler InsnLatencyModel ProcessorState
 
-type ProcessorState = ()
+
+-- | A model of the processor that represents the current time ('ps_t'), the
+--   estimated deadline for each XMM register ('ps_rd'), and a mapping from
+--   resident threads to XMM registers ('ps_tr').
+data ProcessorState = PS { ps_t  :: Double,
+                           ps_rd :: IntMap Double,
+                           ps_tr :: IntMap XMMReg }
+  deriving (Show, Eq)
 
 type XMMReg = Word8
-type Asm    = Assembler () ProcessorState
+
+
+-- TODO: a model that provides an expected deadline for any given instruction.
+type InsnLatencyModel = ()
 
 
 assemble_ssa :: (SSAReg, [SSA Double]) -> BS.ByteString
