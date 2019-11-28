@@ -138,6 +138,8 @@ thread s = TG ret g & deduplicate
 --   computation).
 --
 --   The graph is compacted so there are no holes in the space of thread IDs.
+--
+--   TODO: factor common prefixes into shared threads, then use 'LoadThr'
 
 deduplicate :: Ord a => ThreadGraph a -> ThreadGraph a
 deduplicate tg@(TG r g) | size g' < size g = deduplicate (TG r' g')
@@ -161,8 +163,7 @@ deduplicate tg@(TG r g) | size g' < size g = deduplicate (TG r' g')
 -- | Returns threads whose next instructions can be executed, sorted by
 --   increasing register access latency. Generally, a JIT backend should try to
 --   advance every thread whose 'Latency' is zero before calling 'runnable'
---   again. This should minimize register latencies and time spent in the
---   scheduler.
+--   again.
 
 runnable :: (ThreadID -> Latency) -> ThreadGraph a -> [(ThreadID, Latency)]
 runnable rd (TG _ g) = keys g & filter steppable

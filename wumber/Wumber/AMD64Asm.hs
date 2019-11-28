@@ -48,18 +48,23 @@ data ProcessorState = PS { ps_t  :: Double,
 
 type XMMReg = Word8
 
+init_ps :: ProcessorState
+init_ps = PS 0 all_zero IM.empty
+  where all_zero = IM.fromAscList $ [ (r, 0) | r <- [0..15] ]
+
 
 -- TODO: a model that provides an expected deadline for any given instruction.
 type InsnLatencyModel = ()
 
 
-assemble_ssa :: (SSAReg, [SSA Double]) -> BS.ByteString
-assemble_ssa (nregs, insns) = assemble m () ()
-  where m = do enter nregs
+assemble_graph :: ThreadGraph Double -> BS.ByteString
+assemble_graph tg@(TG r g) = assemble m () init_ps
+  where m = do enter (n_threads tg)
                mapM_ assemble' insns
+               leave_ret r
 
 
-enter :: SSAReg -> Asm ()
+enter :: ThreadID -> Asm ()
 enter nregs = do
   hex "c8"
   tell $ B.word16LE (fromIntegral $ nregs * 8)
@@ -110,22 +115,22 @@ modrm :: Word8 -> Word8 -> Word8 -> Word8
 modrm mod r m = shiftL mod 6 .|. shiftL (r .&. 0x07) 3 .|. m .&. 0x07
 
 
-rbp32 :: SSAReg -> Asm ()
-rbp32 s = tell $ B.int32LE (fromIntegral $ (s + 1) * (-8))
+rbp32 :: ThreadID -> Asm ()
+rbp32 t = tell $ B.int32LE (fromIntegral $ (t + 1) * (-8))
 
 
 movq_mr = rexw_modrm "" "8b"
 movq_rm = rexw_modrm "" "89"
 
-movsd_mr :: SSAReg -> XMMReg -> Asm ()
-movsd_mr s x = do
+movsd_mr :: ThreadID -> XMMReg -> Asm ()
+movsd_mr t x = do
   rex0_modrm "f3" "0f7e" 2 x 5
-  rbp32 s
+  rbp32 t
 
-movsd_rm :: XMMReg -> SSAReg -> Asm ()
-movsd_rm x s = do
+movsd_rm :: XMMReg -> ThreadID -> Asm ()
+movsd_rm x t = do
   rex0_modrm "66" "0fd6" 2 x 5
-  rbp32 s
+  rbp32 t
 
 movsd_ar :: Int -> XMMReg -> Asm ()
 movsd_ar i x = do
