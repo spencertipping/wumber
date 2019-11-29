@@ -98,6 +98,20 @@ model = moved_by (V3 0 1.1 0) (bolt 0.5 0.4) `iunion` scs
     moved_by t f v = f (v - t)
 
 
+show_model :: IO ()
+show_model =
+  putStrLn (show (model (V3 (var 0) (var 1) (var 2)) :: Sym () Double))
+
+show_model_graph :: IO ()
+show_model_graph =
+  putStrLn (show (thread (model (V3 (var 0) (var 1) (var 2)) :: Sym () Double)))
+
+show_model_asm :: IO ()
+show_model_asm =
+  ndisasm (jit_as_machinecode (model (V3 (var 0) (var 1) (var 2)) :: Sym () Double))
+    >>= BS.hPut stdout
+
+
 debug :: VS.Vector Double -> Sym () Double -> BS.ByteString -> IO ()
 debug v sym machinecode = do
   when show_expressions $ putStrLn (show (VS.length v, sym))

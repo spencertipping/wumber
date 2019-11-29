@@ -107,6 +107,7 @@ data Sym f a     = [SymTerm f a] :+ a deriving (     Eq, Generic, Binary)
 data SymTerm f a = a :* [SymExp f a]  deriving (Ord, Eq, Generic, Binary)
 data SymExp f a  = SymVar f a :** a   deriving (Ord, Eq, Generic, Binary)
 data SymVar f a  = Var !VarID
+                 | Poly (OrdSym f a)
                  | Fn1 !SymFn1 (Set VarID) (OrdSym f a)
                  | Fn2 !SymFn2 (Set VarID) (OrdSym f a) (OrdSym f a)
                  | FnN !f      (Set VarID) [OrdSym f a]
@@ -193,6 +194,7 @@ instance ShowConstraints f a => Show (SymVar f a) where
   show (Var 2)       = "z"
   show (Var 3)       = "t"
   show (Var i)       = "v" ++ show i
+  show (Poly v)      = "(" ++ show v ++ ")"
   show (Fn1 f _ x)   = show f ++ "(" ++ show x ++ ")"
   show (Fn2 f _ x y) = show f ++ "(" ++ show x ++ ", " ++ show y ++ ")"
   show (FnN f _ xs)  = show f ++ "(" ++ intercalate ", " (map show xs) ++ ")"
@@ -205,6 +207,7 @@ eval f (ts :+ b) = b + sum (map eval_t ts)
   where eval_t (a :* xs)                = a * product (map eval_e xs)
         eval_e (x :** n)                = eval_v x ** n
         eval_v (Var i)                  = f i
+        eval_v (Poly (OS v))            = eval f v
         eval_v (Fn1 op _ (OS x))        = fn op (eval f x)
         eval_v (Fn2 op _ (OS x) (OS y)) = fn op (eval f x) (eval f y)
         eval_v (FnN op _ xs)            = fn op (map (eval f . unOS) xs)
@@ -385,6 +388,7 @@ vars_in (xs :+ b) = unions (map vars_in_t xs)
   where vars_in_t (a :* xs)     = unions (map vars_in_e xs)
         vars_in_e (x :** n)     = vars_in_v x
         vars_in_v (Var i)       = singleton i
+        vars_in_v (Poly (OS v)) = vars_in v
         vars_in_v (Fn1 _ v _)   = v
         vars_in_v (Fn2 _ v _ _) = v
         vars_in_v (FnN _ v _)   = v

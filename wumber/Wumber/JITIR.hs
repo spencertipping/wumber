@@ -62,6 +62,7 @@ data Insn a = LoadVal !a
             | LoadThr !ThreadID
             | I1      !SymFn1
             | I2      !SymFn2 !ThreadID
+            | I2C     !SymFn2 !a
   deriving (Eq, Ord)
 
 
@@ -96,6 +97,7 @@ instance Show a => Show (Insn a) where
   show (LoadThr t) = "t" ++ show t
   show (I1 f)      = show f
   show (I2 f t)    = printf "%.3s(%d)" (show f) t
+  show (I2C f x)   = printf "%.3s(%s)" (show f) (show x)
 
 
 -- | Returns the number of threads referred to by a thread graph. This is an
@@ -142,14 +144,16 @@ thread s = TG ret g & deduplicate
     et (v :** 1)   = vt v
     et (v :** 0.5) = vt v >>= (++= return [I1 Sqrt])
     et (v :** n)   = do t <- vt v
-                        e <- thr [LoadVal n]
-                        t ++= return [I2 Pow e]
+                        t ++= return [I2C Pow n]
 
-    vt (Var i)                 = thr [LoadVar i]
-    vt (Fn1 f _ (OS a))        = pt a >>= (++= return [I1 f])
-    vt (Fn2 f _ (OS a) (OS b)) = do at <- pt a
-                                    bt <- pt b
-                                    at ++= return [I2 f bt]
+    vt (Var i)                         = thr [LoadVar i]
+    vt (Poly (OS v))                   = pt v
+    vt (Fn1 f _ (OS a))                = pt a >>= (++= return [I1 f])
+    vt (Fn2 f _ (OS a) (OS ([] :+ b))) = do at <- pt a
+                                            at ++= return [I2C f b]
+    vt (Fn2 f _ (OS a) (OS b))         = do at <- pt a
+                                            bt <- pt b
+                                            at ++= return [I2 f bt]
     -- TODO: FnN
 
     f <.> g  = fmap f . g
@@ -233,6 +237,7 @@ runnable rd (TG _ g) = keys g & filter steppable
       LoadVar _  : _ -> True
       LoadThr t' : _ -> null (g ! t')
       I1 _       : _ -> True
+      I2C _ _    : _ -> True
       I2 _ t'    : _ -> null (g ! t')
 
     latency t = max (rd t) $ case g ! t of
@@ -241,4 +246,5 @@ runnable rd (TG _ g) = keys g & filter steppable
       LoadVar _  : _ -> 0
       LoadThr t' : _ -> rd t'
       I1 _       : _ -> 0
+      I2C _ _    : _ -> 0
       I2 _ t'    : _ -> rd t'

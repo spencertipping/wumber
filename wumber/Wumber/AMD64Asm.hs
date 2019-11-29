@@ -100,6 +100,7 @@ movsd_ar i x = rex0_modrm "f3" "0f7e" 2 x rdi >> tell (B.word32LE $ fi $ i * 8)
 
 -- | Loads the specified constant into an XMM register via '%rax'.
 movconst_r :: Double -> XMMReg -> Asm' ()
+movconst_r 0 r = pxor 3 r r
 movconst_r x r = do hex "48b8"
                     tell $ B.doubleLE x
                     rexw_modrm "66" "0f6e" 3 r 0
@@ -129,6 +130,10 @@ maxsd = rex0_modrm "f2" "0f5f"
 minsd = rex0_modrm "f2" "0f5d"
 
 addpd = rex0_modrm "66" "0f58"
+
+pxor = rex0_modrm "66" "0fef"
+
+sqrtsd = rex0_modrm "f2" "0f51"
 
 
 -- GPR
