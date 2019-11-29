@@ -95,23 +95,23 @@ isotree18 = just_tree model_fn (BB (-2) 2) 12 18 0.1
 isotree24 = just_tree model_fn (BB (-2) 2) 18 24 0.1
 
 
-benchmarks = trace info bs
+benchmarks = bs
   where info = printf "isotree12: %d; isotree18: %d; isotree24: %d\n"
                       (t_size isotree12) (t_size isotree18) (t_size isotree24)
         bs = [
-          bench "model/jit"  (nf model_fn  (V3 0.5 1 2 :: V3 Double)),
+          bench "model/jit"  (nf model_fn  (V3 0.5 1 2 :: V3 Double))
           -- bench "model/jit2" (nf model2_fn (V3 0.5 1 2 :: V3 Double)),
           -- bench "model/ghc"  (nf model     (V3 0.5 1 2 :: V3 Double)),
 
-          bench "tree/jit"  (nf (t_size . just_tree model_fn  (BB (-2) 2) 6 12) 0.1),
+          -- bench "tree/jit"  (nf (t_size . just_tree model_fn  (BB (-2) 2) 6 12) 0.1),
           -- bench "tree/jit2" (nf (t_size . just_tree model2_fn (BB (-2) 2) 6 12) 0.1),
           -- bench "tree/hs"   (nf (t_size . just_tree model     (BB (-2) 2) 6 12) 0.1),
 
-          bench "contour/trace/12" (nf (length . trace_lines) isotree12),
-          bench "contour/trace/18" (nf (length . trace_lines) isotree18),
+          -- bench "contour/trace/12" (nf (length . trace_lines) isotree12),
+          -- bench "contour/trace/18" (nf (length . trace_lines) isotree18),
           -- bench "contour/trace/24" (nf (length . trace_lines) isotree24),
 
-          bench "contour12/jit"  (nf (length . iso_contour model_fn  (BB (-2) 2) 6 12) 0.1)
+          -- bench "contour12/jit"  (nf (length . iso_contour model_fn  (BB (-2) 2) 6 12) 0.1)
           -- bench "contour12/jit2" (nf (length . iso_contour model2_fn (BB (-2) 2) 6 12) 0.1),
           -- bench "contour12/hs"   (nf (length . iso_contour model     (BB (-2) 2) 6 12) 0.1)
           ]
