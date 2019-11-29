@@ -48,7 +48,6 @@
 + Sym API
   + Call back into Haskell/C
   + Piecewise/`cond`
-  + Horrible `Integer` embedding hack to bypass `forall` constraints
 + Sym compiler
   + Algebraic simplification
   + Alias local quantities (SSA variables)
@@ -57,9 +56,7 @@
   + Constant vector + indexing
 + JIT
   + Reverse-engineer instruction latency/throughput
-  + Register allocation
-  + Generate processor-optimized code
-  + Auto-vectorization
+  + Redo instruction scheduler
 + Constraints
   + Simplify linear subsystems
 + Simulation
