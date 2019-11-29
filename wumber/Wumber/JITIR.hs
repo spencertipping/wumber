@@ -1,5 +1,6 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -funbox-strict-fields -Wincomplete-patterns #-}
 
 -- | Intermediate representation for JITable expressions. This is the bulk of
@@ -28,6 +29,7 @@ import Data.List           (foldl', groupBy, inits, sortOn)
 import Data.Maybe          (fromJust)
 import Data.Tuple          (swap)
 import Lens.Micro          ((&))
+import Lens.Micro.TH       (makeLenses)
 import Text.Printf         (printf)
 
 import qualified Data.IntMap as IM
@@ -44,18 +46,11 @@ import Wumber.Symbolic
 --   'tg_ret' indicates which thread contains the value we should return when no
 --   threads have instructions left to execute.
 
-data ThreadGraph a = TG { tg_ret :: !ThreadID,
-                          tg_thr :: IntMap [Insn a] }
+data ThreadGraph a = TG { _tg_ret :: !ThreadID,
+                          _tg_thr :: IntMap [Insn a] }
   deriving (Eq)
 
 type ThreadID = Int
-
-instance Show a => Show (ThreadGraph a) where
-  show (TG r tg) = concatMap format (keys tg)
-    where format t = printf "% 3d %s %s\n"
-                     t
-                     (if t == r then "R" else " ")
-                     (concatMap (printf "%-8s" . show) (tg ! t) :: String)
 
 
 -- | A single transformation within a thread. 'LoadVal', 'LoadVar', and
@@ -68,6 +63,32 @@ data Insn a = LoadVal !a
             | I2      !SymFn2 !ThreadID
   deriving (Eq, Ord)
 
+
+-- | Thread read latency, used for scheduling purposes. Usually threads will
+--   have nonzero latency arising from two factors:
+--
+--   1. The register for the thread has been spilled to memory.
+--   2. The thread exists in a register on a superscalar architecture, and
+--      accessing the register would stall the instruction pipeline.
+type Latency = Double
+
+
+-- | Thread priority, used as a hint from functions like 'startable' to indicate
+--   relative importance. Higher values are higher priority.
+type Priority = Int
+
+
+makeLenses ''ThreadGraph
+makeLenses ''Insn
+
+
+instance Show a => Show (ThreadGraph a) where
+  show (TG r tg) = concatMap format (keys tg)
+    where format t = printf "% 3d %s %s\n"
+                     t
+                     (if t == r then "R" else " ")
+                     (concatMap (printf "%-8s" . show) (tg ! t) :: String)
+
 instance Show a => Show (Insn a) where
   show (LoadVal x) = "=" ++ show x
   show (LoadVar i) = "%" ++ show i
@@ -76,20 +97,21 @@ instance Show a => Show (Insn a) where
   show (I2 f t)    = printf "%.3s(%d)" (show f) t
 
 
--- | Thread read latency, used for scheduling purposes. Usually threads will
---   have nonzero latency arising from two factors:
---
---   1. The register for the thread has been spilled to memory.
---   2. The thread exists in a register on a superscalar architecture, and
---      accessing the register would stall the instruction pipeline.
-
-type Latency = Double
-
-
 -- | Returns the number of threads referred to by a thread graph. This is an
 --   upper bound on the number of local variable slots you should allocate.
 n_threads :: ThreadGraph a -> Int
 n_threads (TG _ g) = size g
+
+
+-- | Determines whether a thread is done running.
+complete :: ThreadGraph a -> ThreadID -> Bool
+complete (TG _ g) t = null (g ! t)
+
+
+-- | Steps the graph, pulling the next instruction for the specified thread. The
+--   thread must not be 'complete'.
+thread_step :: ThreadGraph a -> ThreadID -> (Insn a, ThreadGraph a)
+thread_step (TG r g) t = (head (g ! t), TG r (adjust tail t g))
 
 
 -- | Takes a 'Sym' expression and reduces it to a thread graph. Every thread
@@ -160,10 +182,34 @@ deduplicate tg@(TG r g) | size g' < size g = deduplicate (TG r' g')
         rewrite _ i        = i
 
 
+-- | Advises the backend about which threads should be started. At any given
+--   moment, we want to start threads that can either complete or do a lot of
+--   work before blocking on a dependency.
+--
+--   The 'cbias' parameter specifies the priority associated with finishing a
+--   thread. Higher values will cause 'startable' to focus more on threads that
+--   can run to completion without blocking on dependencies, which should free
+--   up other threads. The tradeoff is that doing too much of this may cause
+--   unnecessary register shuffling. (TODO: is this true?)
+
+startable :: Priority -> ThreadGraph a -> [(ThreadID, Priority)]
+startable cbias tg@(TG _ g) = assocs g & map priority & sortOn (negate . snd)
+  where priority (t, is) = (t, nonblocking_insns is)
+        block            = not . complete tg
+
+        nonblocking_insns (I2 _ t' : _) | block t' = 0
+        nonblocking_insns []                       = cbias
+        nonblocking_insns (i:is)                   = 1 + nonblocking_insns is
+
+
 -- | Returns threads whose next instructions can be executed, sorted by
 --   increasing register access latency. Generally, a JIT backend should try to
 --   advance every thread whose 'Latency' is zero before calling 'runnable'
 --   again.
+--
+--   Sometimes 'runnable' will provide no zero-latency threads, e.g. if
+--   registers have been spilled to memory. In that case you should step the
+--   first few threads and accept that there will be pipeline latency.
 
 runnable :: (ThreadID -> Latency) -> ThreadGraph a -> [(ThreadID, Latency)]
 runnable rd (TG _ g) = keys g & filter steppable
