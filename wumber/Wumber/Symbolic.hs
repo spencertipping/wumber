@@ -70,7 +70,8 @@ module Wumber.Symbolic (
   vars_in,
   var,
   val,
-  is_val
+  is_val,
+  sym
 ) where
 
 

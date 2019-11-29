@@ -30,7 +30,7 @@ import Wumber.Symbolic
 
 -- | Separates independent subsystems. This is the first thing we do when
 --   simplifying a set of constraints.
-subsystems :: [Constraint] -> [Subsystem]
+subsystems :: [Constraint f] -> [Subsystem f]
 subsystems cs = cs & map (\c -> ([c], constraint_deps c))
                    & group_by_overlap
                    & map fst
@@ -45,7 +45,8 @@ subsystems cs = cs & map (\c -> ([c], constraint_deps c))
 --
 --   'Subsystem' also collects the initial value of each variable and removes
 --   those elements from the 'Constraint' list.
-data Subsystem = Subsystem [Constraint] (V.Vector VarID) (VS.Vector R)
+
+data Subsystem f = Subsystem [Constraint f] (V.Vector VarID) (VS.Vector R)
   deriving (Show, Generic)
 
 
@@ -57,7 +58,7 @@ data Subsystem = Subsystem [Constraint] (V.Vector VarID) (VS.Vector R)
 --   This function should call into the algebraic simplification stuff so that
 --   our subsystems are fully reduced when they get sent off to the solver.
 
-subsystem :: [Constraint] -> Subsystem
+subsystem :: [Constraint f] -> Subsystem f
 subsystem cs = Subsystem cs (V.generate (maxid + 1) id) inits
   where maxid = S.findMax $ S.unions $ map constraint_deps cs
         inits = VS.generate (maxid + 1) (const 0) VS.// ivs
@@ -89,7 +90,7 @@ group_by_overlap ((l, s) : r)
 
 
 -- | The full set of variables referred to by a constraint.
-constraint_deps :: Constraint -> S.Set VarID
+constraint_deps :: Constraint f -> S.Set VarID
 constraint_deps (CEqual a b)      = vars_in a `S.union` vars_in b
 constraint_deps (CMinimize v)     = vars_in v
 constraint_deps (CInitialize i _) = S.singleton i

@@ -37,22 +37,21 @@ type Asm' t = forall a b. Assembler a b t
 type XMMReg = Word8
 
 
--- | Creates a stack frame sized for the specified thread graph. Uses the x86
---   'enter' instruction, which allows for up to 64K of local variables. '%rsp'
---   will be aligned to a 16-byte boundary.
-enter :: ThreadGraph a -> Asm' ()
-enter g = do hex "c8"
-             tell $ B.word16LE (fromIntegral $ n_threads g * 8)
-             hex "00"
-             hex "50"                   -- at least one more slot for %rdi backup
-             andqimm8 3 rsp (-16)       -- align %rsp to 16-byte boundary
+-- | Creates a stack frame sized for the specified number of locals. Uses the
+--   x86 'enter' instruction, which allows for up to 64K of local variables.
+--   '%rsp' will be aligned to a 16-byte boundary.
+frame_enter :: Int -> Asm' ()
+frame_enter n = do hex "c8"
+                   tell $ B.word16LE (fromIntegral $ n * 8)
+                   hex "00"
+                   hex "50"             -- at least one more slot for %rdi backup
+                   andqimm8 3 rsp (-16) -- align %rsp to 16-byte boundary
 
 
--- | Moves the specified thread's value into '%xmm0' to return it, and then runs
---   x86 'leave' and 'ret' to exit the function.
-leave_ret :: ThreadID -> Asm' ()
-leave_ret r = do -- TODO: shuffle return to xmm0
-                 hex "c9c3"
+-- | Runs x86 'leave' and 'ret' to exit the function, returning whatever is in
+--   '%xmm0'.
+frame_return :: Asm' ()
+frame_return = hex "c9c3"
 
 
 -- | General REX-aware ModR/M encoding. This is such a pain that it's worth
@@ -83,6 +82,10 @@ rbp32 :: ThreadID -> Asm' ()
 rbp32 t = tell $ B.int32LE (fromIntegral $ (t + 1) * (-8))
 
 
+-- | Moves the contents of one XMM register to another.
+movsd_rr :: XMMReg -> XMMReg -> Asm' ()
+movsd_rr r1 r2 = rex0_modrm "f3" "0f7e" 3 r1 r2
+
 -- | Loads a thread from memory into the specified XMM register.
 movsd_mr :: ThreadID -> XMMReg -> Asm' ()
 movsd_mr t x = rex0_modrm "f3" "0f7e" 2 x rbp >> rbp32 t
@@ -93,7 +96,13 @@ movsd_rm x t = rex0_modrm "66" "0fd6" 2 x rbp >> rbp32 t
 
 -- | Loads a 'Var' with the specified index into the given XMM register.
 movsd_ar :: Int -> XMMReg -> Asm' ()
-movsd_ar i x = rex0_modrm "f3" "0f7e" 2 x rbp >> tell (B.word32LE $ fi $ i * 8)
+movsd_ar i x = rex0_modrm "f3" "0f7e" 2 x rdi >> tell (B.word32LE $ fi $ i * 8)
+
+-- | Loads the specified constant into an XMM register via '%rax'.
+movconst_r :: Double -> XMMReg -> Asm' ()
+movconst_r x r = do hex "48b8"
+                    tell $ B.doubleLE x
+                    rexw_modrm "66" "0f6e" 3 r 0
 
 
 -- | Calls a function specified by its absolute address. This function does

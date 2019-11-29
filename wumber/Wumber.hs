@@ -39,11 +39,11 @@ import Wumber.SymbolicJIT
 
 -- | The 'Wumber' monad, which is how you convey state to the shell and render
 --   stuff.
-type Wumber = RWST () [Sym Double] Cursor IO
+type Wumber = RWST () [Sym () Double] Cursor IO
 
 
 sincos θ = (sin r, cos r) where r = θ / 360 * τ
 
 
-runWumber :: Cursor -> Wumber () -> IO [Sym Double]
+runWumber :: Cursor -> Wumber () -> IO [Sym () Double]
 runWumber c m = snd <$> execRWST m () c

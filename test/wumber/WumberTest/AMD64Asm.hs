@@ -1,7 +1,9 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
 
 module WumberTest.AMD64Asm where
 
@@ -22,7 +24,8 @@ import System.IO            (hClose, hFlush, stdout)
 import System.IO.Unsafe     (unsafePerformIO)
 import System.Posix.Types
 import System.Process
-import Test.QuickCheck      (quickCheckAll, Arbitrary(..), Gen(..), Property(..),
+import Test.QuickCheck      (quickCheck, quickCheckAll,
+                             Arbitrary(..), Gen(..), Property(..),
                              discard, counterexample, property, sized, (==>),
                              oneof, choose)
 
@@ -33,6 +36,7 @@ import qualified Data.ByteString.UTF8 as BU
 import qualified Data.Vector.Storable as VS
 
 import Wumber.AMD64Asm
+import Wumber.AMD64JIT
 import Wumber.ClosedComparable
 import Wumber.JIT
 import Wumber.JITIR
@@ -46,7 +50,7 @@ show_disassembly = False
 bulletproof_jit = False
 
 
-debug :: VS.Vector Double -> Sym Double -> BS.ByteString -> IO ()
+debug :: VS.Vector Double -> Sym () Double -> BS.ByteString -> IO ()
 debug v sym machinecode = do
   when show_expressions $ putStrLn (show (VS.length v, sym))
   when show_disassembly $ BS.hPut stdout =<< ndisasm machinecode
@@ -66,16 +70,22 @@ ndisasm code = do
 instance Arbitrary SymFn1 where arbitrary = genericArbitraryU
 instance Arbitrary SymFn2 where arbitrary = genericArbitraryU
 
-instance Arbitrary (Sym Double) where
+instance Arbitrary (Sym () Double) where
   arbitrary = oneof [ terminal, nonterminal ]
-    where terminal    = N <$> arbitrary
-          nonterminal = sized \n -> do v <- genericArbitraryU
-                                       case v of Arg _ -> Arg <$> choose (0, n)
-                                                 _     -> return v
+    where terminal    = val <$> arbitrary
+          nonterminal = sized \n -> do
+            v <- genericArbitraryU
+            sym <$> case v of Var _     -> Var <$> choose (0, n - 1)
+                              FnN _ _ _ -> Var <$> choose (0, n - 1)
+                              _         -> return v
 
-  shrink (Fn2 f x y) = [x, y]
-  shrink (Fn1 f x)   = [x]
-  shrink _           = []
+instance Arbitrary (OrdSym () Double) where arbitrary = OS <$> arbitrary
+
+{- TODO: port this
+  shrink (Fn2 f _ x y) = [x, y]
+  shrink (Fn1 f _ x)   = [x]
+  shrink _             = []
+-}
 
 
 instance Arbitrary (Vector Double) where
@@ -118,26 +128,21 @@ bulletproof thing = do
             return Nothing      -- unreachable
 
 
-forkjit :: BS.ByteString -> Sym Double -> Vector Double -> IO (Maybe Double)
+forkjit :: BS.ByteString -> Sym () Double -> Vector Double -> IO (Maybe Double)
 forkjit code s v = do
   debug v s code
-  do_jit do f <- compile dblfn code
+  do_jit do f <- compile_machinecode dblfn code
             VS.unsafeWith v f
   where do_jit = if bulletproof_jit
                  then bulletproof
                  else fmap Just
 
 
-prop_trivial_stability :: Property
-prop_trivial_stability = prop_symjit s (VS.fromList [0])
-  where s = Fn1 Cos (N 11.014994588887294)
-
-
-prop_symjit :: Sym Double -> Vector Double -> Property
+prop_symjit :: Sym () Double -> Vector Double -> Property
 prop_symjit s v = size_ok && bounds_ok ==> property test
   where l         = VS.length v
         size_ok   = l > 0 && l <= 2047
-        bounds_ok = fromMaybe 0 (lookupMax (args_in s)) < l
+        bounds_ok = fromMaybe 0 (lookupMax (vars_in s)) < l
 
         test | isNaN x || isNaN y' = discard
              | isInfinite x        = discard
@@ -146,7 +151,7 @@ prop_symjit s v = size_ok && bounds_ok ==> property test
 
         test_ok = isJust y && close_enough x y'
         x       = eval (v !) s
-        code    = assemble_ssa $ linearize s
+        code    = assemble_graph (PM 0) (thread s)
         y       = unsafePerformIO $ forkjit code s v
         y'      = fromMaybe (1/0) y
         help    = "\n\n" ++ show (s, x, y) ++ "\n\n"

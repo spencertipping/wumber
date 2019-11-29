@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -28,7 +30,7 @@ instance Arbitrary (UnitInterval R) where
   arbitrary = UnitInterval <$> choose (-1, 1)
 
 
-instance Arbitrary CVal where arbitrary = N <$> arbitrary
+instance Arbitrary (CVal ()) where arbitrary = val <$> arbitrary
 
 instance Arbitrary (V2 R) where
   arbitrary = V2 <$> arbitrary <*> arbitrary
@@ -45,7 +47,8 @@ instance Arbitrary (V3 R) where
 --   resulting cost will be at most √δ. There's no mathematical rigor to this
 --   other than saying it's half as precise in log-terms.
 
-solvable :: (Rewritable a b, Show b) => R -> Int -> Constrained a -> Property
+solvable :: (FConstraints f R, Rewritable f a b, Show b)
+         => R -> Int -> Constrained f a -> Property
 solvable δ n m = counterexample (show (xs, v, a)) $ v <= ε
   where ε           = sqrt δ
         (a, xs, cs) = solve_full δ n m
@@ -58,46 +61,46 @@ iterations = 10000
 t = solvable solve_δ iterations
 
 
-prop_uni_linear :: R -> NonZero R -> CVal -> CVal -> Property
+prop_uni_linear :: R -> NonZero R -> CVal () -> CVal () -> Property
 prop_uni_linear x (NonZero m) b y = t do
-  v <- var x
-  v * N m + b =-= y
+  v <- cvar x
+  v * val m + b =-= y
   return [v]
 
 
 prop_uni_quadratic :: NonNegative R -> NonNegative R -> Property
 prop_uni_quadratic (NonNegative x) (NonNegative y) = t do
-  v <- var x
-  v*v =-= N y
+  v :: CVal () <- cvar x
+  v*v =-= val y
   return [v]
 
 
 prop_v2dist :: V2 R -> NonNegative R -> Property
 prop_v2dist vec (NonNegative d) = t do
-  v <- vars vec
-  norm v =-= N d
+  v :: V2 (CVal ()) <- cvars vec
+  norm v =-= val d
   return v
 
 
 prop_v2joint_lt :: V2 R -> NonNegative R -> Property
 prop_v2joint_lt vec (NonNegative d) = t do
-  v <- vars vec
+  v :: V2 (CVal ()) <- cvars vec
   v^._x  <-= v^._y
-  norm v =-= N d
+  norm v =-= val d
   return v
 
 prop_v2joint_eq :: V2 R -> NonNegative R -> Property
 prop_v2joint_eq vec (NonNegative d) = t do
-  v <- vars vec
+  v :: V2 (CVal ()) <- cvars vec
   v^._x  =-= v^._y
-  norm v =-= N d
+  norm v =-= val d
   return v
 
 
 prop_v3dist :: V3 R -> NonNegative R -> Property
 prop_v3dist vec (NonNegative d) = t do
-  v <- vars vec
-  norm v =-= N d
+  v :: V3 (CVal ()) <- cvars vec
+  norm v =-= val d
   return v
 
 
@@ -113,14 +116,14 @@ prop_v3dist vec (NonNegative d) = t do
 prop_hexagon :: V2 R -> V2 R -> V2 R -> V2 R -> V2 R -> V2 R
              -> Positive R -> Property
 prop_hexagon a b c d e f (Positive dist) = t do
-  av <- vars a
-  bv <- vars b
-  cv <- vars c
-  dv <- vars d
-  ev <- vars e
-  fv <- vars f
+  av :: V2 (CVal ()) <- cvars a
+  bv :: V2 (CVal ()) <- cvars b
+  cv :: V2 (CVal ()) <- cvars c
+  dv :: V2 (CVal ()) <- cvars d
+  ev :: V2 (CVal ()) <- cvars e
+  fv :: V2 (CVal ()) <- cvars f
 
-  all_equal [N dist,
+  all_equal [val dist,
              distance av bv,
              distance bv cv,
              distance cv dv,

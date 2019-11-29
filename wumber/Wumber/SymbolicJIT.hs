@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE CPP #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
@@ -28,7 +29,7 @@ import qualified Data.Vector.Storable as VS
 #endif
 
 #if WUMBER_ARCH == amd64
-import Wumber.AMD64Asm
+import Wumber.AMD64JIT
 #endif
 
 import Wumber.JIT
@@ -41,7 +42,7 @@ import Wumber.Symbolic
 --   given 'Arg' state vector. In general, 'jit sym v == eval (v !) sym', but
 --   'jit' will usually be faster if JIT is supported for your platform. You can
 --   use 'is_jit_supported' to determine this.
-jit :: Sym R -> VS.Vector R -> R
+jit :: FConstraints f R => Sym f R -> VS.Vector R -> R
 
 -- | Returns 'True' if we support JIT on the platform being compiled. You can
 --   still use 'jit' on unsupported platforms, but it will back into 'eval' and
@@ -53,8 +54,8 @@ is_jit_supported :: Bool
 
 is_jit_supported = True
 jit sym = unsafePerformIO do
-  let asm = assemble_ssa $ linearize sym
-  f <- compile dblfn asm
+  let asm = assemble_graph (PM 10) $ thread sym
+  f <- compile_machinecode dblfn asm
   return $ unsafePerformIO . flip VS.unsafeWith f
 
 #else

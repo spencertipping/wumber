@@ -90,7 +90,7 @@ vector_angle_cos a b = a `dot` b / sqrt (quadrance a * quadrance b)
 
 -- | Constrain a vector value to a proper rectangle (one whose size is
 --   nonnegative).
-inside :: (Num a, CEq a) => Rect a -> a -> Constrained ()
+inside :: (Num a, CEq f a) => Rect a -> a -> Constrained f ()
 inside r p = do p >-= r^.rstart; p <-= r^.rend
 
 
@@ -98,13 +98,13 @@ inside r p = do p >-= r^.rstart; p <-= r^.rend
 --   this is done by setting them all equal to the first one. Although this
 --   results in uneven gradients, it should result in faster solutions for most
 --   systems.
-all_equal :: (Foldable f, CEq a) => f a -> Constrained ()
+all_equal :: (Foldable f, CEq t a) => f a -> Constrained t ()
 all_equal xs = case toList xs of h:t -> forM_ t (h =-=)
                                  _   -> return ()
 
 
 -- | Asserts alignment along some lens. For example, 'aligned _x [u, v, w]'
 --   asserts that three points have equal 'x' coordinates.
-aligned :: (CEq a, Functor l, Foldable l)
-        => SimpleGetter b a -> l b -> Constrained ()
+aligned :: (CEq f a, Functor l, Foldable l)
+        => SimpleGetter b a -> l b -> Constrained f ()
 aligned g = all_equal . fmap (^.g)

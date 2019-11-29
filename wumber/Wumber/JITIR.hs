@@ -85,9 +85,9 @@ makeLenses ''Insn
 
 instance Show a => Show (ThreadGraph a) where
   show (TG r tg) = concatMap format (keys tg)
-    where format t = printf "% 3d %s %s\n"
+    where format t = printf "% 3d%s %s\n"
                      t
-                     (if t == r then "R" else " ")
+                     (if t == r then "R" else " " :: String)
                      (concatMap (printf "%-8s" . show) (tg ! t) :: String)
 
 instance Show a => Show (Insn a) where
@@ -133,7 +133,6 @@ thread s = TG ret g & deduplicate
     (ret, g) = runState (pt s) empty
 
     pt ([t] :+ 0) = tt t
-    pt ([t] :+ n) = tt t            >>= (++= return [LoadVal n])
     pt (ts  :+ n) = thr [LoadVal n] >>= (++= mapM (I2 Add <.> tt) ts)
 
     tt (1    :* [e]) = et e
@@ -201,9 +200,13 @@ deduplicate tg@(TG r g) | size g' < size g = deduplicate (TG r' g')
 --   unnecessary register shuffling. (TODO: is this true?)
 
 startable :: Priority -> ThreadGraph a -> [(ThreadID, Priority)]
-startable cbias tg@(TG _ g) = assocs g & map priority & sortOn (negate . snd)
+startable cbias tg@(TG _ g) = assocs g & filter incomplete
+                                       & map priority & sortOn (negate . snd)
   where priority (t, is) = (t, nonblocking_insns is)
         block            = not . complete tg
+
+        incomplete (_, []) = False
+        incomplete _       = True
 
         nonblocking_insns (I2 _ t' : _) | block t' = 0
         nonblocking_insns []                       = cbias

@@ -87,9 +87,7 @@ recompile model f = do
 
 update_model :: MVar (Maybe [Element]) -> Wumber () -> IO ThreadId
 update_model model m = forkOS do
-  (s:_) <- runWumber init_cursor m
-  fp <- compile dblfn $ assemble_ssa (linearize s)
-  let fn = unsafePerformIO . flip unsafeWith fp . to_storable_vector
+  fn <- (. to_storable_vector) <$> jit <$> head <$> runWumber init_cursor m
   forM_ [6..18] \r -> do
     eprintf "\027[2J\027[1;1Hrendering at %d..." r
     let ls = toList $ iso_contour fn (BB (-2) 2) r (max 15 (r + 6)) 0.1

@@ -17,8 +17,9 @@ import Control.Monad     (when)
 import Control.Monad.RWS (asks, gets, modify')
 import Data.Bits
 import Data.IntMap       (IntMap(..), (!))
-import Data.List         (sort)
+import Data.List         (sort, sortOn)
 import Data.Maybe        (fromJust)
+import Data.Word         (Word8(..))
 import Lens.Micro
 import Lens.Micro.TH     (makeLenses)
 
@@ -30,7 +31,10 @@ import Wumber.AMD64Asm
 import Wumber.Assembler
 import Wumber.JIT
 import Wumber.JITIR
+import Wumber.Numeric
 import Wumber.Symbolic
+
+import Debug.Trace
 
 
 -- | AMD64 assembler monad, which tracks register assignments, deadlines, and
@@ -81,17 +85,20 @@ assemble_graph :: ProcessorModel -> ThreadGraph Double -> BS.ByteString
 assemble_graph pm tg@(TG r g) = assemble m pm init_as
   where init_as  = AS tg 0 all_zero IM.empty
         all_zero = IM.fromAscList $ [ (r, 0) | r <- [0..15] ]
-        m        = do enter tg
+        m        = do frame_enter (n_threads tg)
                       run_threads
-                      leave_ret r
+                      frame_return
 
 
--- | Runs threads until the return value is available.
+-- | Runs threads until the return value is available; then moves the return
+--   value into '%xmm0'.
 run_threads :: Asm ()
-run_threads = do tg@(TG r g) <- gets _as_g
-                 if complete tg r
-                   then do spill_thread r
-                           movsd_mr r 0
+run_threads = do tg@(TG ret g) <- gets _as_g
+                 if complete tg ret
+                   then do r <- thread_register ret
+                           if r /= 0
+                             then movsd_rr r 0
+                             else return ()
                    else do start_threads
                            step_threads
                            run_threads
@@ -104,10 +111,13 @@ start_threads = spill_blocked >> start_new
   where spill_blocked = do ts <- register_resident
                            g  <- gets _as_g
                            mapM_ spill_thread $ filter (blocked g) ts
-        start_new = do n <- free_registers
-                       g <- gets _as_g
-                       b <- asks _pm_cbias
-                       mapM_ unspill_thread $ take n (map fst $ startable b g)
+        start_new = do n  <- free_registers
+                       g  <- gets _as_g
+                       tr <- gets _as_tr
+                       b  <- asks _pm_cbias
+                       take n (map fst $ startable b g)
+                         & filter (not . flip IM.member tr)
+                         & mapM_ unspill_thread
 
 
 -- | Steps every thread pinned to a register. If any thread completes, it is
@@ -122,20 +132,24 @@ step_threads = do g  <- gets _as_g
                       es = zipWith encode ts (map (peek g) ts)
                   if all is_fncall es
                     then do mapM_ spill_thread (IM.keys tr)
-                            mapM_ encoded_asm es
-                    else do zip ts es & filter (is_inline . snd)
-                                      & mapM_ do_inline
+                            mapM_ do_fncall (zip ts es)
+                    else do mapM_ do_inline (zip ts es)
                             mapM_ spill_if_complete (IM.keys tr)
 
   where peek    g t = fst (thread_step g t)
         advance g t = snd (thread_step g t)
 
-        latency _ = 0       -- FIXME
+        latency _ = 0       -- TODO
 
-        do_inline (t, Inline e) = do g  <- gets _as_g
-                                     tr <- gets _as_tr
-                                     modify' $ as_g %~ flip advance t
-                                     e
+        -- NOTE: we could spill_if_complete inside do_inline, but we might
+        -- accumulate register latency. We'll do better to encode all of the
+        -- work first, then go back around and spill at the end (as we do
+        -- above).
+        do_inline (_, FnCall _) = return ()
+        do_inline (t, Inline e) = modify' (as_g %~ flip advance t) >> e
+
+        do_fncall (_, Inline _) = error "unexpected inline in step_threads"
+        do_fncall (t, FnCall e) = modify' (as_g %~ flip advance t) >> e
 
         spill_if_complete t = do g <- gets _as_g
                                  when (complete g t) $ spill_thread t
@@ -146,7 +160,43 @@ step_threads = do g  <- gets _as_g
 --   current register mapping, but function calls always assume that registers
 --   have been spilled (which means arguments are always loaded from memory).
 encode :: ThreadID -> Insn Double -> Encoded ()
-encode t i = Inline (return ())
+encode t (LoadVal v)  = Inline $ thread_register t >>= movconst_r v
+encode t (LoadVar i)  = Inline $ thread_register t >>= movsd_ar i
+encode t (LoadThr t') = error "TODO: LoadThr"
+
+encode t (I2 Add t')      = binop addsd t t'
+encode t (I2 Subtract t') = binop subsd t t'
+encode t (I2 Multiply t') = binop mulsd t t'
+encode t (I2 Divide t')   = binop divsd t t'
+encode t (I2 Upper t')    = binop maxsd t t'
+encode t (I2 Lower t')    = binop minsd t t'
+
+encode t (I2 f t') = FnCall do
+  movsd_mr t  0
+  movsd_mr t' 1
+  call (fn f :: P.FunPtr (Double -> Double -> IO Double))
+  movsd_rm 0 t
+
+encode t (I1 f) = FnCall do
+  movsd_mr t 0
+  call (fn f :: P.FunPtr (Double -> IO Double))
+  movsd_rm 0 t
+
+
+-- | Assembles a single binary operator specified by the given unspecialized
+--   function (e.g. 'addsd').
+binop :: (Word8 -> Word8 -> Word8 -> Asm ()) -> ThreadID -> ThreadID -> Encoded ()
+binop f t t' = Inline $ do r  <- thread_register t
+                           tr <- gets _as_tr
+                           if IM.member t' tr
+                             then f 3 r (fi $ tr ! t')
+                             else f 2 r rbp >> rbp32 t'
+
+
+-- | Calls a function with the specified threads as arguments, and stores the
+--   result into the given destination thread. This function operates with the
+--   assumption that all registers are spilled and leaves all registers spilled
+--   upon return.
 
 
 -- | Returns a list of register-resident threads.
@@ -156,10 +206,11 @@ register_resident = gets (IM.keys . _as_tr)
 
 -- | Returns the next free register, or 'Nothing' if no registers are available.
 next_free :: Asm (Maybe XMMReg)
-next_free = free_from . zip [0..] <$> gets (sort . IM.elems . _as_tr)
-  where free_from []                        = Nothing
-        free_from ((i, r) : ps) | i /= r    = Just i
-                                | otherwise = free_from ps
+next_free = free_from 0 <$> gets (sort . IM.elems . _as_tr)
+  where free_from 15 _ = Nothing
+        free_from i [] = Just i
+        free_from i (r:rs) | i == r    = free_from (i + 1) rs
+                           | otherwise = Just i
 
 
 -- | Returns the number of free registers we have.
@@ -167,16 +218,47 @@ free_registers :: Asm Int
 free_registers = (16 -) <$> gets (IM.size . _as_tr)
 
 
+-- | Returns the register for a thread, allocating one if necessary. If no
+--   registers are free, a low-latency register will be spilled to memory.
+thread_register :: ThreadID -> Asm XMMReg
+thread_register t = do tr <- gets _as_tr
+                       if IM.member t tr
+                         then return $ tr ! t
+                         else do n <- free_registers
+                                 if n > 0
+                                   then unspill_thread t
+                                   else do t' <- head <$> registers_by_latency
+                                           spill_thread t'
+                                           unspill_thread t
+
+
+-- | Returns thread IDs sorted by increasing register latency. If you need to
+--   free /n/ registers, then spilling the first /n/ elements from this list
+--   should minimize delays.
+registers_by_latency :: Asm [ThreadID]
+registers_by_latency = do rd <- gets _as_rd
+                          tr <- gets _as_tr
+                          map (\t -> (t, rd ! (fi $ tr ! t))) (IM.keys tr)
+                            & sortOn snd
+                            & map fst
+                            & return
+
+
 -- | Spills a thread to memory.
 spill_thread :: ThreadID -> Asm ()
 spill_thread t = do tr <- gets _as_tr
+                    when (not (IM.member t tr))
+                      $ error ("spilling a non-resident thread" ++ show (t, tr))
                     movsd_rm (tr ! t) t
                     unpin_thread t
 
 
 -- | Loads a thread from memory, allocating a free register for it.
 unspill_thread :: ThreadID -> Asm XMMReg
-unspill_thread t = do r <- fromJust <$> next_free
+unspill_thread t = do tr <- gets _as_tr
+                      when (IM.member t tr)
+                        $ error ("unspilling a resident thread" ++ show (t, tr))
+                      r <- fromJust <$> next_free
                       movsd_mr t r
                       pin_thread t r
                       return r

@@ -25,11 +25,14 @@ import Wumber.AMD64Asm
 import Wumber.JIT
 
 
+type Asm a = Assembler () () a
+
+
 assemble_lowlevel :: Asm a -> BS.ByteString
 assemble_lowlevel m = assemble m' () ()
-  where m' = do enter 0
+  where m' = do frame_enter 0
                 m
-                leave_ret
+                frame_return
 
 
 -- | Serializing 'rdtsc', storing the result into all 64 bits of '%rax'. The
@@ -173,14 +176,14 @@ test4d = reptest 10000 200 $ forM_ [0..7] \i -> addpd 3 i i
 foreign import ccall "dynamic" dfn :: FunPtr (IO Double) -> IO Double
 
 tsc_fn n asm = do
-  f <- compile dfn (assemble_lowlevel asm)
+  f <- compile_machinecode dfn (assemble_lowlevel asm)
   let each !s _ = (+ s) <$> max 0 <$> f
   f
   t <- foldM each 0 [1..n]
   return $ t / fromIntegral n
 
 tsc_fn_med n asm = do
-  f <- compile dfn (assemble_lowlevel asm)
+  f <- compile_machinecode dfn (assemble_lowlevel asm)
   f
   xs <- mapM (const f) [1..n]
   return $! sort xs !! (n `quot` 2)

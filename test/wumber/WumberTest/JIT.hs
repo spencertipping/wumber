@@ -43,7 +43,7 @@ sin_2x_code = toStrict $ toLazyByteString $
 
 sin_2x :: Double -> Double
 sin_2x x = unsafePerformIO do
-  f <- compile dblfn sin_2x_code
+  f <- compile_machinecode dblfn sin_2x_code
   unsafeWith (fromList [100, x]) f
 
 
