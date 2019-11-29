@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE TemplateHaskell #-}
@@ -106,6 +107,13 @@ n_threads (TG _ g) = size g
 -- | Determines whether a thread is done running.
 complete :: ThreadGraph a -> ThreadID -> Bool
 complete (TG _ g) t = null (g ! t)
+
+
+-- | Determines whether a thread is currently blocked on an unavailable value.
+blocked :: ThreadGraph a -> ThreadID -> Bool
+blocked tg@(TG _ g) t = b (g ! t)
+  where b (I2 _ t' : _) = not $ complete tg t'
+        b _             = False
 
 
 -- | Steps the graph, pulling the next instruction for the specified thread. The

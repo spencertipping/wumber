@@ -37,14 +37,6 @@ type Asm' t = forall a b. Assembler a b t
 type XMMReg = Word8
 
 
--- | An encoded instruction, which is either inline machine code or a function
---   call. We care about the distinction because function calls require all xmm
---   registers to be defensively spilled to memory (even uninvolved ones). So we
---   need to model that cost when we're deciding what to schedule next.
-data Encoded a = Inline (Asm' a)
-               | FnCall (Asm' a)
-
-
 -- | Creates a stack frame sized for the specified thread graph. Uses the x86
 --   'enter' instruction, which allows for up to 64K of local variables. '%rsp'
 --   will be aligned to a 16-byte boundary.
@@ -53,7 +45,7 @@ enter g = do hex "c8"
              tell $ B.word16LE (fromIntegral $ n_threads g * 8)
              hex "00"
              hex "50"                   -- at least one more slot for %rdi backup
-             andqimm8 3 4 (-16)         -- align %rsp to 16-byte boundary
+             andqimm8 3 rsp (-16)       -- align %rsp to 16-byte boundary
 
 
 -- | Moves the specified thread's value into '%xmm0' to return it, and then runs
@@ -93,30 +85,32 @@ rbp32 t = tell $ B.int32LE (fromIntegral $ (t + 1) * (-8))
 
 -- | Loads a thread from memory into the specified XMM register.
 movsd_mr :: ThreadID -> XMMReg -> Asm' ()
-movsd_mr t x = rex0_modrm "f3" "0f7e" 2 x 5 >> rbp32 t
+movsd_mr t x = rex0_modrm "f3" "0f7e" 2 x rbp >> rbp32 t
 
 -- | Spills a register's value into the specified thread memory.
 movsd_rm :: XMMReg -> ThreadID -> Asm' ()
-movsd_rm x t = rex0_modrm "66" "0fd6" 2 x 5 >> rbp32 t
+movsd_rm x t = rex0_modrm "66" "0fd6" 2 x rbp >> rbp32 t
 
 -- | Loads a 'Var' with the specified index into the given XMM register.
 movsd_ar :: Int -> XMMReg -> Asm' ()
-movsd_ar i x = rex0_modrm "f3" "0f7e" 2 x 7 >> tell (B.word32LE $ fi $ i * 8)
+movsd_ar i x = rex0_modrm "f3" "0f7e" 2 x rbp >> tell (B.word32LE $ fi $ i * 8)
 
 
 -- | Calls a function specified by its absolute address. This function does
 --   nothing to save or restore XMM registers; all it does is save and restore
 --   '%rdi' using its preallocated stack slot.
 call :: FunPtr a -> Asm' ()
-call p = do movq_rm 0 7 4; hex "24"         -- save %rdi
+call p = do movq_rm 0 rdi 4; hex "24"   -- save %rdi
             hex "48b8"
             tell $ B.word64LE (fromIntegral a)
             hex "ffd0"
-            movq_mr 0 7 4; hex "24"         -- restore %rdi
+            movq_mr 0 rdi 4; hex "24"   -- restore %rdi
             where WordPtr a = P.ptrToWordPtr $ P.castFunPtrToPtr p
 
 
--- SSE2 instructions
+-- SSE2
+
+xmm = fromIntegral
 
 addsd = rex0_modrm "f2" "0f58"
 subsd = rex0_modrm "f2" "0f5c"
@@ -128,7 +122,12 @@ minsd = rex0_modrm "f2" "0f5d"
 addpd = rex0_modrm "66" "0f58"
 
 
--- GPR instructions
+-- GPR
+
+rsp = 4
+rbp = 5
+rsi = 6
+rdi = 7
 
 cvtqi2sd = rexw_modrm "f2" "0f2a"
 
