@@ -17,9 +17,9 @@ import Control.Monad     (when)
 import Control.Monad.RWS (asks, gets, modify')
 import Data.Bits
 import Data.IntMap       (IntMap(..), (!))
-import Data.List         (sort, sortOn)
+import Data.List         (sortOn)
 import Data.Maybe        (fromJust)
-import Data.Word         (Word8(..))
+import Data.Word         (Word8(..), Word16(..))
 import Lens.Micro
 import Lens.Micro.TH     (makeLenses)
 
@@ -206,12 +206,13 @@ register_resident = gets (IM.keys . _as_tr)
 
 -- | Returns the next free register, or 'Nothing' if no registers are available.
 next_free :: Asm (Maybe XMMReg)
-next_free = free_from 0 <$> gets (sort . IM.elems . _as_tr)
-  where free_from 15 _ = Nothing
-        free_from i [] = Just i
-        free_from i (r:rs) | i == r    = free_from (i + 1) rs
-                           | otherwise = Just i
+next_free = free_from (0 :: Word16) <$> gets (IM.elems . _as_tr)
+  where free_from bits (r:rs) = free_from (bits .|. shiftL 1 (fi r)) rs
+        free_from bits []     = find_clear bits 0
 
+        find_clear bits 16 = Nothing
+        find_clear bits i | bits .&. shiftL 1 i == 0 = Just (fi i)
+                          | otherwise                = find_clear bits (i + 1)
 
 -- | Returns the number of free registers we have.
 free_registers :: Asm Int
@@ -248,7 +249,7 @@ registers_by_latency = do rd <- gets _as_rd
 spill_thread :: ThreadID -> Asm ()
 spill_thread t = do tr <- gets _as_tr
                     when (not (IM.member t tr))
-                      $ error ("spilling a non-resident thread" ++ show (t, tr))
+                      $ error ("spilling a non-resident thread " ++ show (t, tr))
                     movsd_rm (tr ! t) t
                     unpin_thread t
 
@@ -257,7 +258,9 @@ spill_thread t = do tr <- gets _as_tr
 unspill_thread :: ThreadID -> Asm XMMReg
 unspill_thread t = do tr <- gets _as_tr
                       when (IM.member t tr)
-                        $ error ("unspilling a resident thread" ++ show (t, tr))
+                        $ error ("unspilling a resident thread " ++ show (t, tr))
+                      when (IM.size tr == 16)
+                        $ error ("no registers free for unspill " ++ show (t, tr))
                       r <- fromJust <$> next_free
                       movsd_mr t r
                       pin_thread t r
