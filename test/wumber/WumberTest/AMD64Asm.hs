@@ -11,8 +11,9 @@ module WumberTest.AMD64Asm where
 import Control.Concurrent   (forkIO)
 import Control.Monad        (replicateM, replicateM_, when)
 import Data.Char            (chr)
+import Data.Foldable        (foldl')
 import Data.Maybe           (fromMaybe, fromJust, isNothing, isJust)
-import Data.Set
+import Data.Set             (Set(..), lookupMax)
 import Data.Vector.Storable (Vector(..), (!))
 import Debug.Trace          (traceShowId)
 import Foreign.C.Types
@@ -20,6 +21,9 @@ import Foreign.Ptr
 import Foreign.Marshal.Alloc
 import Foreign.Storable
 import Generic.Random       (genericArbitraryU)
+import Linear.Matrix        ((*!))
+import Linear.Metric        (distance)
+import Linear.V3            (V3(..))
 import System.IO            (hClose, hFlush, stdout)
 import System.IO.Unsafe     (unsafePerformIO)
 import System.Posix.Types
@@ -37,10 +41,14 @@ import qualified Data.Vector.Storable as VS
 
 import Wumber.AMD64Asm
 import Wumber.AMD64JIT
+import Wumber.BoundingBox
 import Wumber.ClosedComparable
+import Wumber.Cursor
 import Wumber.JIT
 import Wumber.JITIR
+import Wumber.Numeric
 import Wumber.Symbolic
+import Wumber.SymbolicJIT
 
 
 -- Debug stuff
@@ -48,6 +56,46 @@ show_expressions = False
 show_disassembly = False
 
 bulletproof_jit = False
+
+
+-- Test model
+model :: FConstraints f R => V3 (Sym f R) -> Sym f R
+model = moved_by (V3 0 1.1 0) (bolt 0.5 0.4) `iunion` scs
+  where
+    threads p d v@(V3 x y z) = p ρ z'
+      where θ  = atan2 x y
+            ρ  = sqrt (x**2 + y**2)
+            z' = ((z * d + θ/τ) `mod` 1 + 1) `mod` 1
+
+    t45 od ρ z = od - sin (τ/6) * ρ + abs (z - 0.5)
+
+    x_lt l (V3 x _ _) = l - x
+    z_lt l (V3 _ _ z) = l - z
+
+    hex_cap r v = foldl' lower maxBound
+      $ map (\θ -> x_lt r (v *! rotate_z_m (val θ))) [0, 60 .. 300]
+
+
+    bolt od ts = thread_part `iunion` head_part
+      where thread_part = (threads (t45 od) 2 . (/ ts)) `iintersect` z_lt 0
+            head_part   = hex_cap od `iintersect`
+                          cube (BB (V3 minBound minBound 0) (V3 maxBound maxBound 0.5))
+
+    sphere l v = 0.8 - distance v l
+
+    cube (BB (V3 x1 y1 z1) (V3 x2 y2 z2)) (V3 x y z) =
+      foldl' lower maxBound [ x - x1, x2 - x, y - y1, y2 - y, z - z1, z2 - z ]
+
+
+    iunion     f g v = upper (f v) (g v)
+    iintersect f g v = lower (f v) (g v)
+    inegate    f v   = negate (f v)
+
+    spheres = sphere 0 `iunion` sphere 0.9
+    scs     = spheres `iunion` cube (BB (-1.5) (-0.5))
+                      `iunion` cube (BB (-1.2) (-0.2))
+
+    moved_by t f v = f (v - t)
 
 
 debug :: VS.Vector Double -> Sym () Double -> BS.ByteString -> IO ()

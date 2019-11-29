@@ -14,11 +14,13 @@
 
 module Wumber.SymbolicJIT (
   is_jit_supported,
+  jit_as_machinecode,
   jit
 ) where
 
 
 import System.IO.Unsafe (unsafePerformIO)
+import qualified Data.ByteString      as BS
 import qualified Data.Vector.Storable as VS
 
 
@@ -44,6 +46,12 @@ import Wumber.Symbolic
 --   use 'is_jit_supported' to determine this.
 jit :: FConstraints f R => Sym f R -> VS.Vector R -> R
 
+
+-- | Compiles a 'Sym' expression to machine code, but doesn't coerce that code
+--   to a function pointer.
+jit_as_machinecode :: FConstraints f R => Sym f R -> BS.ByteString
+
+
 -- | Returns 'True' if we support JIT on the platform being compiled. You can
 --   still use 'jit' on unsupported platforms, but it will back into 'eval' and
 --   be much slower.
@@ -53,14 +61,17 @@ is_jit_supported :: Bool
 #if WUMBER_ARCH == amd64
 
 is_jit_supported = True
+
+jit_as_machinecode sym = assemble_graph (PM 10) $ thread sym
+
 jit sym = unsafePerformIO do
-  let asm = assemble_graph (PM 10) $ thread sym
-  f <- compile_machinecode dblfn asm
-  return $ unsafePerformIO . flip VS.unsafeWith f
+  f <- compile_machinecode dblfn (jit_as_machinecode sym)
+  return \v -> unsafePerformIO (VS.unsafeWith v f)
 
 #else
 
-is_jit_supported = False
-jit sym v = eval (v VS.!) sym
+is_jit_supported     = False
+jit_as_machinecode s = error "JIT compilation unsupported on this platform"
+jit sym v            = eval (v VS.!) sym
 
 #endif

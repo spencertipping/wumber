@@ -79,11 +79,16 @@ model :: FConstraints f R => V3 (Sym f R) -> Sym f R
 model = moved_by (V3 0 1.1 0) (bolt 0.5 0.4) `iunion` scs
 
 
+tiny_model :: FConstraints f R => V3 (Sym f R) -> Sym f R
+tiny_model (V3 x y z) = x + y + z + 1
+
+
 jit_a_fn :: (V3 (Sym () Double) -> Sym () Double) -> V3 Double -> Double
 jit_a_fn m = jit (m (V3 (var 0) (var 1) (var 2))) . to_storable_vector
 
 
-model_fn  = jit_a_fn model
+model_fn = jit_a_fn model
+tiny_fn  = jit_a_fn tiny_model
 
 -- With FFI overhead, model2_fn is ~2x slower than model_fn but produces
 -- identical results
@@ -99,7 +104,8 @@ benchmarks = bs
   where info = printf "isotree12: %d; isotree18: %d; isotree24: %d\n"
                       (t_size isotree12) (t_size isotree18) (t_size isotree24)
         bs = [
-          bench "model/jit"  (nf model_fn  (V3 0.5 1 2 :: V3 Double))
+          bench "model/jittiny" (nf tiny_fn  (V3 0.5 1 2 :: V3 Double)),
+          bench "model/jit"     (nf model_fn (V3 0.5 1 2 :: V3 Double))
           -- bench "model/jit2" (nf model2_fn (V3 0.5 1 2 :: V3 Double)),
           -- bench "model/ghc"  (nf model     (V3 0.5 1 2 :: V3 Double)),
 
