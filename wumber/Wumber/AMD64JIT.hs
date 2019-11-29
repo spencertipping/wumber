@@ -128,7 +128,7 @@ start_threads = spill_blocked >> start_new
 step_threads :: Asm ()
 step_threads = do g  <- gets _as_g
                   tr <- gets _as_tr
-                  let ts = map fst $ runnable latency g
+                  let ts = map fst $ take 16 $ runnable latency g
                       es = zipWith encode ts (map (peek g) ts)
                   if all is_fncall es
                     then do mapM_ spill_thread (IM.keys tr)
@@ -151,8 +151,10 @@ step_threads = do g  <- gets _as_g
         do_fncall (_, Inline _) = error "unexpected inline in step_threads"
         do_fncall (t, FnCall e) = modify' (as_g %~ flip advance t) >> e
 
-        spill_if_complete t = do g <- gets _as_g
-                                 when (complete g t) $ spill_thread t
+        spill_if_complete t = do g  <- gets _as_g
+                                 tr <- gets _as_tr
+                                 when (IM.member t tr && complete g t)
+                                   $ spill_thread t
 
 
 -- | Encodes a single instruction for the specified thread. Some context is

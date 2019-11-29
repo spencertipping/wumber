@@ -48,9 +48,9 @@ screw dθ v@(V3 x y z) = v *! rotate_z_m (dθ * z)
 -- The profile function should be an iso over ρ and z.
 
 threads p d v@(V3 x y z) = p ρ z'
-  where θ  = Fn2 Atan2 x y
+  where θ  = atan2 x y
         ρ  = sqrt (x**2 + y**2)
-        z' = ((z * d + θ/τ) % 1 + 1) % 1
+        z' = ((z * d + θ/τ) `mod` 1 + 1) `mod` 1
 
 t45 od ρ z = od - sin (τ/6) * ρ + abs (z - 0.5)
 
@@ -59,7 +59,7 @@ x_lt l (V3 x _ _) = l - x
 z_lt l (V3 _ _ z) = l - z
 
 hex_cap r v = foldl' lower maxBound
-  $ map (\θ -> x_lt r (v *! rotate_z_m (N θ))) [0, 60 .. 300]
+  $ map (\θ -> x_lt r (v *! rotate_z_m (val θ))) [0, 60 .. 300]
 
 
 bolt od ts = thread_part `iunion` head_part
@@ -96,4 +96,4 @@ cubes   = cube (BB (-1) 1)
 main :: Wumber ()
 main = do
   zoom 0.005
-  tell [model (V3 (Arg 0) (Arg 1) (Arg 2))]
+  tell [model (V3 (var 0) (var 1) (var 2))]

@@ -37,9 +37,9 @@ just_tree f b minn maxn bias = build f b sf bias
 
 -- Test model
 threads p d v@(V3 x y z) = p ρ z'
-  where θ  = Fn2 Atan2 x y
+  where θ  = atan2 x y
         ρ  = sqrt (x**2 + y**2)
-        z' = ((z * d + θ/τ) % 1 + 1) % 1
+        z' = ((z * d + θ/τ) `mod` 1 + 1) `mod` 1
 
 t45 od ρ z = od - sin (τ/6) * ρ + abs (z - 0.5)
 
@@ -48,7 +48,7 @@ x_lt l (V3 x _ _) = l - x
 z_lt l (V3 _ _ z) = l - z
 
 hex_cap r v = foldl' lower maxBound
-  $ map (\θ -> x_lt r (v *! rotate_z_m (N θ))) [0, 60 .. 300]
+  $ map (\θ -> x_lt r (v *! rotate_z_m (val θ))) [0, 60 .. 300]
 
 
 bolt od ts = thread_part `iunion` head_part
@@ -75,16 +75,12 @@ scs     = spheres `iunion` cube (BB (-1.5) (-0.5))
 moved_by t f v = f (v - t)
 
 
-model :: V3 (Sym R) -> Sym R
+model :: FConstraints f R => V3 (Sym f R) -> Sym f R
 model = moved_by (V3 0 1.1 0) (bolt 0.5 0.4) `iunion` scs
 
 
--- TODO
--- Wumber should provide this (or equivalent)
-jit_a_fn :: (V3 (Sym Double) -> Sym Double) -> V3 Double -> Double
-jit_a_fn m = unsafePerformIO do
-  fp <- compile dblfn $ assemble_ssa (linearize (m (V3 (Arg 0) (Arg 1) (Arg 2))))
-  return $ unsafePerformIO . flip unsafeWith fp . to_storable_vector
+jit_a_fn :: (V3 (Sym () Double) -> Sym () Double) -> V3 Double -> Double
+jit_a_fn m = jit (m (V3 (var 0) (var 1) (var 2))) . to_storable_vector
 
 
 model_fn  = jit_a_fn model

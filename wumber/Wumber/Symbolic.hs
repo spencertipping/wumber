@@ -369,7 +369,8 @@ instance NumConstraints a => Functionable SymFn2 (a -> a -> a) where
   fn Add      = (+)
   fn Subtract = (-)
   fn Multiply = (*)
-  fn Divide   = (/)
+  fn Divide   = safe_div where safe_div _ 0 = 0
+                               safe_div a b = a / b
   fn Pow      = (**)
   fn Quot     = quot
   fn Rem      = rem

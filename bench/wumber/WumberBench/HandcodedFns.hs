@@ -43,12 +43,8 @@ ndisasm code = do
   return b
 
 
-jit_a_fn :: (V3 (Sym Double) -> Sym Double) -> V3 Double -> Double
-jit_a_fn m = unsafePerformIO do
-  let code = assemble_ssa (linearize (m (V3 (Arg 0) (Arg 1) (Arg 2))))
-  -- ndisasm code >>= BS.hPut stdout
-  fp <- compile dblfn code
-  return $ unsafePerformIO . flip unsafeWith fp . to_storable_vector
+jit_a_fn :: (V3 (Sym () Double) -> Sym () Double) -> V3 Double -> Double
+jit_a_fn m = jit (m (V3 (var 0) (var 1) (var 2))) . to_storable_vector
 
 
 type HandcodedIsoFn = (Double, Double, Double) -> Double
