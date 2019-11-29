@@ -82,7 +82,7 @@ codeptr bs = do
 
 instance Functionable SymFn2 (FunPtr (F2 Double)) where
   fn Quot  = p_quot
-  fn Rem   = p_rem    -- FIXME: use fmod if we can
+  fn Rem   = p_fmod    -- FIXME: use fmod if we can
   fn Pow   = p_pow
   fn Upper = p_fmax
   fn Lower = p_fmin
@@ -96,7 +96,7 @@ instance Functionable SymFn2 (FunPtr (F2 Double)) where
 
 instance Functionable SymFn2 (FunPtr (F2 Float)) where
   fn Quot  = p_quotf
-  fn Rem   = p_remf    -- FIXME: use fmod if we can
+  fn Rem   = p_fmodf    -- FIXME: use fmod if we can
   fn Pow   = p_powf
   fn Upper = p_fmaxf
   fn Lower = p_fminf
