@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 -- | JIT backend for the AMD64 instruction set with SSE2. Consumes
@@ -59,6 +60,10 @@ encoded_asm (Inline a) = a
 encoded_asm (FnCall a) = a
 
 
+empty_regset :: RegSet Word16
+empty_regset = RS 0
+
+
 -- TODO: a model that provides an expected deadline for any given instruction.
 data ProcessorModel = PM { _pm_cbias :: Priority }
   deriving (Show, Eq)
@@ -111,7 +116,7 @@ start_threads = spill_blocked >> start_new
   where spill_blocked = do ts <- register_resident
                            g  <- gets _as_g
                            mapM_ spill_thread $ filter (blocked g) ts
-        start_new = do n  <- free_registers
+        start_new = do n  <- n_free_registers
                        g  <- gets _as_g
                        tr <- gets _as_tr
                        b  <- asks _pm_cbias
@@ -173,6 +178,13 @@ encode t (I2 Divide t')   = binop divsd t t'
 encode t (I2 Upper t')    = binop maxsd t t'
 encode t (I2 Lower t')    = binop minsd t t'
 
+encode t (I1 Negate) = Inline do
+  r <- thread_register t
+  s <- scratch_register (regset [r])
+  movconst_r 0 s
+  subsd 3 s r
+  movsd_rr s r
+
 encode t (I2 f t') = FnCall do
   movsd_mr t  0
   movsd_mr t' 1
@@ -187,18 +199,13 @@ encode t (I1 f) = FnCall do
 
 -- | Assembles a single binary operator specified by the given unspecialized
 --   function (e.g. 'addsd').
-binop :: (Word8 -> Word8 -> Word8 -> Asm ()) -> ThreadID -> ThreadID -> Encoded ()
-binop f t t' = Inline $ do r  <- thread_register t
-                           tr <- gets _as_tr
-                           if IM.member t' tr
-                             then f 3 r (fi $ tr ! t')
-                             else f 2 r rbp >> rbp32 t'
-
-
--- | Calls a function with the specified threads as arguments, and stores the
---   result into the given destination thread. This function operates with the
---   assumption that all registers are spilled and leaves all registers spilled
---   upon return.
+binop :: (Word8 -> Word8 -> Word8 -> Asm ())
+      -> ThreadID -> ThreadID -> Encoded ()
+binop f t t' = Inline do r  <- thread_register t
+                         tr <- gets _as_tr
+                         if IM.member t' tr
+                           then f 3 r (fi $ tr ! t')
+                           else f 2 r rbp >> rbp32 t'
 
 
 -- | Returns a list of register-resident threads.
@@ -206,19 +213,30 @@ register_resident :: Asm [ThreadID]
 register_resident = gets (IM.keys . _as_tr)
 
 
--- | Returns the next free register, or 'Nothing' if no registers are available.
-next_free :: Asm (Maybe XMMReg)
-next_free = free_from (0 :: Word16) <$> gets (IM.elems . _as_tr)
-  where free_from bits (r:rs) = free_from (bits .|. shiftL 1 (fi r)) rs
-        free_from bits []     = find_clear bits 0
+-- | Returns a list of available registers.
+free_registers :: Asm [XMMReg]
+free_registers = do rs :: RegSet Word16 <- regset <$> gets (IM.elems . _as_tr)
+                    return (regset_free rs)
 
-        find_clear bits 16 = Nothing
-        find_clear bits i | bits .&. shiftL 1 i == 0 = Just (fi i)
-                          | otherwise                = find_clear bits (i + 1)
+
+-- | Returns a register you can use for scratch purposes, spilling a low-latency
+--   thread if necessary. You can specify a series of registers that /shouldn't/
+--   be spilled, usually because they're relevant operands.
+scratch_register :: RegSet Word16 -> Asm XMMReg
+scratch_register dontuse = do
+  n  <- n_free_registers
+  tr <- gets _as_tr
+  if n == 0
+    then do t' <- head <$> filter (not . regset_member dontuse . (tr !))
+                       <$> threads_by_latency
+            spill_thread t'
+            head <$> free_registers
+    else head <$> free_registers
+
 
 -- | Returns the number of free registers we have.
-free_registers :: Asm Int
-free_registers = (16 -) <$> gets (IM.size . _as_tr)
+n_free_registers :: Asm Int
+n_free_registers = (16 -) <$> gets (IM.size . _as_tr)
 
 
 -- | Returns the register for a thread, allocating one if necessary. If no
@@ -227,33 +245,28 @@ thread_register :: ThreadID -> Asm XMMReg
 thread_register t = do tr <- gets _as_tr
                        if IM.member t tr
                          then return $ tr ! t
-                         else do n <- free_registers
-                                 if n > 0
-                                   then unspill_thread t
-                                   else do t' <- head <$> registers_by_latency
-                                           spill_thread t'
-                                           unspill_thread t
+                         else unspill_thread t
 
 
 -- | Returns thread IDs sorted by increasing register latency. If you need to
 --   free /n/ registers, then spilling the first /n/ elements from this list
 --   should minimize delays.
-registers_by_latency :: Asm [ThreadID]
-registers_by_latency = do rd <- gets _as_rd
-                          tr <- gets _as_tr
-                          map (\t -> (t, rd ! (fi $ tr ! t))) (IM.keys tr)
-                            & sortOn snd
-                            & map fst
-                            & return
+threads_by_latency :: Asm [ThreadID]
+threads_by_latency = do rd <- gets _as_rd
+                        tr <- gets _as_tr
+                        map (\t -> (t, rd ! (fi $ tr ! t))) (IM.keys tr)
+                          & sortOn snd
+                          & map fst
+                          & return
 
 
--- | Spills a thread to memory.
+-- | Spills a thread register to memory.
 spill_thread :: ThreadID -> Asm ()
 spill_thread t = do tr <- gets _as_tr
                     when (not (IM.member t tr))
                       $ error ("spilling a non-resident thread " ++ show (t, tr))
                     movsd_rm (tr ! t) t
-                    unpin_thread t
+                    modify' $ as_tr %~ IM.delete t
 
 
 -- | Loads a thread from memory, allocating a free register for it.
@@ -261,21 +274,7 @@ unspill_thread :: ThreadID -> Asm XMMReg
 unspill_thread t = do tr <- gets _as_tr
                       when (IM.member t tr)
                         $ error ("unspilling a resident thread " ++ show (t, tr))
-                      when (IM.size tr == 16)
-                        $ error ("no registers free for unspill " ++ show (t, tr))
-                      r <- fromJust <$> next_free
+                      r <- scratch_register empty_regset
                       movsd_mr t r
-                      pin_thread t r
+                      modify' $ as_tr %~ IM.insert t r
                       return r
-
-
--- | Assigns a thread to the specified register without emitting any
---   instructions (i.e. this function is just for bookkeeping). The register
---   must not be pinned to any other thread.
-pin_thread :: ThreadID -> XMMReg -> Asm ()
-pin_thread t r = modify' $ as_tr %~ IM.insert t r
-
-
--- | Unpins a thread from whichever register it's currently pinned to.
-unpin_thread :: ThreadID -> Asm ()
-unpin_thread t = modify' $ as_tr %~ IM.delete t

@@ -84,7 +84,7 @@ rbp32 t = tell $ B.int32LE (fromIntegral $ (t + 1) * (-8))
 
 -- | Moves the contents of one XMM register to another.
 movsd_rr :: XMMReg -> XMMReg -> Asm' ()
-movsd_rr r1 r2 = rex0_modrm "f3" "0f7e" 3 r1 r2
+movsd_rr r1 r2 = rex0_modrm "f3" "0f7e" 3 r2 r1
 
 -- | Loads a thread from memory into the specified XMM register.
 movsd_mr :: ThreadID -> XMMReg -> Asm' ()
