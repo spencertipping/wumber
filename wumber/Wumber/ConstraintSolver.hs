@@ -11,7 +11,8 @@
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
--- | The numeric end of the constraint solver.
+-- | The numeric end of the constraint solver. 'solve' and 'solve_full' both
+--   apply algebraic simplification before running numerical minimization.
 module Wumber.ConstraintSolver (
   solve,
   solve_full,
@@ -46,13 +47,14 @@ import Wumber.SymbolicJIT
 --   simplification to each one before handing things off to the numerical
 --   minimizer. The goal is to minimize the amount of work required for complex
 --   constraint sets.
-solve :: (FConstraints f R, Rewritable f a b)
-      => R -> Int -> Constrained f a -> b
+
+solve :: (FConstraints f R, Rewritable f a b) => R -> Int -> Constrained f a -> b
 solve δ n m = b where (b, _, _) = solve_full δ n m
 
 
 -- | Like 'solve', but returns the solution vector and constraints alongside the
 --   result. This is useful if you want to verify tolerances.
+
 solve_full :: (FConstraints f R, Rewritable f a b)
            => R -> Int -> Constrained f a -> (b, Vector R, [Constraint f])
 solve_full δ n m = (rewrite (eval (solution !)) a, solution, cs)
@@ -81,9 +83,9 @@ solve' δ n (Subsystem cs mi start) = remap_solution mi xs
         f           = jit (constraint_cost cs)
         search_size = VS.replicate (V.length mi) 1
 
--- TODO: bypass minimizeV and call the C function directly. This will save some
--- Haskell/C FFI overhead, although the total impact isn't high (on the order of
--- ~100ns/iteration)
+-- TODO(minor): bypass minimizeV and call the C function directly. This will
+-- save some Haskell/C FFI overhead, although the total impact isn't high (on
+-- the order of ~100ns/iteration)
 
 
 -- | The total cost for a set of constraints. It's ok for this to be slow; the

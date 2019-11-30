@@ -52,7 +52,7 @@ makeLenses ''Subsystem
 --   TODO
 --   Algebraic simplification from 'ConstraintSimplify'
 
-subsystems :: [Constraint f] -> [Subsystem f]
+subsystems :: FConstraints f R => [Constraint f] -> [Subsystem f]
 subsystems cs = cs & map (\c -> ([c], constraint_deps c))
                    & group_by_overlap
                    & map fst
@@ -68,7 +68,7 @@ subsystems cs = cs & map (\c -> ([c], constraint_deps c))
 --   TODO
 --   Actually compact the variables
 
-subsystem :: [Constraint f] -> Subsystem f
+subsystem :: FConstraints f R => [Constraint f] -> Subsystem f
 subsystem cs = Subsystem cs remap inits
   where maxid = S.findMax $ S.unions $ map constraint_deps cs
         inits = VS.generate (maxid + 1) (const 0) VS.// ivs
@@ -100,10 +100,3 @@ group_by_overlap ((l, s) : r)
   where (outside, inside) = partition (S.disjoint s . snd) r
         l'                = l ++ concatMap fst inside
         s'                = S.unions (s : map snd inside)
-
-
--- | The full set of variables referred to by a constraint.
-constraint_deps :: Constraint f -> S.Set VarID
-constraint_deps (CEqual a b)      = vars_in a `S.union` vars_in b
-constraint_deps (CMinimize v)     = vars_in v
-constraint_deps (CInitialize i _) = S.singleton i

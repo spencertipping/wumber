@@ -14,7 +14,6 @@
 -- | Algebraic simplification/rewriting for 'Sym' quantities. The most important
 --   operation here is 'isolate', which attempts to isolate a variable within an
 --   equation.
-
 module Wumber.SymbolicAlgebra where
 
 
@@ -33,9 +32,9 @@ import Wumber.Symbolic
 --   itself, or until we don't know how to invert an expression. Most of this
 --   logic is delegated to 'Invertible'.
 
-isolate :: SymConstraints f a => VarID -> Sym f a -> Sym f a -> Maybe (Sym f a)
-isolate v lhs rhs | lv && rv  = isolate v (lhs - rhs) 0
-                  | rv        = isolate v rhs lhs
+isolate :: SymConstraints f a => Sym f a -> Sym f a -> VarID -> Maybe (Sym f a)
+isolate lhs rhs v | lv && rv  = isolate (lhs - rhs) 0 v
+                  | rv        = isolate rhs lhs v
                   | otherwise = invert v lhs >>= \f -> Just (f rhs)
   where lv = member v (vars_in lhs)
         rv = member v (vars_in rhs)
@@ -71,11 +70,9 @@ instance SymConstraints f a => Invertible (SymVar f a) (Sym f a) where
 
   -- Most binary functions can't be inverted easily, but Pow can if either the
   -- exponent or base is constant.
-  invert v (Fn2 Pow _ (OS x) (OS ([] :+ n))) =
-    invert v x ^. Just (** (val (1 / n)))
-
-  invert v (Fn2 Pow _ (OS ([] :+ n)) (OS x)) =
-    invert v x ^. Just (\x -> log x / log (val n))
+  invert v (Fn2 Pow _ (OS x) (OS y))
+    | not (member v (vars_in y)) = invert v x ^. Just (** (1 / y))
+    | not (member v (vars_in x)) = invert v y ^. Just (\y -> log y / log x)
 
   invert v (Fn2 _ _ _ _) = Nothing
 

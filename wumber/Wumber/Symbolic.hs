@@ -285,6 +285,7 @@ pmul (xs :+ a) (ys :+ b) = sum [tmul x y | x <- a :* [] : xs,
 --   exponent is a positive integer constant.
 ppow :: SymConstraints f a => Sym f a -> Sym f a -> Sym f a
 ppow _ 0 = 1
+ppow ([] :+ 1) _         = 1
 ppow ([] :+ x) ([] :+ n) = val (x ** n)
 
 ppow a ([] :+ n) | n == truncate n && n > 0 =

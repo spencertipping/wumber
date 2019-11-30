@@ -25,6 +25,8 @@ import Data.Binary       (Binary)
 import Data.Foldable     (toList)
 import GHC.Generics      (Generic(..))
 
+import qualified Data.Set as S
+
 import Wumber.ClosedComparable
 import Wumber.Numeric
 import Wumber.Symbolic
@@ -47,6 +49,13 @@ data Constraint f = CEqual    !(CVal f) !(CVal f)
 -- | 'Constrained' is a monad that keeps track of 'Var' IDs and collects
 --   equivalences, quantities to minimize, and initial values.
 type Constrained f = RWS () [Constraint f] VarID
+
+
+-- | The full set of variables referred to by a constraint.
+constraint_deps :: FConstraints f R => Constraint f -> S.Set VarID
+constraint_deps (CEqual a b)      = vars_in a `S.union` vars_in b
+constraint_deps (CMinimize v)     = vars_in v
+constraint_deps (CInitialize i _) = S.singleton i
 
 
 -- | Create a new constrained variable initialized to the given value.
