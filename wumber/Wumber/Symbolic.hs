@@ -46,6 +46,9 @@
 --
 --   > -1.0·x² + -1.0·y² + 9.0
 --
+--   See 'SymbolicAlgebra' for methods to isolate variables and solve systems of
+--   equations.
+--
 --   NOTE: avoid using 'RealFrac' and 'RealFloat' methods, except for 'atan2'.
 --   Many of the implementations either use 'unsafeCoerce' to work around
 --   'forall' type quantifiers, or will produce errors at runtime. Intuitively:
@@ -63,12 +66,13 @@ module Wumber.Symbolic (
   SymVar(..),
   OrdSym(..),
   VarID,
+  Eval(..),
   SymFn1(..),
   SymFn2(..),
   Functionable(..),
-  eval,
   vars_in,
   var,
+  var_maybe,
   val,
   is_val,
   sym
@@ -81,6 +85,7 @@ module Wumber.Symbolic (
 
 import Data.Binary   (Binary(..))
 import Data.List     (intercalate, sort, sortBy)
+import Data.Maybe    (fromMaybe)
 import Data.Set      (Set(..), empty, singleton, union, unions)
 import Foreign.Ptr   (FunPtr(..))
 import GHC.Generics  (Generic(..))
@@ -163,7 +168,6 @@ instance (Eq a, Eq f, Ord a, Ord f) => StaticOrd (Sym f a) where
   compare' a b = compare' (OS a) (OS b)
 
 
-
 type ShowConstraints f a = (Num a, Eq a, Show a, Show f)
 
 instance ShowConstraints f a => Show (OrdSym f a) where
@@ -199,17 +203,38 @@ instance ShowConstraints f a => Show (SymVar f a) where
   show (FnN f _ xs)  = show f ++ "(" ++ intercalate ", " (map show xs) ++ ")"
 
 
--- | Evaluate a symbolic quantity using Haskell math. To do this, we need a
---   function that handles 'Var' values.
-eval :: SymConstraints f a => (VarID -> a) -> Sym f a -> a
-eval f (ts :+ b) = b + sum (map eval_t ts)
-  where eval_t (a :* xs)                = a * product (map eval_e xs)
-        eval_e (x :** n)                = eval_v x ** n
-        eval_v (Var i)                  = f i
-        eval_v (Poly (OS v))            = eval f v
-        eval_v (Fn1 op _ (OS x))        = fn op (eval f x)
-        eval_v (Fn2 op _ (OS x) (OS y)) = fn op (eval f x) (eval f y)
-        eval_v (FnN op _ xs)            = fn op (map (eval f . unOS) xs)
+-- | Evaluate a symbolic quantity using Haskell math. To do this, we need two
+--   functions: one to handle terminals and one to handle 'Var' values.
+--
+--   'eval' is how all rewriting is handled, whether that's variable
+--   substitution or reducing forms to constants.
+
+class Eval t r a b | a b -> t, a b -> r where
+  eval :: (t -> r) -> (VarID -> r) -> a -> b
+
+type SymConstraints2 f a b = (SymConstraints f a, SymConstraints f b)
+
+instance SymConstraints2 f a b => Eval a b (Sym f a) b where
+  eval t f (ts :+ b) = t b + sum (map (eval t f) ts)
+
+instance SymConstraints2 f a b => Eval a b (SymTerm f a) b where
+  eval t f (a :* xs) = t a * product (map (eval t f) xs)
+
+instance SymConstraints2 f a b => Eval a b (SymExp f a) b where
+  eval t f (x :** n) = eval t f x ** t n
+
+instance SymConstraints2 f a b => Eval a b (SymVar f a) b where
+  eval t f (Var i)                  = f i
+  eval t f (Poly (OS v))            = eval t f v
+  eval t f (Fn1 op _ (OS x))        = fn op (eval t f x)
+  eval t f (Fn2 op _ (OS x) (OS y)) = fn op (eval t f x) (eval t f y)
+  eval t f (FnN op _ xs)            = fn op (map (eval t f . unOS) xs)
+
+
+-- | Turns a partial variable resolver function into a full function, by leaving
+--   unbound variables abstract.
+var_maybe :: SymConstraints f a => (VarID -> Maybe (Sym f a)) -> VarID -> Sym f a
+var_maybe f i = fromMaybe (var i) (f i)
 
 
 class    ToSym t       where sym :: SymConstraints f a => t f a -> Sym f a

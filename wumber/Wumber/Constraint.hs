@@ -1,3 +1,4 @@
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE ExistentialQuantification #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -9,6 +10,7 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE ConstraintKinds #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 -- | Numerically specified constraint equations. These are solved with a hybrid
@@ -16,6 +18,13 @@
 --   then we take each of those and isolate/substitute variables, and finally we
 --   JIT a cost function with whichever variables remain and pass that to the
 --   GSL BGFS solver.
+
+-- TODO
+-- WTF ... why do I even have CEqual etc? If the goal is to minimize CVals, then
+-- we can do it by setting some expression to zero; that's an implied equation
+-- and good enough for 'isolate'.
+--
+-- Let's rework this and get rid of the 'Constraint' type.
 
 module Wumber.Constraint where
 
@@ -32,8 +41,10 @@ import Wumber.Numeric
 import Wumber.Symbolic
 
 
--- | A value being constrained in some way.
+-- | A value being constrained by one of the 'Constraint' variants.
 type CVal f = Sym f R
+
+type CConstraints f = (FConstraints f R, Functionable f ([CVal f] -> CVal f))
 
 
 -- | Constraints to be solved or minimized. Although both can be reduced to cost
@@ -44,6 +55,11 @@ data Constraint f = CEqual    !(CVal f) !(CVal f)
                   | CMinimize !(CVal f)
                   | CInitialize !VarID !R
   deriving (Show, Eq)
+
+instance CConstraints f => Eval R (CVal f) (Constraint f) (Constraint f) where
+  eval t f (CEqual a b)      = CEqual (eval t f a) (eval t f b)
+  eval t f (CMinimize a)     = CMinimize (eval t f a)
+  eval _ _ (CInitialize _ _) = error "can't evaluate CInitialize"
 
 
 -- | 'Constrained' is a monad that keeps track of 'Var' IDs and collects

@@ -32,6 +32,7 @@ import qualified Data.Vector.Storable as VS
 
 import Wumber.ClosedComparable
 import Wumber.Constraint
+import Wumber.ConstraintSimplify
 import Wumber.ConstraintSplit
 import Wumber.Numeric
 import Wumber.Symbolic
@@ -57,7 +58,7 @@ solve δ n m = b where (b, _, _) = solve_full δ n m
 
 solve_full :: (FConstraints f R, Rewritable f a b)
            => R -> Int -> Constrained f a -> (b, Vector R, [Constraint f])
-solve_full δ n m = (rewrite (eval (solution !)) a, solution, cs)
+solve_full δ n m = (rewrite (eval id (solution !)) a, solution, cs)
   where solution = VS.replicate (1 + foldl1 max (map fst solved)) 0 VS.// solved
         (a, cs)  = evalRWS m () 0
         solved   = concatMap (solve' δ n) (subsystems cs)
