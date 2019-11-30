@@ -92,9 +92,12 @@ benchmark wumber-bench
                      , WumberBench.Contour
                      , WumberBench.HandcodedFns
                      , WumberBench.HintLoad
+                     , WumberBench.JIT
   build-depends:       base >= 4.12
                      , bytestring
+                     , containers
                      , criterion >= 1.5.6.0
+                     , deepseq
                      , hint
                      , linear
                      , microlens >= 0.4

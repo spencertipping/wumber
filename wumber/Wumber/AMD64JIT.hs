@@ -2,6 +2,7 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 -- | JIT backend for the AMD64 instruction set with SSE2. Consumes
@@ -26,6 +27,7 @@ import Data.IntMap       (IntMap(..), (!))
 import Data.List         (sortOn)
 import Data.Maybe        (fromJust)
 import Data.Word         (Word8(..), Word16(..))
+import GHC.Generics      (Generic(..), Generic1(..))
 import Lens.Micro
 import Lens.Micro.TH     (makeLenses)
 
@@ -54,6 +56,7 @@ type Asm t = Assembler ProcessorModel AsmState t
 --   need to model that cost when we're deciding what to schedule next.
 data Encoded a = Inline (Asm a)
                | FnCall (Asm a)
+  deriving (Generic, Generic1)
 
 is_fncall            = not . is_inline
 is_inline (Inline _) = True
@@ -69,7 +72,7 @@ empty_regset = RS 0
 
 -- TODO: a model that provides an expected deadline for any given instruction.
 data ProcessorModel = PM { _pm_cbias :: Priority }
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic)
 
 
 -- | A model of the thread graph and processor that represents the current
@@ -77,7 +80,7 @@ data ProcessorModel = PM { _pm_cbias :: Priority }
 --   ('ps_tr').
 data AsmState = AS { _as_g  :: ThreadGraph Double,
                      _as_tr :: IntMap XMMReg }
-  deriving (Show, Eq)
+  deriving (Show, Eq, Generic)
 
 
 makeLenses ''AsmState

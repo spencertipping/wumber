@@ -3,6 +3,8 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE DeriveGeneric #-}
+
 {-# OPTIONS_GHC -funbox-strict-fields -Wincomplete-patterns #-}
 
 -- | Intermediate representation for JITable expressions. This is the bulk of
@@ -31,6 +33,7 @@ import Data.List           (foldl', groupBy, inits, sortOn)
 import Data.Map            (Map)
 import Data.Maybe          (fromJust)
 import Data.Tuple          (swap)
+import GHC.Generics        (Generic(..), Generic1(..))
 import Lens.Micro          ((&))
 import Lens.Micro.TH       (makeLenses)
 import Text.Printf         (printf)
@@ -51,7 +54,7 @@ import Wumber.Symbolic
 
 data ThreadGraph a = TG { _tg_ret :: !ThreadID,
                           _tg_thr :: IntMap [Insn a] }
-  deriving (Eq)
+  deriving (Eq, Generic, Generic1)
 
 type ThreadID = Int
 
@@ -69,7 +72,7 @@ data Insn a = LoadVal !a
             | I1      !SymFn1
             | I2      !SymFn2 !ThreadID
             | I2C     !SymFn2 !a
-  deriving (Eq, Ord)
+  deriving (Eq, Ord, Generic, Generic1)
 
 
 data InsnProfile = PI1  !SymFn1
@@ -78,7 +81,7 @@ data InsnProfile = PI1  !SymFn1
                  | PLoadVal
                  | PLoadVar
                  | PLoadThr
-  deriving (Eq, Ord, Show)
+  deriving (Eq, Ord, Show, Generic)
 
 newtype GraphProfile = GP (Map InsnProfile Int)
 

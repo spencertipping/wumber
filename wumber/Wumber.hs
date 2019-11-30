@@ -2,6 +2,7 @@
 
 module Wumber (
   module Wumber.AMD64Asm,
+  module Wumber.AMD64JIT,
   module Wumber.BoundingBox,
   module Wumber.ClosedComparable,
   module Wumber.Constraint,
@@ -23,6 +24,7 @@ module Wumber (
 import Control.Monad.RWS.Strict
 
 import Wumber.AMD64Asm
+import Wumber.AMD64JIT
 import Wumber.BoundingBox
 import Wumber.ClosedComparable
 import Wumber.Constraint

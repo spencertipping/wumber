@@ -30,21 +30,6 @@ import Wumber.Numeric
 import Wumber.Symbolic
 
 
--- | Separates independent subsystems. This is the first thing we do when
---   simplifying a set of constraints.
---
---   TODO
---   Algebraic simplification from 'ConstraintSimplify'
-
-subsystems :: [Constraint f] -> [Subsystem f]
-subsystems cs = cs & map (\c -> ([c], constraint_deps c))
-                   & group_by_overlap
-                   & map fst
-                   -- Simplification goes here
-                   & filter (not . null)
-                   & map subsystem
-
-
 -- | 'Subsystem cs v inits' means "a set of constraints whose variables have
 --   compact 'Int's, and you can convert each back to the original using
 --   'v ! i'". 'remap_solution' does this for you once you have a 'Vector' with
@@ -59,6 +44,21 @@ data Subsystem f = Subsystem { _ss_constraints :: [Constraint f],
   deriving (Show, Generic)
 
 makeLenses ''Subsystem
+
+
+-- | Separates independent subsystems. This is the first thing we do when
+--   simplifying a set of constraints.
+--
+--   TODO
+--   Algebraic simplification from 'ConstraintSimplify'
+
+subsystems :: [Constraint f] -> [Subsystem f]
+subsystems cs = cs & map (\c -> ([c], constraint_deps c))
+                   & group_by_overlap
+                   & map fst
+                   -- Simplification goes here
+                   & filter (not . null)
+                   & map subsystem
 
 
 -- | Reduces a set of constraints to a subsystem with compactly-identified
