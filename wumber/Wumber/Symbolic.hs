@@ -158,11 +158,10 @@ class Eq a => StaticOrd a where
   (<<)     :: a -> a -> Bool
   a << b = compare' a b == LT
 
-instance {-# OVERLAPPING #-} (Eq a, Eq f, Ord a, Ord f) => StaticOrd (Sym f a) where
+instance {-# OVERLAPPABLE #-} (Eq a, Ord a) => StaticOrd a where compare' = compare
+instance (Eq a, Eq f, Ord a, Ord f) => StaticOrd (Sym f a) where
   compare' a b = compare' (OS a) (OS b)
 
-instance {-# OVERLAPPING #-} (Eq a, Ord a) => StaticOrd a where
-  compare' = compare
 
 
 type ShowConstraints f a = (Num a, Eq a, Show a, Show f)
@@ -386,15 +385,23 @@ instance NumConstraints a => Functionable SymFn2 (a -> a -> a) where
 
 
 -- | Returns a set of all 'Var' indexes used by an expression.
-vars_in :: Sym f a -> Set VarID
-vars_in (xs :+ b) = unions (map vars_in_t xs)
-  where vars_in_t (a :* xs)     = unions (map vars_in_e xs)
-        vars_in_e (x :** n)     = vars_in_v x
-        vars_in_v (Var i)       = singleton i
-        vars_in_v (Poly (OS v)) = vars_in v
-        vars_in_v (Fn1 _ v _)   = v
-        vars_in_v (Fn2 _ v _ _) = v
-        vars_in_v (FnN _ v _)   = v
+class HasVars a where vars_in :: a -> Set VarID
+
+instance SymConstraints f a => HasVars (Sym f a) where
+  vars_in (xs :+ b) = unions (map vars_in xs)
+
+instance SymConstraints f a => HasVars (SymTerm f a) where
+  vars_in (a :* xs) = unions (map vars_in xs)
+
+instance SymConstraints f a => HasVars (SymExp f a) where
+  vars_in (x :** n) = vars_in x
+
+instance SymConstraints f a => HasVars (SymVar f a) where
+  vars_in (Var i)       = singleton i
+  vars_in (Poly (OS v)) = vars_in v
+  vars_in (Fn1 _ v _)   = v
+  vars_in (Fn2 _ v _ _) = v
+  vars_in (FnN _ v _)   = v
 
 
 instance Bounded a => Bounded (Sym f a) where

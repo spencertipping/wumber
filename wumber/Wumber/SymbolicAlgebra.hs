@@ -1,9 +1,15 @@
+{-# LANGUAGE MonoLocalBinds #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE IncoherentInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FunctionalDependencies #-}
 
-{-# OPTIONS_GHC -funbox-strict-fields #-}
+{-# OPTIONS_GHC -funbox-strict-fields -Wincomplete-patterns #-}
 
 -- | Algebraic simplification/rewriting for 'Sym' quantities. The most important
 --   operation here is 'isolate', which attempts to isolate a variable within an
@@ -13,6 +19,7 @@ module Wumber.SymbolicAlgebra where
 
 
 import Data.Binary  (Binary(..))
+import Data.List    (partition)
 import Data.Set     (member)
 import GHC.Generics (Generic(..))
 
@@ -26,19 +33,67 @@ import Wumber.Symbolic
 --   itself, or until we don't know how to invert an expression. Most of this
 --   logic is delegated to 'Invertible'.
 
-isolate :: (Invertible (Sym f a), SymConstraints f a)
-        => VarID -> Sym f a -> Sym f a -> Maybe (Sym f a)
+isolate :: SymConstraints f a => VarID -> Sym f a -> Sym f a -> Maybe (Sym f a)
 isolate v lhs rhs | lv && rv  = isolate v (lhs - rhs) 0
                   | rv        = isolate v rhs lhs
-                  | otherwise = invert v lhs >>= \f -> return (f rhs)
+                  | otherwise = invert v lhs >>= \f -> Just (f rhs)
   where lv = member v (vars_in lhs)
         rv = member v (vars_in rhs)
 
 
--- | Things that can be inverted, at least sometimes. Inversion happens with
---   respect to a specific variable.
-class Invertible a where invert :: VarID -> a -> Maybe (a -> a)
+-- | Things that can provide inversions against 'Sym' quantities.
+class Invertible a b where invert :: VarID -> a -> Maybe (b -> b)
 
-(??) :: Maybe (a -> b) -> a -> Maybe b
-Nothing ?? x = Nothing
-Just f  ?? x = Just (f x)
+(^.) :: Maybe (b -> c) -> Maybe (a -> b) -> Maybe (a -> c)
+Just f ^. Just g = Just (f . g)
+_      ^. _      = Nothing
+
+
+instance SymConstraints f a => Invertible (Sym f a) (Sym f a) where
+  invert v (ts :+ n) | length i == 1 = invert v (head i) ^. Just (+ (- (o :+ n)))
+                     | otherwise     = Nothing
+    where (i, o) = partition (member v . vars_in) ts
+
+instance SymConstraints f a => Invertible (SymTerm f a) (Sym f a) where
+  invert v (a :* es) | length i == 1 = invert v (head i) ^. Just (/ (sym (a :* o)))
+                     | otherwise     = Nothing
+    where (i, o) = partition (member v . vars_in) es
+
+instance SymConstraints f a => Invertible (SymExp f a) (Sym f a) where
+  invert v (x :** n) = invert v x ^. Just (** (val (1 / n)))
+
+instance SymConstraints f a => Invertible (SymVar f a) (Sym f a) where
+  invert v (Poly (OS x))    = invert v x
+  invert v (Var i) | i == v = Just id
+  invert v (Var _)          = Nothing
+  invert v (Fn1 f _ (OS x)) = invert v x ^. invert v f
+  invert v (FnN _ _ _)      = Nothing
+
+  -- Most binary functions can't be inverted easily, but Pow can if either the
+  -- exponent or base is constant.
+  invert v (Fn2 Pow _ (OS x) (OS ([] :+ n))) =
+    invert v x ^. Just (** (val (1 / n)))
+
+  invert v (Fn2 Pow _ (OS ([] :+ n)) (OS x)) =
+    invert v x ^. Just (\x -> log x / log (val n))
+
+  invert v (Fn2 _ _ _ _) = Nothing
+
+instance SymConstraints f a => Invertible SymFn1 (Sym f a) where
+  invert _ Log    = Just exp
+  invert _ Exp    = Just log
+  invert _ Sin    = Just asin
+  invert _ Cos    = Just acos
+  invert _ Tan    = Just atan
+  invert _ Asin   = Just sin
+  invert _ Acos   = Just cos
+  invert _ Atan   = Just tan
+  invert _ Sinh   = Just asinh
+  invert _ Cosh   = Just acosh
+  invert _ Tanh   = Just atanh
+  invert _ Asinh  = Just sinh
+  invert _ Acosh  = Just cosh
+  invert _ Atanh  = Just tanh
+  invert _ Negate = Just negate
+  invert _ Sqrt   = Just (** 2)
+  invert _ _      = Nothing
