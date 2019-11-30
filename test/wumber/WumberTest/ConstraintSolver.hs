@@ -52,7 +52,7 @@ solvable :: (FConstraints f R, Rewritable f a b, Show b)
 solvable δ n m = counterexample (show (xs, v, a)) $ v <= ε
   where ε           = sqrt δ
         (a, xs, cs) = solve_full δ n m
-        v           = eval (xs VS.!) (constraint_cost cs)
+        v           = eval id (xs VS.!) (constraint_cost cs)
 
 
 solve_δ    = 1e-6

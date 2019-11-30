@@ -212,7 +212,7 @@ prop_symjit s v = size_ok && bounds_ok ==> property test
              | otherwise           = counterexample help test_ok
 
         test_ok = isJust y && close_enough x y'
-        x       = eval (v !) s
+        x       = eval id (v !) s
         code    = assemble_graph (PM 0) (thread s)
         y       = unsafePerformIO $ forkjit code s v
         y'      = fromMaybe (1/0) y

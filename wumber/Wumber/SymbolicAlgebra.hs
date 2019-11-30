@@ -14,7 +14,10 @@
 -- | Algebraic simplification/rewriting for 'Sym' quantities. The most important
 --   operation here is 'isolate', which attempts to isolate a variable within an
 --   equation.
-module Wumber.SymbolicAlgebra where
+module Wumber.SymbolicAlgebra (
+  isolate,
+  Invertible(..)
+) where
 
 
 import Data.Binary  (Binary(..))
