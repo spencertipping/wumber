@@ -6,6 +6,7 @@ module Wumber (
   module Wumber.BoundingBox,
   module Wumber.ClosedComparable,
   module Wumber.Constraint,
+  module Wumber.ConstraintSimplify,
   module Wumber.ConstraintSolver,
   module Wumber.Cursor,
   module Wumber.DualContour,
@@ -14,6 +15,7 @@ module Wumber (
   module Wumber.JITIR,
   module Wumber.Numeric,
   module Wumber.Symbolic,
+  module Wumber.SymbolicAlgebra,
   module Wumber.SymbolicJIT,
 
   Wumber,
@@ -28,6 +30,7 @@ import Wumber.AMD64JIT
 import Wumber.BoundingBox
 import Wumber.ClosedComparable
 import Wumber.Constraint
+import Wumber.ConstraintSimplify
 import Wumber.ConstraintSolver
 import Wumber.Cursor
 import Wumber.DualContour
@@ -36,6 +39,7 @@ import Wumber.JIT
 import Wumber.JITIR
 import Wumber.Numeric
 import Wumber.Symbolic
+import Wumber.SymbolicAlgebra
 import Wumber.SymbolicJIT
 
 
