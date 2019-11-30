@@ -2,6 +2,7 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
@@ -15,9 +16,10 @@ module Wumber.ConstraintSplit (
 ) where
 
 
-import Data.List    (partition)
-import GHC.Generics (Generic)
-import Lens.Micro   ((&))
+import Data.List     (partition)
+import GHC.Generics  (Generic)
+import Lens.Micro    ((&))
+import Lens.Micro.TH (makeLenses)
 
 import qualified Data.Set             as S
 import qualified Data.Vector          as V
@@ -30,10 +32,15 @@ import Wumber.Symbolic
 
 -- | Separates independent subsystems. This is the first thing we do when
 --   simplifying a set of constraints.
+--
+--   TODO
+--   Algebraic simplification from 'ConstraintSimplify'
+
 subsystems :: [Constraint f] -> [Subsystem f]
 subsystems cs = cs & map (\c -> ([c], constraint_deps c))
                    & group_by_overlap
                    & map fst
+                   -- Simplification goes here
                    & filter (not . null)
                    & map subsystem
 
@@ -46,8 +53,12 @@ subsystems cs = cs & map (\c -> ([c], constraint_deps c))
 --   'Subsystem' also collects the initial value of each variable and removes
 --   those elements from the 'Constraint' list.
 
-data Subsystem f = Subsystem [Constraint f] (V.Vector VarID) (VS.Vector R)
+data Subsystem f = Subsystem { _ss_constraints :: [Constraint f],
+                               _ss_remap       :: V.Vector VarID,
+                               _ss_init        :: VS.Vector R }
   deriving (Show, Generic)
+
+makeLenses ''Subsystem
 
 
 -- | Reduces a set of constraints to a subsystem with compactly-identified
@@ -55,15 +66,16 @@ data Subsystem f = Subsystem [Constraint f] (V.Vector VarID) (VS.Vector R)
 --   minimizer).
 --
 --   TODO
---   This function should call into the algebraic simplification stuff so that
---   our subsystems are fully reduced when they get sent off to the solver.
+--   Actually compact the variables
 
 subsystem :: [Constraint f] -> Subsystem f
-subsystem cs = Subsystem cs (V.generate (maxid + 1) id) inits
+subsystem cs = Subsystem cs remap inits
   where maxid = S.findMax $ S.unions $ map constraint_deps cs
         inits = VS.generate (maxid + 1) (const 0) VS.// ivs
         ivs   = cs & concatMap \case CInitialize i v -> [(i, v)]
                                      _               -> []
+
+        remap = V.generate (maxid + 1) id      -- FIXME
 
 
 -- | Remaps a compact solution vector into the original variable space by
@@ -72,6 +84,7 @@ subsystem cs = Subsystem cs (V.generate (maxid + 1) id) inits
 --   for constraint systems to get partitioned into multiple subproblems and
 --   recombined after the fact (which isn't an operation that vectors are
 --   particularly good at).
+
 remap_solution :: V.Vector VarID -> VS.Vector R -> [(VarID, R)]
 remap_solution mi xs = V.toList mi `zip` VS.toList xs
 

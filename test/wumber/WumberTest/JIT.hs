@@ -1,5 +1,6 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE CPP #-}
 
 module WumberTest.JIT where
 
@@ -13,6 +14,14 @@ import Test.QuickCheck
 
 import Wumber.JIT
 
+
+#if __amd64__ || __amd64 || __x86_64__ || __x86_64
+#  define WUMBER_ARCH amd64
+#else
+#  define WUMBER_ARCH unknown
+#endif
+
+#if WUMBER_ARCH == amd64
 
 -- Test bare JIT: no assembler or anything, just the compiler and FFI.
 prop_bare_jit_works :: Double -> Bool
@@ -45,6 +54,8 @@ sin_2x :: Double -> Double
 sin_2x x = unsafePerformIO do
   f <- compile_machinecode dblfn sin_2x_code
   unsafeWith (fromList [100, x]) f
+
+#endif
 
 
 return []

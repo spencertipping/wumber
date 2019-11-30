@@ -39,6 +39,9 @@ hex (d1:d2:s) = do tell $ B.word8 (fromIntegral h); hex s
 
 
 -- | A register set of some size.
+--
+--   TODO: make this less silly
+
 newtype RegSet a = RS a deriving (Show, Eq)
 
 regset :: (Integral a, Num b, FiniteBits b) => [a] -> RegSet b
