@@ -26,6 +26,11 @@
 --
 -- Let's rework this and get rid of the 'Constraint' type.
 
+-- TODO
+-- Do we need initial values? Can we set everything to zero instead? (I guess
+-- the problem with that is that if you do need an initial value, you'll
+-- compromise your solution to specify it.)
+
 module Wumber.Constraint where
 
 

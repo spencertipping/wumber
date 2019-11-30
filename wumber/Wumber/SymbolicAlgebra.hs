@@ -49,6 +49,11 @@ _      ^. _      = Nothing
 
 
 instance SymConstraints f a => Invertible (Sym f a) (Sym f a) where
+  -- TODO
+  -- Implement Cantor-Zassenhaus to try to factor polynomials when we see the
+  -- variable mentioned in multiple terms.
+  --
+  -- https://kluedo.ub.uni-kl.de/frontdoor/deliver/index/docId/3555/file/Doktorarbeit_Martin_Lee.pdf
   invert v (ts :+ n) | length i == 1 = invert v (head i) ^. Just (+ (- (o :+ n)))
                      | otherwise     = Nothing
     where (i, o) = partition (member v . vars_in) ts

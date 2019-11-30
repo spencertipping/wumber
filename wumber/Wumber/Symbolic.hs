@@ -231,6 +231,11 @@ instance SymConstraints2 f a b => Eval a b (SymVar f a) b where
   eval t f (FnN op _ xs)            = fn op (map (eval t f . unOS) xs)
 
 
+-- | Re-evaluates a symbolic structure, allowing it to potentially collapse
+--   certain unreduced terms. It isn't normally necessary to do this.
+normalize = eval val var
+
+
 -- | Turns a partial variable resolver function into a full function, by leaving
 --   unbound variables abstract.
 var_maybe :: SymConstraints f a => (VarID -> Maybe (Sym f a)) -> VarID -> Sym f a
