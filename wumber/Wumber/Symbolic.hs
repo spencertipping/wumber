@@ -257,6 +257,9 @@ merge_with v i f (x:xs) (y:ys) | v x << v y = i x   : merge_with v i f xs (y:ys)
 
 
 -- | Polynomial addition with term grouping.
+--
+--   TODO: collapse to a constant when the constant term is non-finite
+
 padd :: SymConstraints f a => Sym f a -> Sym f a -> Sym f a
 padd (xs :+ a) (ys :+ b) = concat (merge_with te (: []) tadd xs ys) :+ (a + b)
   where te (_ :* es) = es

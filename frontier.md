@@ -56,9 +56,11 @@
   + Constant vector + indexing
 + JIT
   + Reverse-engineer instruction latency/throughput
-  + Redo instruction scheduler
+  + Preload operands into registers while ALUs are busy
+    + Model processor ports at some level
 + Constraints
   + Simplify linear subsystems
+  + Variable substitution for nonlinear systems
 + Simulation
   + 4D meshing for animation/object-through-time collision detection
     + Collisions happen only at the `t` coordinates of 4D vertices

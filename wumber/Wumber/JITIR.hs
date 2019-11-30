@@ -1,3 +1,4 @@
+{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
@@ -27,6 +28,7 @@ import Control.Monad.State (State, gets, modify', runState)
 import Data.IntMap.Strict  (IntMap, (!), (!?), adjust, assocs, delete, elems,
                             empty, keys, insert, lookupMax, member, size)
 import Data.List           (foldl', groupBy, inits, sortOn)
+import Data.Map            (Map)
 import Data.Maybe          (fromJust)
 import Data.Tuple          (swap)
 import Lens.Micro          ((&))
@@ -57,6 +59,10 @@ type ThreadID = Int
 -- | A single transformation within a thread. 'LoadVal', 'LoadVar', and
 --   'LoadThr' are used only at the beginning of a thread to set an initial
 --   value.
+--
+--   TODO: add memory->register loads here; then the JIT backend won't have to
+--   track residence or defensively unspill registers when allocating them.
+
 data Insn a = LoadVal !a
             | LoadVar !VarID
             | LoadThr !ThreadID
@@ -64,6 +70,17 @@ data Insn a = LoadVal !a
             | I2      !SymFn2 !ThreadID
             | I2C     !SymFn2 !a
   deriving (Eq, Ord)
+
+
+data InsnProfile = PI1  !SymFn1
+                 | PI2  !SymFn2
+                 | PI2C !SymFn2
+                 | PLoadVal
+                 | PLoadVar
+                 | PLoadThr
+  deriving (Eq, Ord, Show)
+
+newtype GraphProfile = GP (Map InsnProfile Int)
 
 
 -- | Thread read latency, used for scheduling purposes. Usually threads will
@@ -99,6 +116,10 @@ instance Show a => Show (Insn a) where
   show (I2 f t)    = printf "%.3s(%d)" (show f) t
   show (I2C f x)   = printf "%.3s(%s)" (show f) (show x)
 
+instance Show GraphProfile where
+  show (GP m) = concatMap format (M.assocs m)
+    where format (p, c) = printf "% 4d  %s\n" c (show p)
+
 
 -- | Returns the number of threads referred to by a thread graph. This is an
 --   upper bound on the number of local variable slots you should allocate.
@@ -124,10 +145,43 @@ thread_step :: ThreadGraph a -> ThreadID -> (Insn a, ThreadGraph a)
 thread_step (TG r g) t = (head (g ! t), TG r (adjust tail t g))
 
 
+-- TODO
+-- Lift the latency model into a form we can use here, then explore the "within
+-- N time steps" frontier for register load dependencies.
+
+
+-- TODO
+-- 'thread_unstep'
+--
+-- Is there a way to generalize this and thread_step? Ideally so we can operate
+-- on multiple threads at once.
+
+
+-- | Profiles a graph by measuring how many times it invokes each 'SymFn'
+--   variant.
+profile_graph :: ThreadGraph a -> GraphProfile
+profile_graph (TG _ g) = GP $ M.unionsWith (+) $ map (flip M.singleton 1 . p)
+                                               $ concat (elems g)
+  where p (LoadVal _) = PLoadVal
+        p (LoadVar _) = PLoadVar
+        p (LoadThr _) = PLoadThr
+        p (I1 f)      = PI1 f
+        p (I2 f _)    = PI2 f
+        p (I2C f _)   = PI2C f
+
+
 -- | Takes a 'Sym' expression and reduces it to a thread graph. Every thread
 --   begins with a 'Load' instruction. The thread graph we return will be
 --   deduplicated, but will have a dense set of thread IDs. This means thread
 --   IDs can be mapped directly to local variable offsets in an 'alloca' region.
+--
+--   TODO: index common subexpressions and assign them to threads. The example
+--   iso model has duplicated work like this:
+--
+--   @
+--   -1.0·Pow(x² + y² + z², 0.5)
+--   -1.0·Pow(-1.8·x + x² + -1.8·y + y² + -1.8·z + z² + 2.43, 0.5)
+--   @
 
 thread :: SymConstraints f a => Sym f a -> ThreadGraph a
 thread s = TG ret g & deduplicate
