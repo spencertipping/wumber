@@ -24,6 +24,12 @@ import Wumber.Symbolic
 import Wumber.SymbolicAlgebra
 
 
+-- TODO
+-- Rewrite most of this code. It mostly works, but isn't at all efficient about
+-- rewriting and often fails to normalize the substitution mappings to any sane
+-- form (e.g. we get a lot of x = y + 1; y = z + 1; z = t + 1; ...)
+
+
 -- | Tries to reduce the number of independent variables within a set of
 --   constraints by applying algebraic substitutions to variables that can be
 --   isolated.
@@ -41,8 +47,6 @@ import Wumber.SymbolicAlgebra
 
 csimplify :: AlgConstraints f R
           => [CVal f] -> ([CVal f], IntMap (CVal f), IntMap R)
-
--- TODO: this function does a bunch of redundant rewriting
 
 csimplify cs
   | IM.null m = (cs', m, solved)

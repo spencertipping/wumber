@@ -9,6 +9,8 @@
 module WumberTest.ConstraintSolver where
 
 import Control.Monad (foldM)
+import Control.Monad.RWS (evalRWS)
+import Data.Either (rights)
 import Data.Foldable (toList)
 import Lens.Micro
 import Linear.Metric (norm, distance)
@@ -24,6 +26,7 @@ import Debug.Trace
 
 import Wumber.Constraint
 import Wumber.ConstraintSplit
+import Wumber.ConstraintSimplify
 import Wumber.ConstraintSolver
 import Wumber.GeometricConstraints
 import Wumber.Numeric
@@ -172,12 +175,39 @@ prop_hexagon a b c d e f (Positive dist) = t do
   return av
 
 
-prop_varchains :: V2 R -> Property
-prop_varchains v = t do
+prop_vec_varchains :: V2 R -> Property
+prop_vec_varchains v = t $ vec_varchain 15 v
+
+prop_varchains :: R -> Property
+prop_varchains v = t $ varchain 30 v
+
+
+vec_varchain :: Int -> V2 R -> Constrained () (V2 (CVal ()))
+vec_varchain n v = do
   v0 <- cvars v
-  foldM (\vn i -> do v' <- cvars v
-                     v' =-= vn + 1
-                     return v') v0 [1..10]
+  vn <- foldM (\vn i -> do v' <- cvars v
+                           v' =-= vn + 1
+                           return v') v0 [1..n]
+  vn =-= fmap val v
+  return vn
+
+
+varchain :: Int -> R -> Constrained () [CVal ()]
+varchain 0 v = (: []) <$> cvar v
+varchain n v = do vn <- cvar v
+                  vc <- head <$> varchain (n - 1) v
+                  vn =-= vc + 1
+                  return [vn]
+
+{-
+To see how simplify handles large var chains, I tried this in the repl:
+
+csimplify (rights (snd (evalRWS (vec_varchain 30 (V2 0 0)) () 0)))
+csimplify (rights (snd (evalRWS (varchain 30 0) () 0)))
+
+Currently, varchain works correctly while vec_varchain doesn't collapse
+rewrites. varchain 60 is also much faster than vec_varchain 30.
+-}
 
 
 return []

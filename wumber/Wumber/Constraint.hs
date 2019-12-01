@@ -18,14 +18,12 @@
 module Wumber.Constraint where
 
 
-import Control.Monad.RWS (RWS, gets, modify', tell)
+import Control.Monad.RWS (RWS, get, modify', tell)
 import Data.Binary       (Binary)
 import Data.Either       (lefts, rights)
 import Data.Foldable     (toList)
-import Data.IntMap       (IntMap, insert, (!?))
 import Data.Maybe        (isJust)
 import GHC.Generics      (Generic(..))
-import Lens.Micro        (_1, _2, (%~), (&))
 
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
@@ -45,13 +43,13 @@ type CVal f = Sym f R
 --   use one such monad per independent constraint system within a project,
 --   although it's fine to combine many into one: Wumber will figure out when
 --   you have separable subsystems and solve them independently.
-type Constrained f = RWS () [Either (VarID, R) (CVal f)] (VarID, IntMap (CVal f))
+type Constrained f = RWS () [Either (VarID, R) (CVal f)] VarID
 
 
 -- | Create a new constrained variable initialized to the specified value.
 cvar :: FConstraints f R => R -> Constrained f (CVal f)
-cvar init = do id <- gets fst
-               modify' (_1 %~ (+ 1))
+cvar init = do id <- get
+               modify' (+ 1)
                tell [Left (id, init)]
                return $ var id
 
@@ -63,32 +61,15 @@ cvars = mapM cvar
 -- | Sets two constrained quantities equal to each other. When the two
 --   quantities yield isolatable terms, adds entries to the substitution map.
 set_equal :: AlgConstraints f R => CVal f -> CVal f -> Constrained f (CVal f)
-set_equal a b = do m <- gets snd
-                   let v = rewrite_vars m (a - b)
-                   update_rewrite_table v
+set_equal a b = do let v = a - b
                    tell [Right v]
                    return v
 
 -- | Sets one constrained quantity to be less than the other.
 set_below :: AlgConstraints f R => CVal f -> CVal f -> Constrained f (CVal f)
-set_below a b = do m <- gets snd
-                   let v = rewrite_vars m $ (b - a) `upper` 0
+set_below a b = do let v = (b - a) `upper` 0
                    tell [Right v]
                    return v
-
-
--- | Isolates local variables to create new entries in the substitution table.
---   This isn't an exact science; the main purpose is to pre-simplify the set of
---   variables before we send the resulting constraints off to modules like
---   'ConstraintSplit' and 'ConstraintSimplify'.
-update_rewrite_table :: AlgConstraints f R => CVal f -> Constrained f ()
-update_rewrite_table v = do
-  m <- gets snd
-  let vars = IS.filter (not . flip IM.member m) (vars_in v) & IS.toList
-      isos = zip vars (map (isolate v 0) vars)
-             & filter (isJust . snd)
-             & map (\(a, Just b) -> (a, normalize b))
-  modify' $ _2 %~ IM.union (IM.fromList isos)
 
 
 -- | Constraint equivalence. The premise is that we can reduce each constraint

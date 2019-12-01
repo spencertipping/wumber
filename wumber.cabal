@@ -74,6 +74,7 @@ test-suite wumber-tests
                      , generic-random
                      , linear
                      , microlens >= 0.4
+                     , mtl
                      , process
                      , QuickCheck
                      , unix
