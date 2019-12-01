@@ -45,11 +45,7 @@
   + DC isn't sufficient for realtime modeling: we need boundary/corner hints
   + LOD-variant feature hinting
   + Calculate LOD by view prominence
-+ Sym API
-  + Call back into Haskell/C
-  + Piecewise/`cond`
 + Sym compiler
-  + Algebraic simplification
   + Alias local quantities (SSA variables)
 + Assembler
   + Multi-branch assembly
@@ -58,9 +54,6 @@
   + Reverse-engineer instruction latency/throughput
   + Preload operands into registers while ALUs are busy
     + Model processor ports at some level
-+ Constraints
-  + Simplify linear subsystems
-  + Variable substitution for nonlinear systems
 + Simulation
   + 4D meshing for animation/object-through-time collision detection
     + Collisions happen only at the `t` coordinates of 4D vertices
