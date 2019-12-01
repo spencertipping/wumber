@@ -65,7 +65,7 @@ solve δ n m = (eval id (solved V.!) a, solved)
 
 -- | Solves a single subsystem and returns the solution in sparse '(Int, N)'
 --   tuple form. This is a low-level function used by 'solve'.
-solve_subsystem :: FConstraints f R => R -> Int -> Subsystem f -> [(Int, R)]
+solve_subsystem :: AlgConstraints f R => R -> Int -> Subsystem f -> [(Int, R)]
 solve_subsystem δ n ss = remap_solution ss xs
   where (xs, _)     = minimizeV NMSimplex2 δ n search_size f (_ss_init ss)
         f           = jit (constraint_cost (_ss_compact ss))

@@ -187,10 +187,10 @@ profile_graph (TG _ g) = GP $ M.unionsWith (+) $ map (flip M.singleton 1 . p)
 --   -1.0·Pow(-1.8·x + x² + -1.8·y + y² + -1.8·z + z² + 2.43, 0.5)
 --   @
 
-thread :: SymConstraints f a => Sym f a -> ThreadGraph a
+thread :: AlgConstraints f a => Sym f a -> ThreadGraph a
 thread s = TG ret g & deduplicate
   where
-    (ret, g) = runState (pt s) empty
+    (ret, g) = runState (pt $ normalize s) empty
 
     pt ([t] :+ 0) = tt t
     pt (ts  :+ n) = thr [LoadVal n] >>= (++= mapM (I2 Add <.> tt) ts)

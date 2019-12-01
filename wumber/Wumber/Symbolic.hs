@@ -1,3 +1,4 @@
+{-# LANGUAGE BangPatterns #-}
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE IncoherentInstances #-}
@@ -110,15 +111,15 @@ import Wumber.ClosedComparable
 --   are ordered with 'OrdSym' for this purpose, but that isn't exposed to the
 --   user.
 
-data Sym f a     = [SymTerm f a] :+ a deriving (     Eq, Generic, Binary)
-data SymTerm f a = a :* [SymExp f a]  deriving (Ord, Eq, Generic, Binary)
-data SymExp f a  = SymVar f a :** a   deriving (Ord, Eq, Generic, Binary)
+data Sym f a     = [SymTerm f a] :+ !a  deriving (     Eq, Generic, Binary)
+data SymTerm f a = !a :* [SymExp f a]   deriving (Ord, Eq, Generic, Binary)
+data SymExp f a  = !(SymVar f a) :** !a deriving (Ord, Eq, Generic, Binary)
 
-data SymVar f a = Var !VarID
-                | Poly (OrdSym f a)
-                | Fn1 !SymFn1 (Set VarID) (OrdSym f a)
-                | Fn2 !SymFn2 (Set VarID) (OrdSym f a) (OrdSym f a)
-                | FnN !f      (Set VarID) [OrdSym f a]
+data SymVar f a = Var  !VarID
+                | Poly !(OrdSym f a)
+                | Fn1  !SymFn1 (Set VarID) !(OrdSym f a)
+                | Fn2  !SymFn2 (Set VarID) !(OrdSym f a) !(OrdSym f a)
+                | FnN  !f      (Set VarID) [OrdSym f a]
   deriving (Ord, Eq, Generic, Binary)
 
 infixl 6 :+
@@ -221,16 +222,16 @@ class Eval t r a b | a b -> t, a b -> r where
 type SymConstraints2 f a b = (SymConstraints f a, SymConstraints f b)
 
 instance SymConstraints2 f a b => Eval a b (Sym f a) b where
-  eval t f (ts :+ b) = t b + sum (map (eval t f) ts)
+  eval !t f (!ts :+ b) = t b + sum (map (eval t f) ts)
 
 instance SymConstraints2 f a b => Eval a b (SymTerm f a) b where
-  eval t f (a :* xs) = t a * product (map (eval t f) xs)
+  eval !t f (a :* (!xs)) = t a * product (map (eval t f) xs)
 
 instance SymConstraints2 f a b => Eval a b (SymExp f a) b where
-  eval t f (x :** n) = eval t f x ** t n
+  eval !t f (x :** n) = eval t f x ** t n
 
 instance SymConstraints2 f a b => Eval a b (SymVar f a) b where
-  eval t f (Var i)                  = f i
+  eval _ f (Var i)                  = f i
   eval t f (Poly (OS v))            = eval t f v
   eval t f (Fn1 op _ (OS x))        = fn op (eval t f x)
   eval t f (Fn2 op _ (OS x) (OS y)) = fn op (eval t f x) (eval t f y)
@@ -295,12 +296,13 @@ merge_with v i f (x:xs) (y:ys) | v x << v y = i x   : merge_with v i f xs (y:ys)
 
 -- | Polynomial addition with term grouping.
 padd :: SymConstraints f a => Sym f a -> Sym f a -> Sym f a
-padd (xs :+ a) (ys :+ b)
+padd (!xs :+ a) (!ys :+ b)
   | isNaN a || isNaN b || isInfinite a || isInfinite b = [] :+ (a + b)
-  | otherwise = concat (merge_with te (: []) tadd xs ys) :+ (a + b)
-  where te (_ :* es) = es
-        tadd (a :* x) (b :* _) | a + b /= 0 = [(a + b) :* x]
-                               | otherwise  = []
+  | otherwise = filter nonzero (merge_with te id tadd xs ys) :+ (a + b)
+  where nonzero (n :* _) = n /= 0
+        te (_ :* es) = es
+        tadd (a :* x) (b :* _) | a + b /= 0 = (a + b) :* x
+                               | otherwise  = 0 :* []
 
 
 -- | Polynomial multiplication with term grouping.
@@ -366,7 +368,7 @@ data SymFn1 = Abs
 
 data SymFn2 = Quot
             | Rem
-            | Pow
+            | Pow       -- NOTE: just for non-constant exponents
             | Upper
             | Lower
             | Atan2
@@ -414,8 +416,7 @@ instance NumConstraints a => Functionable SymFn2 (a -> a -> a) where
   fn Add      = (+)
   fn Subtract = (-)
   fn Multiply = (*)
-  fn Divide   = safe_div where safe_div _ 0 = 0
-                               safe_div a b = a / b
+  fn Divide   = (/)
   fn Pow      = (**)
   fn Quot     = quot
   fn Rem      = rem
@@ -558,6 +559,8 @@ instance SymConstraints f a => RealFloat (Sym f a) where
   isNegativeZero _ = error "isNegativeZero is undefined on Syms"
   isIEEE _         = error "isIEEE is undefined on Syms"
 
+  -- NaN and infinity propagate upwards due to behavior in 'padd'. All we need
+  -- to do is check the constant term.
   isNaN      (_ :+ n) = isNaN n
   isInfinite (_ :+ n) = isInfinite n
   atan2 a b           = fn2 Atan2 a b

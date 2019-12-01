@@ -1,3 +1,4 @@
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE CPP #-}
@@ -44,12 +45,12 @@ import Wumber.Symbolic
 --   given 'Arg' state vector. In general, 'jit sym v == eval (v !) sym', but
 --   'jit' will usually be faster if JIT is supported for your platform. You can
 --   use 'is_jit_supported' to determine this.
-jit :: FConstraints f R => Sym f R -> VS.Vector R -> R
+jit :: AlgConstraints f R => Sym f R -> VS.Vector R -> R
 
 
 -- | Compiles a 'Sym' expression to machine code, but doesn't coerce that code
 --   to a function pointer.
-jit_as_machinecode :: FConstraints f R => Sym f R -> BS.ByteString
+jit_as_machinecode :: AlgConstraints f R => Sym f R -> BS.ByteString
 
 
 -- | Returns 'True' if we support JIT on the platform being compiled. You can

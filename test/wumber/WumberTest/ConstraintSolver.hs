@@ -176,7 +176,7 @@ prop_varchains v = t do
   v0 <- cvars v
   foldM (\vn i -> do v' <- cvars v
                      v' =-= vn + 1
-                     return v') v0 [1..30]
+                     return v') v0 [1..10]
 
 
 return []
