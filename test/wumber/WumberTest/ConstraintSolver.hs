@@ -58,7 +58,8 @@ solvable :: (Foldable f, Eval R R a R)
          => R -> Int -> Constrained () (f a) -> Property
 solvable δ n m | isNaN cost || isInfinite cost = discard
                | isNaN v                       = discard
-               | otherwise = counterexample (show (solution, cost, v, a)) $ v <= sqrt δ
+               | otherwise = counterexample (show (solution, cost, v, a))
+                             $ v <= sqrt δ
   where (a :: [R], solution) = solve δ n (toList <$> m)
         (_, subs) = ccompile m
         cost      = constraint_cost (concatMap _ss_constraints subs)
@@ -156,16 +157,15 @@ prop_hexagon a b c d e f (Positive dist) = t do
   aligned _x [av, ev]
   aligned _x [bv, dv]
 
-  -- TODO: why do these constraints cause the test case to fail to converge?
-  {-
   aligned _y   [av, bv]
   aligned _y [fv,     cv]
   aligned _y   [ev, dv]
-  -}
 
+  {-
   all_equal [distance av dv,
              distance bv ev,
              distance cv fv]
+  -}
 
   return av
 
