@@ -61,6 +61,7 @@ module Wumber.Symbolic (
   SymConstraints(..),
   FConstraints(..),
   NumConstraints(..),
+  AlgConstraints(..),
   SymTerm(..),
   SymExp(..),
   SymVar(..),
@@ -148,6 +149,9 @@ type NumConstraints a = (Show a,
                          RealFloat a,
                          Integral a,
                          ClosedComparable a)
+
+type AlgConstraints f a = (SymConstraints f a,
+                           Functionable f ([Sym f a] -> Sym f a))
 
 
 -- | An 'Ord' replacement that works with our hidden 'Ord' thing. 'Sym'

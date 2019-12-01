@@ -1,3 +1,4 @@
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE DeriveGeneric #-}
@@ -13,33 +14,55 @@
 module Wumber.ConstraintSplit (
   subsystems,
   Subsystem(..),
+  merge_solution_vector,
   remap_solution
 ) where
 
 
+import Data.IntMap   (IntMap)
 import Data.List     (partition)
+import Data.Set      (Set)
+import Data.Tuple    (swap)
 import GHC.Generics  (Generic)
 import Lens.Micro    ((&))
 import Lens.Micro.TH (makeLenses)
 
+import qualified Data.IntMap          as IM
 import qualified Data.Set             as S
 import qualified Data.Vector          as V
 import qualified Data.Vector.Storable as VS
 
 import Wumber.Constraint
+import Wumber.ConstraintSimplify
 import Wumber.Numeric
 import Wumber.Symbolic
 
 
--- | 'Subsystem cs v inits' means "a set of constraints whose variables have
---   compact 'Int's, and you can convert each back to the original using
---   'v ! i'". 'remap_solution' does this for you once you have a 'Vector' with
---   solution values.
+-- | A subsystem is a set of mutually dependent constraints that is ready to be
+--   solved numerically. Subsystems have been simplified algebraically and any
+--   solved variables are factored into the '_ss_solved' map; as a result,
+--   '_ss_constraints' may be empty, in which case no numerical step is
+--   required.
 --
---   'Subsystem' also collects the initial value of each variable and removes
---   those elements from the 'Constraint' list.
+--   Because the numerical solver operates on a compactly-indexed vector, we
+--   need to transform our variable indexes to remove holes. That means
+--   '_ss_constraints' doesn't contain the original symbolic quantities; they're
+--   transformed to use fewer variables. '_ss_remap' is a lookup table to
+--   retrieve the original sparse IDs from our compact ones.
+--
+--   Here's which field uses which variable ID space:
+--
+--   @
+--   _ss_constraints : compact
+--   _ss_subst       : original (sparse)
+--   _ss_solved      : original (sparse)
+--   _ss_remap       : compact -> original
+--   _ss_init        : compact
+--   @
 
-data Subsystem f = Subsystem { _ss_constraints :: [Constraint f],
+data Subsystem f = Subsystem { _ss_constraints :: [CVal f],
+                               _ss_subst       :: IntMap (CVal f),
+                               _ss_solved      :: IntMap R,
                                _ss_remap       :: V.Vector VarID,
                                _ss_init        :: VS.Vector R }
   deriving (Show, Generic)
@@ -47,36 +70,40 @@ data Subsystem f = Subsystem { _ss_constraints :: [Constraint f],
 makeLenses ''Subsystem
 
 
+-- | Takes a list of individual subsystem solutions and produces a single vector
+--   in the original variable space.
+merge_solution_vector :: [[(VarID, R)]] -> V.Vector R
+merge_solution_vector vs = V.replicate (1 + foldl1 max (map fst c)) 0 V.// c
+  where c = concat vs
+
+
 -- | Separates independent subsystems. This is the first thing we do when
 --   simplifying a set of constraints.
---
---   TODO
---   Algebraic simplification from 'ConstraintSimplify'
-
-subsystems :: FConstraints f R => [Constraint f] -> [Subsystem f]
-subsystems cs = cs & map (\c -> ([c], constraint_deps c))
-                   & group_by_overlap
-                   & map fst
-                   -- Simplification goes here
-                   & filter (not . null)
-                   & map subsystem
+subsystems :: AlgConstraints f R => V.Vector R -> [CVal f] -> [Subsystem f]
+subsystems init cs = cs & map (\c -> ([c], vars_in c))
+                        & group_by_overlap
+                        & map (subsystem init . fst)
 
 
 -- | Reduces a set of constraints to a subsystem with compactly-identified
 --   variables (whose indexes correspond to 'Vector' indexes used by the GSL
 --   minimizer).
---
---   TODO
---   Actually compact the variables
+subsystem :: AlgConstraints f R => V.Vector R -> [CVal f] -> Subsystem f
+subsystem init cs = Subsystem compact_cs subst solved remap init'
+  where (cs', subst, solved) = csimplify cs
+        (m, remap)           = compact_var_mapping (S.unions (map vars_in cs'))
+        compact_cs           = map (eval val (var . (m IM.!))) cs'
+        init'                = VS.generate (V.length remap)
+                                           ((init V.!) . (m IM.!))
 
-subsystem :: FConstraints f R => [Constraint f] -> Subsystem f
-subsystem cs = Subsystem cs remap inits
-  where maxid = S.findMax $ S.unions $ map constraint_deps cs
-        inits = VS.generate (maxid + 1) (const 0) VS.// ivs
-        ivs   = cs & concatMap \case CInitialize i v -> [(i, v)]
-                                     _               -> []
 
-        remap = V.generate (maxid + 1) id      -- FIXME
+-- | Removes holes from a set of variable IDs, producing a compact set suitable
+--   for numerical solving. Also returns the reverse mapping, which will become
+--   '_ss_remap' in 'Subsystem'.
+compact_var_mapping :: Set VarID -> (IntMap VarID, V.Vector VarID)
+compact_var_mapping s = (IM.fromList (map swap pairs),
+                         V.replicate (length pairs) 0 V.// pairs)
+  where pairs = zip [0..] (S.toAscList s)
 
 
 -- | Remaps a compact solution vector into the original variable space by
@@ -85,14 +112,20 @@ subsystem cs = Subsystem cs remap inits
 --   for constraint systems to get partitioned into multiple subproblems and
 --   recombined after the fact (which isn't an operation that vectors are
 --   particularly good at).
+--
+--   This function produces a list suitable for use by 'merge_solution_vector'.
 
-remap_solution :: V.Vector VarID -> VS.Vector R -> [(VarID, R)]
-remap_solution mi xs = V.toList mi `zip` VS.toList xs
+remap_solution :: FConstraints f R => Subsystem f -> VS.Vector R -> [(VarID, R)]
+remap_solution ss xs = algebraic ++ subst ++ solved
+  where solved    = V.toList (_ss_remap ss) `zip` VS.toList xs
+        algebraic = IM.toList (_ss_solved ss)
+        knowns    = IM.union (_ss_solved ss) (IM.fromList solved)
+        subst     = IM.toList $ IM.map (eval id (knowns IM.!)) (_ss_subst ss)
 
 
 -- | Groups values by overlapping set elements, transitively. The result is a
 --   list of values whose sets are fully disjoint.
-group_by_overlap :: Ord b => [([a], S.Set b)] -> [([a], S.Set b)]
+group_by_overlap :: Ord b => [([a], Set b)] -> [([a], Set b)]
 group_by_overlap [] = []
 group_by_overlap ((l, s) : r)
   | null inside = (l, s) : group_by_overlap r

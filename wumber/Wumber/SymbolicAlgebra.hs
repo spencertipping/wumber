@@ -25,7 +25,6 @@ import Data.List    (partition)
 import Data.Set     (member)
 import GHC.Generics (Generic(..))
 
-import Wumber.Constraint
 import Wumber.Symbolic
 
 

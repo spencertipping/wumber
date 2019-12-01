@@ -1,3 +1,4 @@
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE BlockArguments #-}
@@ -25,13 +26,22 @@ import Wumber.SymbolicAlgebra
 -- | Tries to reduce the number of independent variables within a set of
 --   constraints by applying algebraic substitutions to variables that can be
 --   isolated.
-reduce_constraints :: CConstraints f
-                   => [Constraint f] -> ([Constraint f], IntMap (CVal f))
-reduce_constraints cs = (cs', m)
-  where m   = var_substitutions cs
-        cs' = cs & map (eval val (var_maybe (m !?)))
-                 & filter \case CEqual a b -> a /= b
-                                _          -> True
+--
+--   'csimplify' returns three values:
+--
+--   @
+--   [CVal f]        : the new, hopefully smaller set of constraints
+--   IntMap (CVal f) : the full set of variable substitutions
+--   IntMap R        : any variables with algebraic solutions
+--   @
+
+csimplify :: AlgConstraints f R
+          => [CVal f] -> ([CVal f], IntMap (CVal f), IntMap R)
+csimplify cs = (cs', m, solved)
+  where m      = var_substitutions cs
+        solved = IM.filter is_val m & IM.map (\([] :+ x) -> x)
+        cs'    = cs & map (eval val (var_maybe (m !?)))
+                    & filter (not . S.null . vars_in)
 
 
 -- | Removes cycles from a list of substitutions by applying each one
@@ -40,7 +50,7 @@ reduce_constraints cs = (cs', m)
 --   the first to the second, the first and second to the third, and so forth,
 --   doing a total of /n/ 'eval' operations for /n/ substitution rules.
 
-remove_cycles :: CConstraints f => IntMap (CVal f) -> IntMap (CVal f)
+remove_cycles :: AlgConstraints f R => IntMap (CVal f) -> IntMap (CVal f)
 remove_cycles = IM.fromList . each IM.empty . IM.toList
   where each _ []            = []
         each m ((v, s) : vs) = (v, s') : each (IM.insert v s' m) vs
@@ -51,13 +61,10 @@ remove_cycles = IM.fromList . each IM.empty . IM.toList
 --   constraints to reduce the number of independent variables. Substitutions
 --   will have no cycles.
 
-var_substitutions :: CConstraints f
-                  => [Constraint f] -> IntMap (CVal f)
+var_substitutions :: AlgConstraints f R => [CVal f] -> IntMap (CVal f)
 var_substitutions [] = IM.empty
-var_substitutions (CMinimize _     : cs) = var_substitutions cs
-var_substitutions (CInitialize _ _ : cs) = var_substitutions cs
-var_substitutions (c@(CEqual a b)  : cs) = isos `union` var_substitutions cs'
+var_substitutions (c : cs) = isos `union` var_substitutions cs'
   where isos  = remove_cycles $ IM.fromList $ catMaybes $ map iso vars
-        iso v = (v, ) <$> isolate a b v
-        vars  = S.toList (constraint_deps c)
+        iso v = (v, ) <$> isolate c 0 v
+        vars  = S.toList (vars_in c)
         cs'   = map (eval val (\i -> fromMaybe (var i) (isos !? i))) cs

@@ -11,14 +11,9 @@
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
--- | The numeric end of the constraint solver. 'solve' and 'solve_full' both
---   apply algebraic simplification before running numerical minimization.
-module Wumber.ConstraintSolver (
-  solve,
-  solve_full,
-  Rewritable(..),
-  constraint_cost
-) where
+-- | The numeric end of the constraint solver. 'solve' applies algebraic
+--   simplification before running numerical minimization.
+module Wumber.ConstraintSolver where
 
 
 import Control.Monad.RWS        (evalRWS)
@@ -39,6 +34,17 @@ import Wumber.Symbolic
 import Wumber.SymbolicJIT
 
 
+-- | Un-monadifies a 'Constrained' monad into a series of independent
+--   subsystems, simplifying each algebraically.
+ccompile :: Constrained f a -> (a, [Subsystem f])
+ccompile m = (a, subs)
+  where (a, cs) = evalRWS m () 0
+        subs    = subsystems init (rights cs)
+        init    = V.replicate (maxid + 1) 0 V.// inits
+        inits   = lefts cs
+        maxid   = maximum (map snd inits)
+
+
 -- | Solves a constrained system that returns a rewritable value, and rewrites
 --   that value with the constraint solution.
 --
@@ -49,37 +55,16 @@ import Wumber.SymbolicJIT
 --   minimizer. The goal is to minimize the amount of work required for complex
 --   constraint sets.
 
-solve :: (FConstraints f R, Rewritable f a b) => R -> Int -> Constrained f a -> b
-solve δ n m = b where (b, _, _) = solve_full δ n m
+solve :: (FConstraints f R, Eval R R a b) => R -> Int -> Constrained f a -> b
+solve δ n m = eval id (solution !) a
+  where solved    = merge_solution_vector $ map (solve_subsystem δ n) subs
+        (a, subs) = ccompile m
 
 
--- | Like 'solve', but returns the solution vector and constraints alongside the
---   result. This is useful if you want to verify tolerances.
-
-solve_full :: (FConstraints f R, Rewritable f a b)
-           => R -> Int -> Constrained f a -> (b, Vector R, [Constraint f])
-solve_full δ n m = (rewrite (eval id (solution !)) a, solution, cs)
-  where solution = VS.replicate (1 + foldl1 max (map fst solved)) 0 VS.// solved
-        (a, cs)  = evalRWS m () 0
-        solved   = concatMap (solve' δ n) (subsystems cs)
-
-
--- | The class of objects that can have constraint variables rewritten into
---   fixed values. Not all objects will preserve form when you do this; you
---   might start with constraint-friendly data structures that render themselves
---   into more optimized final types.
-class Rewritable t a b | a -> b, a -> t where
-  rewrite :: (CVal t -> R) -> a -> b
-
-instance Rewritable t (CVal t) R where rewrite = id
-instance Functor f => Rewritable t (f (CVal t)) (f R) where
-  rewrite = fmap . rewrite
-
-
--- | Solves a constrained system and returns the solution as a list of
---   '(Int, N)' tuples. This is a low-level function used by 'solve'.
-solve' :: FConstraints f R => R -> Int -> Subsystem f -> [(Int, R)]
-solve' δ n (Subsystem cs mi start) = remap_solution mi xs
+-- | Solves a single subsystem and returns the solution in sparse '(Int, N)'
+--   tuple form. This is a low-level function used by 'solve'.
+solve_subsystem :: FConstraints f R => R -> Int -> Subsystem f -> [(Int, R)]
+solve_subsystem δ n (Subsystem cs mi start) = remap_solution mi xs
   where (xs, _)     = minimizeV NMSimplex2 δ n search_size f start
         f           = jit (constraint_cost cs)
         search_size = VS.replicate (V.length mi) 1
@@ -89,11 +74,6 @@ solve' δ n (Subsystem cs mi start) = remap_solution mi xs
 -- the order of ~100ns/iteration)
 
 
--- | The total cost for a set of constraints. It's ok for this to be slow; the
---   goal is to get a symbolic quantity we can JIT into the cost function we
---   send to the minimizer.
-constraint_cost :: FConstraints f R => [Constraint f] -> Sym f R
-constraint_cost cs = sum $ concatMap each cs
-  where each (CEqual a b)      = [(a - b) ** 2]
-        each (CMinimize v)     = [upper 0 v]
-        each (CInitialize _ _) = []
+-- | The total cost for a list of constraints.
+constraint_cost :: FConstraints f R => [Constraint f] -> CVal f
+constraint_cost cs = sum $ map (** 2) cs
