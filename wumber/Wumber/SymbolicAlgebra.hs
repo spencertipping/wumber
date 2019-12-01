@@ -37,7 +37,7 @@ import Wumber.Symbolic
 isolate :: AlgConstraints f a => Sym f a -> Sym f a -> VarID -> Maybe (Sym f a)
 isolate lhs rhs v | lv && rv  = isolate (lhs - rhs) 0 v
                   | rv        = isolate rhs lhs v
-                  | otherwise = invert v (normalize lhs) >>= \f -> Just (f rhs)
+                  | otherwise = invert v lhs >>= \f -> Just (f rhs)
   where lv = member v (vars_in lhs)
         rv = member v (vars_in rhs)
 
