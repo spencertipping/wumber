@@ -8,6 +8,7 @@
 
 module WumberTest.ConstraintSolver where
 
+import Control.Monad (foldM)
 import Data.Foldable (toList)
 import Lens.Micro
 import Linear.Metric
@@ -168,6 +169,14 @@ prop_hexagon a b c d e f (Positive dist) = t do
   -}
 
   return av
+
+
+prop_varchains :: V2 R -> Property
+prop_varchains v = t do
+  v0 <- cvars v
+  foldM (\vn i -> do v' <- cvars v
+                     v' =-= vn + 1
+                     return v') v0 [1..30]
 
 
 return []
