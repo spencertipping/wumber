@@ -1,4 +1,5 @@
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE BlockArguments #-}
@@ -7,6 +8,7 @@
 
 module WumberTest.ConstraintSolver where
 
+import Data.Foldable (toList)
 import Lens.Micro
 import Linear.Metric
 import Linear.V2
@@ -14,11 +16,12 @@ import Linear.V3
 import Test.QuickCheck
 import Text.Printf
 
-import qualified Data.Vector.Storable as VS
+import qualified Data.Vector as V
 
 import Debug.Trace
 
 import Wumber.Constraint
+import Wumber.ConstraintSplit
 import Wumber.ConstraintSolver
 import Wumber.GeometricConstraints
 import Wumber.Numeric
@@ -39,6 +42,10 @@ instance Arbitrary (V3 R) where
   arbitrary = V3 <$> arbitrary <*> arbitrary <*> arbitrary
 
 
+instance Eval R R a b => Eval R R [a] [b] where
+  eval t r = map (eval t r)
+
+
 -- | A system is solvable iff it converges to error below the epsilon and hasn't
 --   exhausted its iteration count.
 --
@@ -47,12 +54,15 @@ instance Arbitrary (V3 R) where
 --   resulting cost will be at most √δ. There's no mathematical rigor to this
 --   other than saying it's half as precise in log-terms.
 
-solvable :: (FConstraints f R, Rewritable f a b, Show b)
-         => R -> Int -> Constrained f a -> Property
-solvable δ n m = counterexample (show (xs, v, a)) $ v <= ε
-  where ε           = sqrt δ
-        (a, xs, cs) = solve_full δ n m
-        v           = eval id (xs VS.!) (constraint_cost cs)
+solvable :: (Foldable f, Eval R R a R)
+         => R -> Int -> Constrained () (f a) -> Property
+solvable δ n m | isNaN cost || isInfinite cost = discard
+               | isNaN v                       = discard
+               | otherwise = counterexample (show (solution, cost, v, a)) $ v <= sqrt δ
+  where (a :: [R], solution) = solve δ n (toList <$> m)
+        (_, subs) = ccompile m
+        cost      = constraint_cost (concatMap _ss_constraints subs)
+        v         = eval id (solution V.!) cost
 
 
 solve_δ    = 1e-6
@@ -134,7 +144,7 @@ prop_hexagon a b c d e f (Positive dist) = t do
   -- TODO: these fail to converge if all points have equal starting values (and
   -- possibly in other cases).
   {-
-  all_equal [cos $ N (τ / 6),
+  all_equal [cos $ val (τ / 6),
              inner_angle_cos av bv cv,
              inner_angle_cos bv cv dv,
              inner_angle_cos cv dv ev,
@@ -147,9 +157,11 @@ prop_hexagon a b c d e f (Positive dist) = t do
   aligned _x [bv, dv]
 
   -- TODO: why do these constraints cause the test case to fail to converge?
-  --aligned _y   [av, bv]
-  --aligned _y [fv,     cv]
-  --aligned _y   [ev, dv]
+  {-
+  aligned _y   [av, bv]
+  aligned _y [fv,     cv]
+  aligned _y   [ev, dv]
+  -}
 
   all_equal [distance av dv,
              distance bv ev,

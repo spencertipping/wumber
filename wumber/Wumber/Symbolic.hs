@@ -76,7 +76,8 @@ module Wumber.Symbolic (
   var_maybe,
   val,
   is_val,
-  sym
+  sym,
+  normalize
 ) where
 
 
@@ -112,11 +113,12 @@ import Wumber.ClosedComparable
 data Sym f a     = [SymTerm f a] :+ a deriving (     Eq, Generic, Binary)
 data SymTerm f a = a :* [SymExp f a]  deriving (Ord, Eq, Generic, Binary)
 data SymExp f a  = SymVar f a :** a   deriving (Ord, Eq, Generic, Binary)
-data SymVar f a  = Var !VarID
-                 | Poly (OrdSym f a)
-                 | Fn1 !SymFn1 (Set VarID) (OrdSym f a)
-                 | Fn2 !SymFn2 (Set VarID) (OrdSym f a) (OrdSym f a)
-                 | FnN !f      (Set VarID) [OrdSym f a]
+
+data SymVar f a = Var !VarID
+                | Poly (OrdSym f a)
+                | Fn1 !SymFn1 (Set VarID) (OrdSym f a)
+                | Fn2 !SymFn2 (Set VarID) (OrdSym f a) (OrdSym f a)
+                | FnN !f      (Set VarID) [OrdSym f a]
   deriving (Ord, Eq, Generic, Binary)
 
 infixl 6 :+
@@ -237,6 +239,7 @@ instance SymConstraints2 f a b => Eval a b (SymVar f a) b where
 
 -- | Re-evaluates a symbolic structure, allowing it to potentially collapse
 --   certain unreduced terms. It isn't normally necessary to do this.
+normalize :: AlgConstraints f a => Sym f a -> Sym f a
 normalize = eval val var
 
 
@@ -269,6 +272,7 @@ fn1 f x         = sym $ Fn1 f (vars_in x) (OS x)
 
 fn2 :: SymConstraints f a => SymFn2 -> Sym f a -> Sym f a -> Sym f a
 fn2 f ([] :+ x) ([] :+ y) = val $ fn f x y
+fn2 Pow a b | is_val b    = ppow a b
 fn2 f x y                 = sym $ Fn2 f (vars_in x `union` vars_in y) (OS x) (OS y)
 
 fnn :: SymConstraints f a => f -> [Sym f a] -> Sym f a
@@ -290,11 +294,10 @@ merge_with v i f (x:xs) (y:ys) | v x << v y = i x   : merge_with v i f xs (y:ys)
 
 
 -- | Polynomial addition with term grouping.
---
---   TODO: collapse to a constant when the constant term is non-finite
-
 padd :: SymConstraints f a => Sym f a -> Sym f a -> Sym f a
-padd (xs :+ a) (ys :+ b) = concat (merge_with te (: []) tadd xs ys) :+ (a + b)
+padd (xs :+ a) (ys :+ b)
+  | isNaN a || isNaN b || isInfinite a || isInfinite b = [] :+ (a + b)
+  | otherwise = concat (merge_with te (: []) tadd xs ys) :+ (a + b)
   where te (_ :* es) = es
         tadd (a :* x) (b :* _) | a + b /= 0 = [(a + b) :* x]
                                | otherwise  = []
@@ -327,6 +330,8 @@ ppow a ([] :+ n) | n == truncate n && n > 0 =
   where half = ppow a (val (n `quot` 2))
 
 ppow ([a :* es] :+ 0) ([] :+ n) = [a**n :* map (\(v:**e) -> v:**(e*n)) es] :+ 0
+ppow a ([] :+ n) = sym (Poly (OS a) :** n)
+
 ppow a b = fn2 Pow a b
 
 
@@ -549,9 +554,10 @@ instance SymConstraints f a => RealFloat (Sym f a) where
   floatRange _     = error "floatRange is undefined on Syms"
   decodeFloat _    = error "decodeFloat is undefined on Syms"
   encodeFloat _ _  = error "decodeFloat is undefined on Syms"
-  isNaN _          = error "isNaN is undefined on Syms"
-  isInfinite _     = error "isInfinite is undefined on Syms"
   isDenormalized _ = error "isDenormalized is undefined on Syms"
   isNegativeZero _ = error "isNegativeZero is undefined on Syms"
   isIEEE _         = error "isIEEE is undefined on Syms"
-  atan2 a b        = fn2 Atan2 a b
+
+  isNaN      (_ :+ n) = isNaN n
+  isInfinite (_ :+ n) = isInfinite n
+  atan2 a b           = fn2 Atan2 a b

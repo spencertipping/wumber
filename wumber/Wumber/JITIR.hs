@@ -232,7 +232,7 @@ thread s = TG ret g & deduplicate
 --
 --   TODO: factor common prefixes into shared threads, then use 'LoadThr'
 
-deduplicate :: Ord a => ThreadGraph a -> ThreadGraph a
+deduplicate :: (Show a, Ord a) => ThreadGraph a -> ThreadGraph a
 deduplicate tg@(TG r g) | size g' < size g = deduplicate (TG r' g')
                         | otherwise        = TG (k' ! r) compact
 

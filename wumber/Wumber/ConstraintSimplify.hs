@@ -35,19 +35,23 @@ import Wumber.SymbolicAlgebra
 --   IntMap (CVal f) : the full set of variable substitutions
 --   IntMap R        : any variables with algebraic solutions
 --   @
+--
+--   'csimplify' works iteratively: it reapplies itself until 'isolate' returns
+--   no further substitutions.
 
 csimplify :: AlgConstraints f R
           => [CVal f] -> ([CVal f], IntMap (CVal f), IntMap R)
 
 csimplify cs
   | IM.null m = (cs', m, solved)
-  | otherwise = let (cs'', m', solved') = csimplify cs'
-                in (cs'', IM.union m m', IM.union solved solved')
+  | otherwise = let (cs'', m', s') = csimplify cs'
+                in (cs'', IM.map rewrite (IM.union m m'), IM.union solved s')
 
-  where m      = var_substitutions cs
-        solved = IM.filter is_val m & IM.map (\([] :+ x) -> x)
-        cs'    = cs & map (eval val (var_maybe (m !?)))
-                    & filter (not . S.null . vars_in)
+  where m       = var_substitutions cs
+        rewrite = eval val (var_maybe (m !?))
+        solved  = IM.filter is_val m & IM.map (\([] :+ x) -> x)
+        cs'     = cs & map rewrite
+                     & filter (not . S.null . vars_in)
 
 
 -- | Removes cycles from a list of substitutions by applying each one

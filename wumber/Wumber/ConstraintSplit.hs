@@ -53,7 +53,8 @@ import Wumber.Symbolic
 --   Here's which field uses which variable ID space:
 --
 --   @
---   _ss_constraints : compact
+--   _ss_constraints : original (sparse)
+--   _ss_compact     : compact
 --   _ss_subst       : original (sparse)
 --   _ss_solved      : original (sparse)
 --   _ss_remap       : compact -> original
@@ -61,6 +62,7 @@ import Wumber.Symbolic
 --   @
 
 data Subsystem f = Subsystem { _ss_constraints :: [CVal f],
+                               _ss_compact     :: [CVal f],
                                _ss_subst       :: IntMap (CVal f),
                                _ss_solved      :: IntMap R,
                                _ss_remap       :: V.Vector VarID,
@@ -80,7 +82,8 @@ merge_solution_vector vs = V.replicate (1 + foldl1 max (map fst c)) 0 V.// c
 -- | Separates independent subsystems. This is the first thing we do when
 --   simplifying a set of constraints.
 subsystems :: AlgConstraints f R => V.Vector R -> [CVal f] -> [Subsystem f]
-subsystems init cs = cs & map (\c -> ([c], vars_in c))
+subsystems init cs = cs & map normalize
+                        & map (\c -> ([c], vars_in c))
                         & group_by_overlap
                         & map (subsystem init . fst)
 
@@ -89,12 +92,12 @@ subsystems init cs = cs & map (\c -> ([c], vars_in c))
 --   variables (whose indexes correspond to 'Vector' indexes used by the GSL
 --   minimizer).
 subsystem :: AlgConstraints f R => V.Vector R -> [CVal f] -> Subsystem f
-subsystem init cs = Subsystem compact_cs subst solved remap init'
+subsystem init cs = Subsystem cs' compact_cs subst solved remap init'
   where (cs', subst, solved) = csimplify cs
         (m, remap)           = compact_var_mapping (S.unions (map vars_in cs'))
         compact_cs           = map (eval val (var . (m IM.!))) cs'
         init'                = VS.generate (V.length remap)
-                                           ((init V.!) . (m IM.!))
+                                           ((init V.!) . (remap V.!))
 
 
 -- | Removes holes from a set of variable IDs, producing a compact set suitable
@@ -116,10 +119,10 @@ compact_var_mapping s = (IM.fromList (map swap pairs),
 --   This function produces a list suitable for use by 'merge_solution_vector'.
 
 remap_solution :: FConstraints f R => Subsystem f -> VS.Vector R -> [(VarID, R)]
-remap_solution ss xs = algebraic ++ subst ++ solved
-  where solved    = V.toList (_ss_remap ss) `zip` VS.toList xs
+remap_solution ss xs = algebraic ++ subst ++ numerical
+  where numerical = V.toList (_ss_remap ss) `zip` VS.toList xs
         algebraic = IM.toList (_ss_solved ss)
-        knowns    = IM.union (_ss_solved ss) (IM.fromList solved)
+        knowns    = IM.union (_ss_solved ss) (IM.fromList numerical)
         subst     = IM.toList $ IM.map (eval id (knowns IM.!)) (_ss_subst ss)
 
 

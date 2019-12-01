@@ -56,8 +56,9 @@ ccompile m = (a, subs)
 --   minimizer. The goal is to minimize the amount of work required for complex
 --   constraint sets.
 
-solve :: (AlgConstraints f R, Eval R R a b) => R -> Int -> Constrained f a -> b
-solve δ n m = eval id (solved V.!) a
+solve :: (AlgConstraints f R, Eval R R a b)
+      => R -> Int -> Constrained f a -> (b, V.Vector R)
+solve δ n m = (eval id (solved V.!) a, solved)
   where solved    = merge_solution_vector $ map (solve_subsystem δ n) subs
         (a, subs) = ccompile m
 
@@ -67,7 +68,7 @@ solve δ n m = eval id (solved V.!) a
 solve_subsystem :: FConstraints f R => R -> Int -> Subsystem f -> [(Int, R)]
 solve_subsystem δ n ss = remap_solution ss xs
   where (xs, _)     = minimizeV NMSimplex2 δ n search_size f (_ss_init ss)
-        f           = jit (constraint_cost (_ss_constraints ss))
+        f           = jit (constraint_cost (_ss_compact ss))
         search_size = VS.replicate (V.length (_ss_remap ss)) 1
 
 -- TODO(minor): bypass minimizeV and call the C function directly. This will
