@@ -90,7 +90,7 @@ vector_angle_cos a b = a `dot` b / sqrt (quadrance a * quadrance b)
 
 -- | Constrain a vector value to a proper rectangle (one whose size is
 --   nonnegative).
-inside :: (Num a, CEq f a) => Rect a -> a -> Constrained f ()
+inside :: (Num a, CEq f a) => Rect a -> a -> Constrained f (CVal f)
 inside r p = do p >-= r^.rstart; p <-= r^.rend
 
 

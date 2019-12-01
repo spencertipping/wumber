@@ -78,24 +78,22 @@ module Wumber.Symbolic (
   val,
   is_val,
   sym,
-  normalize
+  normalize,
+  rewrite_vars
 ) where
 
 
--- TODO
--- Replace 'Data.Set' with an intset implementation. Normal 'Set' for small
--- variable index ints is obscenely inefficient.
-
 import Data.Binary   (Binary(..))
+import Data.IntMap   (IntMap(..), (!?))
+import Data.IntSet   (IntSet(..), empty, singleton, union, unions)
 import Data.List     (intercalate, sort, sortBy)
 import Data.Maybe    (fromMaybe)
-import Data.Set      (Set(..), empty, singleton, union, unions)
 import Foreign.Ptr   (FunPtr(..))
 import GHC.Generics  (Generic(..))
 import Text.Printf   (printf)
 import Unsafe.Coerce (unsafeCoerce)
 
-import qualified Data.Set as S
+import qualified Data.IntSet as IS
 
 import Wumber.ClosedComparable
 
@@ -117,9 +115,9 @@ data SymExp f a  = !(SymVar f a) :** !a deriving (Ord, Eq, Generic, Binary)
 
 data SymVar f a = Var  !VarID
                 | Poly !(OrdSym f a)
-                | Fn1  !SymFn1 (Set VarID) !(OrdSym f a)
-                | Fn2  !SymFn2 (Set VarID) !(OrdSym f a) !(OrdSym f a)
-                | FnN  !f      (Set VarID) [OrdSym f a]
+                | Fn1  !SymFn1 IntSet !(OrdSym f a)
+                | Fn2  !SymFn2 IntSet !(OrdSym f a) !(OrdSym f a)
+                | FnN  !f      IntSet [OrdSym f a]
   deriving (Ord, Eq, Generic, Binary)
 
 infixl 6 :+
@@ -248,6 +246,14 @@ normalize = eval val var
 --   unbound variables abstract.
 var_maybe :: SymConstraints f a => (VarID -> Maybe (Sym f a)) -> VarID -> Sym f a
 var_maybe f i = fromMaybe (var i) (f i)
+
+
+-- | Resolves a specific set of variables, leaving others unmodified.
+--
+--   TODO: optimize by skipping if 'vars_in' is disoint
+
+rewrite_vars :: AlgConstraints f a => IntMap (Sym f a) -> Sym f a -> Sym f a
+rewrite_vars m = eval val (var_maybe (m !?))
 
 
 class    ToSym t       where sym :: SymConstraints f a => t f a -> Sym f a
@@ -426,7 +432,7 @@ instance NumConstraints a => Functionable SymFn2 (a -> a -> a) where
 
 
 -- | Returns a set of all 'Var' indexes used by an expression.
-class HasVars a where vars_in :: a -> Set VarID
+class HasVars a where vars_in :: a -> IntSet
 
 instance SymConstraints f a => HasVars (Sym f a) where
   vars_in (xs :+ b) = unions (map vars_in xs)

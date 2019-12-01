@@ -20,15 +20,15 @@ module Wumber.ConstraintSplit (
 
 
 import Data.IntMap   (IntMap)
+import Data.IntSet   (IntSet)
 import Data.List     (partition)
-import Data.Set      (Set)
 import Data.Tuple    (swap)
 import GHC.Generics  (Generic)
 import Lens.Micro    ((&))
 import Lens.Micro.TH (makeLenses)
 
 import qualified Data.IntMap          as IM
-import qualified Data.Set             as S
+import qualified Data.IntSet          as IS
 import qualified Data.Vector          as V
 import qualified Data.Vector.Storable as VS
 
@@ -94,7 +94,7 @@ subsystems init cs = cs & map normalize
 subsystem :: AlgConstraints f R => V.Vector R -> [CVal f] -> Subsystem f
 subsystem init cs = Subsystem cs' compact_cs subst solved remap init'
   where (cs', subst, solved) = csimplify cs
-        (m, remap)           = compact_var_mapping (S.unions (map vars_in cs'))
+        (m, remap)           = compact_var_mapping (IS.unions (map vars_in cs'))
         compact_cs           = map (eval val (var . (m IM.!))) cs'
         init'                = VS.generate (V.length remap)
                                            ((init V.!) . (remap V.!))
@@ -103,10 +103,10 @@ subsystem init cs = Subsystem cs' compact_cs subst solved remap init'
 -- | Removes holes from a set of variable IDs, producing a compact set suitable
 --   for numerical solving. Also returns the reverse mapping, which will become
 --   '_ss_remap' in 'Subsystem'.
-compact_var_mapping :: Set VarID -> (IntMap VarID, V.Vector VarID)
+compact_var_mapping :: IntSet -> (IntMap VarID, V.Vector VarID)
 compact_var_mapping s = (IM.fromList (map swap pairs),
                          V.replicate (length pairs) 0 V.// pairs)
-  where pairs = zip [0..] (S.toAscList s)
+  where pairs = zip [0..] (IS.toAscList s)
 
 
 -- | Remaps a compact solution vector into the original variable space by
@@ -128,12 +128,12 @@ remap_solution ss xs = algebraic ++ subst ++ numerical
 
 -- | Groups values by overlapping set elements, transitively. The result is a
 --   list of values whose sets are fully disjoint.
-group_by_overlap :: Ord b => [([a], Set b)] -> [([a], Set b)]
+group_by_overlap :: [([a], IntSet)] -> [([a], IntSet)]
 group_by_overlap [] = []
 group_by_overlap ((l, s) : r)
   | null inside = (l, s) : group_by_overlap r
   | otherwise   = group_by_overlap ((l', s') : outside)
 
-  where (outside, inside) = partition (S.disjoint s . snd) r
+  where (outside, inside) = partition (IS.disjoint s . snd) r
         l'                = l ++ concatMap fst inside
-        s'                = S.unions (s : map snd inside)
+        s'                = IS.unions (s : map snd inside)

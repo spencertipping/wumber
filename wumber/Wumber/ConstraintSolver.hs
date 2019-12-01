@@ -22,6 +22,7 @@ import Data.Either              (lefts, rights)
 import Lens.Micro               ((&))
 import Numeric.GSL.Minimization (minimizeV, MinimizeMethod(..))
 
+import qualified Data.IntMap          as IM
 import qualified Data.Set             as S
 import qualified Data.Vector          as V
 import qualified Data.Vector.Storable as VS
@@ -39,7 +40,7 @@ import Wumber.SymbolicJIT
 --   subsystems, simplifying each algebraically.
 ccompile :: AlgConstraints f R => Constrained f a -> (a, [Subsystem f])
 ccompile m = (a, subs)
-  where (a, cs) = evalRWS m () 0
+  where (a, cs) = evalRWS m () (0, IM.empty)
         subs    = subsystems init (rights cs)
         init    = V.replicate (maxid + 1) 0 V.// inits
         inits   = lefts cs

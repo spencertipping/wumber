@@ -12,8 +12,8 @@ import Control.Concurrent   (forkIO)
 import Control.Monad        (replicateM, replicateM_, when)
 import Data.Char            (chr)
 import Data.Foldable        (foldl')
+import Data.IntSet          (IntSet(..), findMax)
 import Data.Maybe           (fromMaybe, fromJust, isNothing, isJust)
-import Data.Set             (Set(..), lookupMax)
 import Data.Vector.Storable (Vector(..), (!))
 import Debug.Trace          (traceShowId)
 import Foreign.C.Types
@@ -37,6 +37,7 @@ import qualified Data.Binary          as Bin
 import qualified Data.ByteString      as BS
 import qualified Data.ByteString.Lazy as BL
 import qualified Data.ByteString.UTF8 as BU
+import qualified Data.IntSet          as IS
 import qualified Data.Vector.Storable as VS
 
 import Wumber.AMD64Asm
@@ -204,7 +205,7 @@ prop_symjit :: Sym () Double -> Vector Double -> Property
 prop_symjit s v = size_ok && bounds_ok ==> property test
   where l         = VS.length v
         size_ok   = l > 0 && l <= 2047
-        bounds_ok = fromMaybe 0 (lookupMax (vars_in s)) < l
+        bounds_ok = IS.null (vars_in s) || findMax (vars_in s) < l
 
         test | isNaN x || isNaN y' = discard
              | isInfinite x        = discard

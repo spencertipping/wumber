@@ -16,7 +16,7 @@ import GHC.Exts           (groupWith)
 import Lens.Micro         ((&))
 
 import qualified Data.IntMap.Strict as IM
-import qualified Data.Set           as S
+import qualified Data.IntSet        as IS
 
 import Wumber.Constraint
 import Wumber.Numeric
@@ -42,16 +42,20 @@ import Wumber.SymbolicAlgebra
 csimplify :: AlgConstraints f R
           => [CVal f] -> ([CVal f], IntMap (CVal f), IntMap R)
 
+-- TODO: this function does a bunch of redundant rewriting
+
 csimplify cs
   | IM.null m = (cs', m, solved)
   | otherwise = let (cs'', m', s') = csimplify cs'
-                in (cs'', IM.map rewrite (IM.union m m'), IM.union solved s')
+                in (map normalize cs'',
+                    IM.map (normalize . rewrite) (IM.union m m'),
+                    IM.union solved s')
 
   where m       = var_substitutions cs
-        rewrite = normalize . eval val (var_maybe (m !?))
+        rewrite = rewrite_vars m
         solved  = IM.filter is_val m & IM.map (\([] :+ x) -> x)
         cs'     = cs & map rewrite
-                     & filter (not . S.null . vars_in)
+                     & filter (not . IS.null . vars_in)
 
 
 -- | Removes cycles from a list of substitutions by applying each one
@@ -65,7 +69,7 @@ remove_cycles = IM.fromList . filter neq . each IM.empty . IM.toList
   where neq (x, y)           = var x /= y
         each _ []            = []
         each m ((v, s) : vs) = (v, s') : each (IM.insert v s' m) vs
-          where s' = eval val (var_maybe (m !?)) s
+          where s' = rewrite_vars m s
 
 
 -- | Returns a map of algebraic substitutions that can be applied to a system of
@@ -77,5 +81,5 @@ var_substitutions [] = IM.empty
 var_substitutions (c : cs) = isos `union` var_substitutions cs'
   where isos  = map iso vars & catMaybes & IM.fromList & remove_cycles
         iso v = (v, ) <$> isolate c 0 v
-        vars  = S.toList (vars_in c)
-        cs'   = map (eval val (var_maybe (isos !?))) cs
+        vars  = IS.toList (vars_in c)
+        cs'   = map (rewrite_vars isos) cs

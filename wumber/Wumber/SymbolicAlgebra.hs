@@ -21,8 +21,8 @@ module Wumber.SymbolicAlgebra (
 
 
 import Data.Binary  (Binary(..))
+import Data.IntSet  (member)
 import Data.List    (partition)
-import Data.Set     (member)
 import GHC.Generics (Generic(..))
 
 import Wumber.Symbolic
