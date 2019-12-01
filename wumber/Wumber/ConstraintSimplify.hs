@@ -48,7 +48,7 @@ csimplify cs
                 in (cs'', IM.map rewrite (IM.union m m'), IM.union solved s')
 
   where m       = var_substitutions cs
-        rewrite = eval val (var_maybe (m !?))
+        rewrite = normalize . eval val (var_maybe (m !?))
         solved  = IM.filter is_val m & IM.map (\([] :+ x) -> x)
         cs'     = cs & map rewrite
                      & filter (not . S.null . vars_in)

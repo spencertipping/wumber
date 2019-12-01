@@ -11,12 +11,13 @@ module WumberTest.ConstraintSolver where
 import Control.Monad (foldM)
 import Data.Foldable (toList)
 import Lens.Micro
-import Linear.Metric
+import Linear.Metric (norm, distance)
 import Linear.V2
 import Linear.V3
 import Test.QuickCheck
 import Text.Printf
 
+import qualified Data.IntMap as IM
 import qualified Data.Vector as V
 
 import Debug.Trace
