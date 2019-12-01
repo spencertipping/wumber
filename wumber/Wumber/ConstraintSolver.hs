@@ -1,3 +1,4 @@
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TupleSections #-}
 {-# LANGUAGE BangPatterns #-}
@@ -17,7 +18,7 @@ module Wumber.ConstraintSolver where
 
 
 import Control.Monad.RWS        (evalRWS)
-import Data.Vector.Storable     (Vector, (!))
+import Data.Either              (lefts, rights)
 import Lens.Micro               ((&))
 import Numeric.GSL.Minimization (minimizeV, MinimizeMethod(..))
 
@@ -36,13 +37,13 @@ import Wumber.SymbolicJIT
 
 -- | Un-monadifies a 'Constrained' monad into a series of independent
 --   subsystems, simplifying each algebraically.
-ccompile :: Constrained f a -> (a, [Subsystem f])
+ccompile :: AlgConstraints f R => Constrained f a -> (a, [Subsystem f])
 ccompile m = (a, subs)
   where (a, cs) = evalRWS m () 0
         subs    = subsystems init (rights cs)
         init    = V.replicate (maxid + 1) 0 V.// inits
         inits   = lefts cs
-        maxid   = maximum (map snd inits)
+        maxid   = maximum (map fst inits)
 
 
 -- | Solves a constrained system that returns a rewritable value, and rewrites
@@ -55,8 +56,8 @@ ccompile m = (a, subs)
 --   minimizer. The goal is to minimize the amount of work required for complex
 --   constraint sets.
 
-solve :: (FConstraints f R, Eval R R a b) => R -> Int -> Constrained f a -> b
-solve δ n m = eval id (solution !) a
+solve :: (AlgConstraints f R, Eval R R a b) => R -> Int -> Constrained f a -> b
+solve δ n m = eval id (solved V.!) a
   where solved    = merge_solution_vector $ map (solve_subsystem δ n) subs
         (a, subs) = ccompile m
 
@@ -64,10 +65,10 @@ solve δ n m = eval id (solution !) a
 -- | Solves a single subsystem and returns the solution in sparse '(Int, N)'
 --   tuple form. This is a low-level function used by 'solve'.
 solve_subsystem :: FConstraints f R => R -> Int -> Subsystem f -> [(Int, R)]
-solve_subsystem δ n (Subsystem cs mi start) = remap_solution mi xs
-  where (xs, _)     = minimizeV NMSimplex2 δ n search_size f start
-        f           = jit (constraint_cost cs)
-        search_size = VS.replicate (V.length mi) 1
+solve_subsystem δ n ss = remap_solution ss xs
+  where (xs, _)     = minimizeV NMSimplex2 δ n search_size f (_ss_init ss)
+        f           = jit (constraint_cost (_ss_constraints ss))
+        search_size = VS.replicate (V.length (_ss_remap ss)) 1
 
 -- TODO(minor): bypass minimizeV and call the C function directly. This will
 -- save some Haskell/C FFI overhead, although the total impact isn't high (on
@@ -75,5 +76,5 @@ solve_subsystem δ n (Subsystem cs mi start) = remap_solution mi xs
 
 
 -- | The total cost for a list of constraints.
-constraint_cost :: FConstraints f R => [Constraint f] -> CVal f
+constraint_cost :: FConstraints f R => [CVal f] -> CVal f
 constraint_cost cs = sum $ map (** 2) cs

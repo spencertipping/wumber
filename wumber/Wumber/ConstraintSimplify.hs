@@ -12,6 +12,7 @@ module Wumber.ConstraintSimplify where
 
 import Data.IntMap.Strict (IntMap(..), (!?), fromList, union)
 import Data.Maybe         (catMaybes, fromMaybe)
+import GHC.Exts           (groupWith)
 import Lens.Micro         ((&))
 
 import qualified Data.IntMap.Strict as IM
@@ -37,7 +38,12 @@ import Wumber.SymbolicAlgebra
 
 csimplify :: AlgConstraints f R
           => [CVal f] -> ([CVal f], IntMap (CVal f), IntMap R)
-csimplify cs = (cs', m, solved)
+
+csimplify cs
+  | IM.null m = (cs', m, solved)
+  | otherwise = let (cs'', m', solved') = csimplify cs'
+                in (cs'', IM.union m m', IM.union solved solved')
+
   where m      = var_substitutions cs
         solved = IM.filter is_val m & IM.map (\([] :+ x) -> x)
         cs'    = cs & map (eval val (var_maybe (m !?)))
@@ -51,8 +57,9 @@ csimplify cs = (cs', m, solved)
 --   doing a total of /n/ 'eval' operations for /n/ substitution rules.
 
 remove_cycles :: AlgConstraints f R => IntMap (CVal f) -> IntMap (CVal f)
-remove_cycles = IM.fromList . each IM.empty . IM.toList
-  where each _ []            = []
+remove_cycles = IM.fromList . filter neq . each IM.empty . IM.toList
+  where neq (x, y)           = var x /= y
+        each _ []            = []
         each m ((v, s) : vs) = (v, s') : each (IM.insert v s' m) vs
           where s' = eval val (var_maybe (m !?)) s
 
@@ -64,7 +71,7 @@ remove_cycles = IM.fromList . each IM.empty . IM.toList
 var_substitutions :: AlgConstraints f R => [CVal f] -> IntMap (CVal f)
 var_substitutions [] = IM.empty
 var_substitutions (c : cs) = isos `union` var_substitutions cs'
-  where isos  = remove_cycles $ IM.fromList $ catMaybes $ map iso vars
+  where isos  = map iso vars & catMaybes & IM.fromList & remove_cycles
         iso v = (v, ) <$> isolate c 0 v
         vars  = S.toList (vars_in c)
-        cs'   = map (eval val (\i -> fromMaybe (var i) (isos !? i))) cs
+        cs'   = map (eval val (var_maybe (isos !?))) cs
