@@ -71,6 +71,10 @@ solve_subsystem δ n ss = remap_solution ss xs
         f           = jit (constraint_cost (_ss_compact ss))
         search_size = VS.replicate (V.length (_ss_remap ss)) 1
 
+-- TODO
+-- JIT a function that calculates the function gradient, then use a version of
+-- the GSL minimizer that can work with it.
+
 -- TODO(minor): bypass minimizeV and call the C function directly. This will
 -- save some Haskell/C FFI overhead, although the total impact isn't high (on
 -- the order of ~100ns/iteration)

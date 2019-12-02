@@ -22,6 +22,11 @@
 --   So, what's a thread? It's a serial computation that accumulates into one
 --   register and intermittently uses a second register for operands. In theory,
 --   a processor with /n/ registers can run /n - 1/ threads without spilling.
+--
+--   TODO: fix lies in the above; e.g. scratch registers also have latency, so
+--   we should think about it as two persistent registers per thread. We'll have
+--   more if the thread uses 'FnN' operations and fewer if the thread is running
+--   a serial computation of 'I1' or, in some cases, 'I2C'.
 
 module Wumber.JITIR where
 
@@ -173,6 +178,9 @@ profile_graph (TG _ g) = GP $ M.unionsWith (+) $ map (flip M.singleton 1 . p)
         p (I2 f _)    = PI2 f
         p (I2C f _)   = PI2C f
 
+-- TODO
+-- Have 'profile_graph' show redundant work as well as instruction counts.
+
 
 -- | Takes a 'Sym' expression and reduces it to a thread graph. Every thread
 --   begins with a 'Load' instruction. The thread graph we return will be
@@ -260,6 +268,9 @@ deduplicate tg@(TG r g) | size g' < size g = deduplicate (TG r' g')
 --   can run to completion without blocking on dependencies, which should free
 --   up other threads. The tradeoff is that doing too much of this may cause
 --   unnecessary register shuffling. (TODO: is this true?)
+
+-- TODO
+-- Seriously rethink how this works, starting with the 'cbias' silliness.
 
 startable :: Priority -> ThreadGraph a -> [(ThreadID, Priority)]
 startable cbias tg@(TG _ g) = assocs g & filter incomplete

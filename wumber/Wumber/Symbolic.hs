@@ -22,39 +22,47 @@
 {-# OPTIONS_GHC -funbox-strict-fields -Wincomplete-patterns #-}
 
 
--- | Symbolic numerical quantities. 'Sym f a' is a symbolic quantity with
---   'Functionable' type 'f' (or '()' if you don't need custom functions) and
---   numeric type 'a'.
+-- TODO
+-- Split this module into multiple parts:
+--
+-- 1. Data type definitions + 'Show'
+-- 2. Polynomial math + term normalization
+-- 3. 'Num' and 'RealFloat' shenanigans
+-- 4. Symbolic derivatives
+-- 5. Symbolic variable isolation
+
+
+-- | Symbolic numerical quantities. @Sym f a@ is a symbolic quantity with
+--   'Functionable' type @f@ (or @()@ if you don't need custom functions) and
+--   numeric type @a@.
 --
 --   'Sym's behave like numbers in that they implement Haskell's full numeric
 --   stack, sometimes incompletely. Internally they constant-fold when possible
 --   and otherwise maintain polynomial normal form around variables.
 --
---   Two functions, 'var' and 'val', are useful if you want to construct 'Sym's.
+--   Two functions, 'var' and 'val', are useful if you want to construct @Sym@s.
 --   For example:
 --
---   @
---   circle_fn :: Double -> Sym () Double
---   circle_fn r = val r ** 2 - (var 0 ** 2 + var 1 ** 2)
---   @
+--   > circle_fn :: Double -> Sym () Double
+--   > circle_fn r = val r ** 2 - (var 0 ** 2 + var 1 ** 2)
 --
---   The meaning of 'var's depends on context. As far as 'Sym' is concerned,
+--   The meaning of @var@s depends on context. As far as @Sym@ is concerned,
 --   they're just indexed arguments to the function that will be JIT-compiled,
 --   and it doesn't really matter whether the function will be used as an
 --   isosurface or for constraint minimization. Within an isosurface/implicit
---   context, vars 0..3 are 'x', 'y', 'z', and 't' (reflected by their 'Show'
---   output). The above 'circle_fn' definition renders like this:
+--   context, vars @0..3@ are @x@, @y@, @z@, and @t@ (reflected by their @Show@
+--   output). The above @circle_fn@ definition renders like this:
 --
 --   > -1.0·x² + -1.0·y² + 9.0
 --
---   See 'SymbolicAlgebra' for methods to isolate variables and solve systems of
---   equations.
+--   See 'Wumber.SymbolicAlgebra' for methods to isolate variables and solve
+--   systems of equations.
 --
 --   NOTE: avoid using 'RealFrac' and 'RealFloat' methods, except for 'atan2'.
 --   Many of the implementations either use 'unsafeCoerce' to work around
---   'forall' type quantifiers, or will produce errors at runtime. Intuitively:
---   any function whose signature is 'Sym -> not-Sym' is likely to fail because
---   'Sym' quantities aren't determinable until we have values for their
+--   @forall@ type quantifiers, or will produce errors at runtime. Intuitively:
+--   any function whose signature is @Sym -> not-Sym@ is likely to fail because
+--   @Sym@ quantities aren't determinable until we have values for their
 --   variables.
 
 module Wumber.Symbolic (
@@ -100,8 +108,8 @@ import Wumber.ClosedComparable
 
 -- | A symbolic expression in a normal form that's reasonably easy to work with.
 --   'Sym' expressions simplify themselves as you build them up. This includes
---   constant folding, condensing common subexpressions (e.g. 'x + x' becomes
---   '2*x'), and keeping track of variable dependencies and invertibility.
+--   constant folding, condensing common subexpressions (e.g. @x + x@ becomes
+--   @2*x@), and keeping track of variable dependencies and invertibility.
 --
 --   NOTE: 'Sym' needs to be 'Ord' to implement 'Real', but unknown quantities
 --   will fail at runtime if you try to compare them. 'SymTerm' etc are 'Ord'
@@ -112,6 +120,24 @@ import Wumber.ClosedComparable
 -- TODO
 -- Replace IntSet with a bitset (can't use the one on hackage, but maybe port
 -- it); then drop a bitset onto every level of this hierarchy.
+
+-- TODO
+-- Cache a 'profile' per element, something that keeps it indexed/located within
+-- chains. Profiles should be unboxed hash-like things we can use to pattern
+-- match things without visiting children.
+
+-- TODO
+-- No more infix constructors here; the notation isn't useful and it prevents us
+-- from having additional fields.
+
+-- TODO
+-- Replace lists with a sorted-merge-friendly linear structure, possibly wrapped
+-- around Vector.
+
+-- TODO
+-- Use a shell 'newtype' for user-facing operations and 'Ord', then have that be
+-- unwrappable to an internal thing that supports structural 'Ord', 'Eq', etc.
+-- In other words, invert the current 'OrdSym' idea.
 
 data Sym f a     = [SymTerm f a] :+ !a  deriving (     Eq, Generic, Binary)
 data SymTerm f a = !a :* [SymExp f a]   deriving (Ord, Eq, Generic, Binary)
@@ -328,6 +354,10 @@ pmul (xs :+ a) (ys :+ b) = sum [tmul x y | x <- a :* [] : xs,
         emul (x :** m) (y :** n) | x /= y     = sortBy compare' [x :** m, y :** n]
                                  | m + n /= 0 = [x :** (m + n)]
                                  | otherwise  = []
+
+
+-- TODO
+-- Implement polynomial long division as a way to get a factored representation.
 
 
 -- | Polynomial exponentiation with term grouping. Uses repeated squaring if the

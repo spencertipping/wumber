@@ -9,6 +9,8 @@
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 
+-- | Boundary scanning for isosurfaces, implemented by dual contouring a binary
+--   bounding volume hierarchy.
 module Wumber.DualContour (
   Tree(..),
   TreeMeta(..),
@@ -31,7 +33,6 @@ import Data.Binary           (Binary(..))
 import Data.Bits             (xor, shiftL, (.&.))
 import Data.Foldable         (toList)
 import Data.Maybe            (isJust, fromJust)
-import Data.Set              (Set)
 import Data.Traversable      (traverse)
 import GHC.Generics          (Generic(..))
 import Lens.Micro            ((^.))
@@ -44,7 +45,6 @@ import Linear.Vector         (Additive, lerp, (^*))
 import Numeric.LinearAlgebra ((!))
 
 import qualified Data.Sequence as SQ
-import qualified Data.Set as S
 import qualified Linear.V as V
 import qualified Numeric.LinearAlgebra as LA
 
@@ -108,6 +108,9 @@ iso_contour f b minn maxn bias = lines (trace_lines t)
 --
 --   TODO: almost every vertex is shared by more than one cell, but we
 --   re-evaluate the function instead of reusing data.
+--
+--   TODO: accept a symbolic gradient function instead of calculating it
+--   ourselves
 --
 --   TODO: infer crossing points using normals and 'max_gradient'.
 --
@@ -228,8 +231,6 @@ instance StorableVector (V2 R) where
 --
 --   NOTE: arguments to 'lerp' are a little counterintuitive: 'lerp 0 a b == b'
 --   and 'lerp 1 a b == a'.
---
---   TODO: convert to BFGS?
 
 surface_point :: Additive f => IsoFn (f R) -> (f R, f R) -> f R
 surface_point f (a, b) = lerp (newton 0.5) b a
