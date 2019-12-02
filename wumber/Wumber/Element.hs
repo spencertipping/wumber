@@ -42,6 +42,13 @@ import Wumber.BoundingBox
 -- last resort.
 
 
+-- TODO
+-- Use 'Element' for EDA components, which include 3D, 'EDALayout' and
+-- 'EDAConductance'. I think we can use constraints to define the PCB layout,
+-- perhaps with some hinting (or maybe not; it's NP-hard
+-- https://en.wikipedia.org/wiki/Routing_(electronic_design_automation)).
+
+
 -- This whole module is gonna be toast, just FYI
 
 
