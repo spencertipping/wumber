@@ -1,6 +1,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE BlockArguments, TemplateHaskell #-}
+{-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 module Wumber.Element where
@@ -18,11 +19,31 @@ import Wumber.BoundingBox
 
 
 -- TODO
--- Shape represents its points in un-transformed space, so we end up
--- re-transforming them each time we want to enumerate vertices or render stuff.
--- This seems unnecessary. Is it really that worthwhile to capture "semantic"
--- information? We don't have abstract coordinates yet so at most we could put
--- them on a grid or something.
+-- Have 'Element' wrap dual contouring: dual contours are one variety of
+-- elements, but others also exist. What kind of integration should we have with
+-- symbolics and constraint variables? Do elements specify mutually constrained
+-- quantities and/or lenses? Maybe it's as simple as parameterizing on a numeric
+-- type that can be either 'Sym' or 'R'.
+
+
+-- TODO
+-- Are all elements 3D? Maybe we have different classes for different dimensions
+-- of things. We can have sketch elements constrained by local 2D coordinates,
+-- which can be lensed into 3D if we have a plane to frame them. Then we can
+-- constrain everything in either local or global coordinates.
+
+
+-- TODO
+-- Facet by behaviors: 'Viewable', 'FiniteElements', etc. Then 'Element' doesn't
+-- exist as a union type, but instead as a series of open-ended things that can
+-- be lensed individually (and we can have element transformers).
+--
+-- Use 'Implicit' as the CSG backend; everything can be reduced to isos as a
+-- last resort.
+
+
+-- This whole module is gonna be toast, just FYI
+
 
 data Element = Multi     !BB3D [Element]
              | Shape     !BB3D !(M44 Double) [V3 Double]

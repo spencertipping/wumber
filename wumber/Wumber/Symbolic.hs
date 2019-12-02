@@ -35,7 +35,7 @@
 --
 --   @
 --   circle_fn :: Double -> Sym () Double
---   circle_fn r = r**2 - (var 0 ** 2 + var 1 ** 2)
+--   circle_fn r = val r ** 2 - (var 0 ** 2 + var 1 ** 2)
 --   @
 --
 --   The meaning of 'var's depends on context. As far as 'Sym' is concerned,
@@ -108,6 +108,10 @@ import Wumber.ClosedComparable
 --   because we use orderings to maintain sorted factor lists. 'Sym' instances
 --   are ordered with 'OrdSym' for this purpose, but that isn't exposed to the
 --   user.
+
+-- TODO
+-- Replace IntSet with a bitset (can't use the one on hackage, but maybe port
+-- it); then drop a bitset onto every level of this hierarchy.
 
 data Sym f a     = [SymTerm f a] :+ !a  deriving (     Eq, Generic, Binary)
 data SymTerm f a = !a :* [SymExp f a]   deriving (Ord, Eq, Generic, Binary)
@@ -250,7 +254,7 @@ var_maybe f i = fromMaybe (var i) (f i)
 
 -- | Resolves a specific set of variables, leaving others unmodified.
 --
---   TODO: optimize by skipping if 'vars_in' is disoint
+--   TODO: optimize by skipping if 'vars_in' is disjoint
 
 rewrite_vars :: AlgConstraints f a => IntMap (Sym f a) -> Sym f a -> Sym f a
 rewrite_vars m = eval val (var_maybe (m !?))
@@ -328,6 +332,12 @@ pmul (xs :+ a) (ys :+ b) = sum [tmul x y | x <- a :* [] : xs,
 
 -- | Polynomial exponentiation with term grouping. Uses repeated squaring if the
 --   exponent is a positive integer constant.
+--
+--   TODO: is term expansion ever useful from an algebraic perspective? Other
+--   options would be to leave things factored by multiplying or applying ':**'
+--   to a 'Poly' 'SymVar'. Then we could expand down the line if we wanted to,
+--   but we'd still have the factored representation.
+
 ppow :: SymConstraints f a => Sym f a -> Sym f a -> Sym f a
 ppow _ 0 = 1
 ppow ([] :+ 1) _         = 1
