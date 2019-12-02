@@ -332,11 +332,17 @@ pmul (xs :+ a) (ys :+ b) = sum [tmul x y | x <- a :* [] : xs,
 
 -- | Polynomial exponentiation with term grouping. Uses repeated squaring if the
 --   exponent is a positive integer constant.
+
+-- TODO
+-- Is term expansion ever useful from an algebraic perspective? Other options
+-- would be to leave things factored by multiplying or applying ':**' to a
+-- 'Poly' 'SymVar'. Then we could expand down the line if we wanted to, but we'd
+-- still have the factored representation.
 --
---   TODO: is term expansion ever useful from an algebraic perspective? Other
---   options would be to leave things factored by multiplying or applying ':**'
---   to a 'Poly' 'SymVar'. Then we could expand down the line if we wanted to,
---   but we'd still have the factored representation.
+-- Do we want to prefer the factored representation until we see nontrivial
+-- terms get merged? Or maybe we always treat the factored representation (if we
+-- have one) as canonical, then try expanding terms when we want to match
+-- things.
 
 ppow :: SymConstraints f a => Sym f a -> Sym f a -> Sym f a
 ppow _ 0 = 1
