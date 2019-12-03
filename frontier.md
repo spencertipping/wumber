@@ -45,20 +45,32 @@
   + DC isn't sufficient for realtime modeling: we need boundary/corner hints
   + LOD-variant feature hinting
   + Calculate LOD by view prominence
-+ Sym compiler
-  + Alias local quantities (SSA variables)
++ Sym compiler/algebra
+  + `ifpos` conditional instead of `upper`/`lower`
+  + Cache `Binary` encodings for fast deduplication within `JITIR`
+  + Symbolic derivatives
+  + Algebraic simplification of sign expressions?
+  + BVH primitives?
++ Isosurfaces
+  + Bounding-box metadata as part of the function spec
+  + BVH for CSG
 + Assembler
-  + Multi-branch assembly
+  + Multi-branch assembly with conditionals
   + Constant vector + indexing
 + JIT
+  + Flexible register allocation (not all threads need extra registers)
   + Reverse-engineer instruction latency/throughput
   + Preload operands into registers while ALUs are busy
     + Model processor ports at some level
++ JITIR
+  + Full `Sym` deduplication
 + Simulation
   + 4D meshing for animation/object-through-time collision detection
     + Collisions happen only at the `t` coordinates of 4D vertices
 + Meshing
   + Progressive solid meshing for FEA, driven by error gradient
+    + Is FEA incrementally splittable this way? (Probably, since it's an
+      integral equation)
 
 
 ## Long-term

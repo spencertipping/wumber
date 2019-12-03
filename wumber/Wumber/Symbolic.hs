@@ -32,6 +32,57 @@
 -- 5. Symbolic variable isolation
 
 
+-- TODO
+-- Replace IntSet with a bitset (can't use the one on hackage, but maybe port
+-- it); then drop a bitset onto every level of this hierarchy.
+
+-- TODO
+-- Cache a 'profile' per element, something that keeps it indexed/located within
+-- chains. Profiles should be unboxed hash-like things we can use to pattern
+-- match things without visiting children.
+
+-- TODO
+-- Lazily calculate the 'Binary' representation for each element on each element
+-- for fingerprinting/comparison purposes.
+
+-- TODO
+-- No more infix constructors here; the notation isn't useful and it prevents us
+-- from having additional fields.
+
+-- TODO
+-- Replace lists with a sorted-merge-friendly linear structure, possibly wrapped
+-- around Vector.
+
+-- TODO
+-- Use a shell 'newtype' for user-facing operations and 'Ord', then have that be
+-- unwrappable to an internal thing that supports structural 'Ord', 'Eq', etc.
+-- In other words, invert the current 'OrdSym' idea.
+
+
+-- TODO
+-- Implement polynomial long division as a way to get a factored representation.
+
+-- TODO
+-- Is term expansion ever useful from an algebraic perspective? Other options
+-- would be to leave things factored by multiplying or applying ':**' to a
+-- 'Poly' 'SymVar'. Then we could expand down the line if we wanted to, but we'd
+-- still have the factored representation.
+--
+-- Do we want to prefer the factored representation until we see nontrivial
+-- terms get merged? Or maybe we always treat the factored representation (if we
+-- have one) as canonical, then try expanding terms when we want to match
+-- things.
+
+
+-- TODO
+-- Replace 'Upper' and 'Lower' with 'IfPositive(x, a, b)' ternary. This will
+-- make it possible for derivatives to use a closed set of operations; right now
+-- 'Upper' and 'Lower' have no symbolic derivatives within Sym.
+
+
+
+
+
 -- | Symbolic numerical quantities. @Sym f a@ is a symbolic quantity with
 --   'Functionable' type @f@ (or @()@ if you don't need custom functions) and
 --   numeric type @a@.
@@ -116,28 +167,6 @@ import Wumber.ClosedComparable
 --   because we use orderings to maintain sorted factor lists. 'Sym' instances
 --   are ordered with 'OrdSym' for this purpose, but that isn't exposed to the
 --   user.
-
--- TODO
--- Replace IntSet with a bitset (can't use the one on hackage, but maybe port
--- it); then drop a bitset onto every level of this hierarchy.
-
--- TODO
--- Cache a 'profile' per element, something that keeps it indexed/located within
--- chains. Profiles should be unboxed hash-like things we can use to pattern
--- match things without visiting children.
-
--- TODO
--- No more infix constructors here; the notation isn't useful and it prevents us
--- from having additional fields.
-
--- TODO
--- Replace lists with a sorted-merge-friendly linear structure, possibly wrapped
--- around Vector.
-
--- TODO
--- Use a shell 'newtype' for user-facing operations and 'Ord', then have that be
--- unwrappable to an internal thing that supports structural 'Ord', 'Eq', etc.
--- In other words, invert the current 'OrdSym' idea.
 
 data Sym f a     = [SymTerm f a] :+ !a  deriving (     Eq, Generic, Binary)
 data SymTerm f a = !a :* [SymExp f a]   deriving (Ord, Eq, Generic, Binary)
@@ -356,24 +385,8 @@ pmul (xs :+ a) (ys :+ b) = sum [tmul x y | x <- a :* [] : xs,
                                  | otherwise  = []
 
 
--- TODO
--- Implement polynomial long division as a way to get a factored representation.
-
-
 -- | Polynomial exponentiation with term grouping. Uses repeated squaring if the
 --   exponent is a positive integer constant.
-
--- TODO
--- Is term expansion ever useful from an algebraic perspective? Other options
--- would be to leave things factored by multiplying or applying ':**' to a
--- 'Poly' 'SymVar'. Then we could expand down the line if we wanted to, but we'd
--- still have the factored representation.
---
--- Do we want to prefer the factored representation until we see nontrivial
--- terms get merged? Or maybe we always treat the factored representation (if we
--- have one) as canonical, then try expanding terms when we want to match
--- things.
-
 ppow :: SymConstraints f a => Sym f a -> Sym f a -> Sym f a
 ppow _ 0 = 1
 ppow ([] :+ 1) _         = 1
