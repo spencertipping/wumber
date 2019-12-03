@@ -2,6 +2,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE CPP #-}
+
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 -- | Platform-independent JIT compilation for 'Sym' expressions. If you have a
@@ -24,6 +25,8 @@ import System.IO.Unsafe (unsafePerformIO)
 import qualified Data.ByteString      as BS
 import qualified Data.Vector.Storable as VS
 
+import Wumber.VectorConversion
+
 
 #if __amd64__ || __amd64 || __x86_64__ || __x86_64
 #  define WUMBER_ARCH amd64
@@ -45,7 +48,8 @@ import Wumber.Symbolic
 --   given 'Arg' state vector. In general, 'jit sym v == eval (v !) sym', but
 --   'jit' will usually be faster if JIT is supported for your platform. You can
 --   use 'is_jit_supported' to determine this.
-jit :: AlgConstraints f R => Sym f R -> VS.Vector R -> R
+jit :: (AlgConstraints f R, VectorConversion v (VS.Vector R))
+    => Sym f R -> v -> R
 
 
 -- | Compiles a 'Sym' expression to machine code, but doesn't coerce that code
@@ -67,12 +71,12 @@ jit_as_machinecode sym = assemble_graph (PM 10) $ thread sym
 
 jit sym = unsafePerformIO do
   f <- compile_machinecode dblfn (jit_as_machinecode sym)
-  return \v -> unsafePerformIO (VS.unsafeWith v f)
+  return \v -> unsafePerformIO (VS.unsafeWith (vconvert v :: VS.Vector R) f)
 
 #else
 
 is_jit_supported     = False
 jit_as_machinecode s = error "JIT compilation unsupported on this platform"
-jit sym v            = eval (v VS.!) sym
+jit sym v            = eval (vconvert v VS.!) sym
 
 #endif

@@ -29,6 +29,11 @@ import qualified Numeric.LinearAlgebra as LA
 class VectorConversion a b where vconvert :: a -> b
 
 
+instance VectorConversion a a where
+  vconvert = id
+  {-# INLINE vconvert #-}
+
+
 instance VectorConversion (V2 Double) (V.Vector Double) where
   vconvert (V2 x y) = V.fromList [x, y]
   {-# INLINE vconvert #-}
