@@ -28,7 +28,6 @@ import qualified Numeric.LinearAlgebra as LA
 -- | Specifies that we can convert vectors from type 'a' to 'b'.
 class VectorConversion a b where vconvert :: a -> b
 
-
 instance VectorConversion a a where
   vconvert = id
   {-# INLINE vconvert #-}

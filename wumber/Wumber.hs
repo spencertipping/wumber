@@ -6,6 +6,7 @@ module Wumber (
   module Wumber.Constraint,
   module Wumber.Cursor,
   module Wumber.Element,
+  module Wumber.Model,
   module Wumber.Numeric,
   module Wumber.Symbolic,
 
@@ -21,6 +22,7 @@ import Wumber.ClosedComparable
 import Wumber.Constraint
 import Wumber.Cursor
 import Wumber.Element
+import Wumber.Model
 import Wumber.Numeric
 import Wumber.Symbolic
 

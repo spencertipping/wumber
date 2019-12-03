@@ -52,6 +52,7 @@ library
                      , Wumber.Element
                      , Wumber.JIT
                      , Wumber.JITIR
+                     , Wumber.Model
                      , Wumber.Numeric
                      , Wumber.Symbolic
                      , Wumber.SymbolicAlgebra

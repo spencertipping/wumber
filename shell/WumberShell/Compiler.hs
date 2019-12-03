@@ -10,7 +10,7 @@ import Control.Concurrent.MVar
 import Control.Monad (forM_)
 import Data.Foldable (toList)
 import Data.Maybe
-import Data.Vector.Storable (unsafeWith)
+import Linear.Matrix (identity)
 import System.INotify hiding (Event)
 import System.IO (stderr)
 import System.IO.Unsafe (unsafePerformIO)
@@ -92,6 +92,7 @@ update_model model m = forkOS do
   fn <- jit <$> head <$> runWumber init_cursor m
   forM_ [6..18] \r -> do
     eprintf "\027[2J\027[1;1Hrendering at %d..." r
-    let ls = toList $ iso_contour fn (BB (-2) 2) r (max 15 (r + 6)) 0.1
+    let ls = map line $ toList $ iso_contour fn (BB (-2) 2) r (max 15 (r + 6)) 0.1
+        line (a, b) = shape_of identity [a, b]
     eprintf " [%d line(s)]" (length ls) -- NB: force list before swapping mvar
     swapMVar model $! Just $! ls

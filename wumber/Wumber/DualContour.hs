@@ -18,6 +18,7 @@ module Wumber.DualContour (
   TreeMeta(..),
   IsoFn,
   SplitFn,
+  DCVector,
 
   t_bound, t_corners, t_size,
 
@@ -49,7 +50,6 @@ import qualified Data.Sequence         as SQ
 import qualified Numeric.LinearAlgebra as LA
 
 import Wumber.BoundingBox
-import Wumber.Element
 import Wumber.Numeric
 import Wumber.VectorConversion
 
@@ -94,15 +94,14 @@ t_size _                = 1
 
 
 -- | Traces an iso element to the specified non-surface and surface resolutions
---   and returns a list of 'Element's to contour it.
-iso_contour :: IsoFn (V3 R) -> BB3D -> Int -> Int -> R -> SQ.Seq Element
-iso_contour f b minn maxn bias = lines (trace_lines t)
-  where t     = build f b sf bias
-        lines = fmap (\(v1, v2) -> shape_of identity [v1, v2])
-
-        sf _ n (TM b (v:vs)) _
-          | any ((/= signum v) . signum) vs = n < maxn
-          | otherwise                       = n < minn
+--   and returns a list of lines to contour it.
+iso_contour :: DCVector v
+            => IsoFn (v R) -> BoundingBox (v R)
+            -> Int -> Int -> R -> SQ.Seq (v R, v R)
+iso_contour f b minn maxn bias = trace_lines t
+  where t = build f b sf bias
+        sf _ n (TM b (v:vs)) _ | any ((/= signum v) . signum) vs = n < maxn
+                               | otherwise                       = n < minn
 
 
 -- | Type constraints for vectors that can be used for dual contouring.
