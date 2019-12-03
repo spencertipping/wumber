@@ -20,6 +20,7 @@ import qualified Data.ByteString.UTF8         as B8
 import qualified Language.Haskell.Interpreter as HI
 
 import Wumber
+import Wumber.SymbolicJIT
 
 
 eprintf :: HPrintfType r => String -> r
@@ -87,7 +88,7 @@ recompile model f = do
 
 update_model :: MVar (Maybe [Element]) -> Wumber () -> IO ThreadId
 update_model model m = forkOS do
-  fn <- (. to_storable_vector) <$> jit <$> head <$> runWumber init_cursor m
+  fn <- (. vconvert) <$> jit <$> head <$> runWumber init_cursor m
   forM_ [6..18] \r -> do
     eprintf "\027[2J\027[1;1Hrendering at %d..." r
     let ls = toList $ iso_contour fn (BB (-2) 2) r (max 15 (r + 6)) 0.1

@@ -1,22 +1,15 @@
 {-# LANGUAGE NoMonomorphismRestriction #-}
 
 module Wumber (
-  module Wumber.AMD64Asm,
-  module Wumber.AMD64JIT,
   module Wumber.BoundingBox,
   module Wumber.ClosedComparable,
   module Wumber.Constraint,
-  module Wumber.ConstraintSimplify,
-  module Wumber.ConstraintSolver,
   module Wumber.Cursor,
   module Wumber.DualContour,
   module Wumber.Element,
-  module Wumber.JIT,
-  module Wumber.JITIR,
   module Wumber.Numeric,
   module Wumber.Symbolic,
-  module Wumber.SymbolicAlgebra,
-  module Wumber.SymbolicJIT,
+  module Wumber.VectorConversion,
 
   Wumber,
   runWumber,
@@ -25,28 +18,24 @@ module Wumber (
 
 import Control.Monad.RWS.Strict
 
-import Wumber.AMD64Asm
-import Wumber.AMD64JIT
 import Wumber.BoundingBox
 import Wumber.ClosedComparable
 import Wumber.Constraint
-import Wumber.ConstraintSimplify
-import Wumber.ConstraintSolver
 import Wumber.Cursor
 import Wumber.DualContour
 import Wumber.Element
-import Wumber.JIT
-import Wumber.JITIR
 import Wumber.Numeric
 import Wumber.Symbolic
-import Wumber.SymbolicAlgebra
-import Wumber.SymbolicJIT
+import Wumber.VectorConversion
 
 
 -- | The 'Wumber' monad, which is how you convey state to the shell and render
 --   stuff.
 type Wumber = RWST () [Sym () Double] Cursor IO
 
+
+-- TODO
+-- WTF is this doing here
 
 sincos θ = (sin r, cos r) where r = θ / 360 * τ
 

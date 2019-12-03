@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE FlexibleInstances #-}
@@ -5,6 +6,7 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE ConstraintKinds #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
@@ -22,8 +24,7 @@ module Wumber.DualContour (
   iso_contour,
   build,
   trace_cells,
-  trace_lines,
-  StorableVector(..)
+  trace_lines
 ) where
 
 
@@ -44,13 +45,13 @@ import Linear.V3             (V3(..))
 import Linear.Vector         (Additive, lerp, (^*))
 import Numeric.LinearAlgebra ((!))
 
-import qualified Data.Sequence as SQ
-import qualified Linear.V as V
+import qualified Data.Sequence         as SQ
 import qualified Numeric.LinearAlgebra as LA
 
 import Wumber.BoundingBox
 import Wumber.Element
 import Wumber.Numeric
+import Wumber.VectorConversion
 
 
 -- | An isoshape function you want to evaluate.
@@ -104,6 +105,13 @@ iso_contour f b minn maxn bias = lines (trace_lines t)
           | otherwise                       = n < minn
 
 
+-- | Type constraints for vectors that can be used for dual contouring.
+type DCVector v = (Metric v, Traversable v, Applicative v, Fractional (v R),
+                   MonadZip v,
+                   VectorConversion (LA.Vector R) (v R),
+                   VectorConversion (v R) (LA.Vector R))
+
+
 -- | Constructs a tree whose structure is determined by the 'SplitFn'.
 --
 --   TODO: almost every vertex is shared by more than one cell, but we
@@ -116,8 +124,7 @@ iso_contour f b minn maxn bias = lines (trace_lines t)
 --
 --   TODO: let 'sf' specify which split it wants, then bisect down to that axis.
 
-build :: (Metric v, Traversable v, Applicative v, Fractional (v R), MonadZip v,
-          StorableVector (v R))
+build :: DCVector v
       => IsoFn (v R) -> BoundingBox (v R) -> SplitFn (v R) -> R -> Tree (v R)
 
 build f b sf bias = go b (cycle basis) 0
@@ -139,7 +146,7 @@ build f b sf bias = go b (cycle basis) 0
 
 
 -- | Shows the outline of tree cells for debugging.
-trace_cells :: (Traversable v, MonadZip v) => Tree (v R) -> [(v R, v R)]
+trace_cells :: DCVector v => Tree (v R) -> [(v R, v R)]
 trace_cells (Bisect _ _ l r) = trace_cells l ++ trace_cells r
 trace_cells t                = map pair $ edge_pairs (length l)
   where b@(BB l u)  = t ^. t_bound
@@ -152,7 +159,7 @@ trace_cells t                = map pair $ edge_pairs (length l)
 
 -- | Uses dual contouring to find lines along an isosurface. The lines end up
 --   forming a closed net unless your cells are too large.
-trace_lines :: (Applicative v, Foldable v) => Tree (v R) -> SQ.Seq (v R, v R)
+trace_lines :: DCVector v => Tree (v R) -> SQ.Seq (v R, v R)
 trace_lines (Bisect _ _ l r) = go l r SQ.>< trace_lines l SQ.>< trace_lines r
   where go l r
           | not (intersects (l^.t_bound) (r^.t_bound))         = SQ.empty
@@ -199,31 +206,11 @@ trace_lines _ = SQ.empty
 --   bias·xz = bias·centerz
 --   @
 
-surface_vertex :: (Metric f, Foldable f, Traversable f, StorableVector (f R),
-                   Applicative f, Fractional (f R))
-               => BoundingBox (f R) -> [f R] -> [f R] -> R -> f R
-surface_vertex b s v bias = b `clip` from_storable_vector x
-  where m = LA.fromRows $ map to_storable_vector $ v ++ toList (identity !!* bias)
+surface_vertex :: DCVector v => BoundingBox (v R) -> [v R] -> [v R] -> R -> v R
+surface_vertex b s v bias = b `clip` vconvert x
+  where m = LA.fromRows $ map vconvert $ v ++ toList (identity !!* bias)
         y = LA.col $ zipWith dot s v ++ toList (center b ^* bias)
         x = head $ LA.toColumns $ LA.linearSolveSVD m y
-
-
--- | Things that can be converted from the storable vectors used by
---   'Numeric.LinearAlgebra'. I'm using this because I couldn't find a way to
---   convert storable vectors back to things like 'V2' or 'V3'.
---
---   If anyone knows of a better way to solve this problem, please let me know.
-class StorableVector a where
-  from_storable_vector :: LA.Vector R -> a
-  to_storable_vector   :: a -> LA.Vector R
-
-instance StorableVector (V3 R) where
-  from_storable_vector v = V3 (v!0) (v!1) (v!2)
-  to_storable_vector (V3 x y z) = LA.vector [x, y, z]
-
-instance StorableVector (V2 R) where
-  from_storable_vector v = V2 (v!0) (v!1)
-  to_storable_vector (V2 x y) = LA.vector [x, y]
 
 
 -- | Finds the surface point of an 'IsoFn' along a bounded vector using Newton's
@@ -232,7 +219,7 @@ instance StorableVector (V2 R) where
 --   NOTE: arguments to 'lerp' are a little counterintuitive: 'lerp 0 a b == b'
 --   and 'lerp 1 a b == a'.
 
-surface_point :: Additive f => IsoFn (f R) -> (f R, f R) -> f R
+surface_point :: DCVector v => IsoFn (v R) -> (v R, v R) -> v R
 surface_point f (a, b) = lerp (newton 0.5) b a
   where f' = if f a > f b
              then \x -> - (f (lerp x b a))
@@ -254,8 +241,7 @@ surface_point f (a, b) = lerp (newton 0.5) b a
 
 -- | Returns the /n/-dimensional gradient vector of the isofunction at a given
 --   point.
-gradient :: (Traversable f, Applicative f, Num (f R))
-         => IsoFn (f R) -> f R -> f R
+gradient :: DCVector v => IsoFn (v R) -> v R -> v R
 gradient f v = sum [diff b | b <- basis]
   where δx     = δ 1            -- NOTE: suboptimal (should use vector coords)
         diff b = b ^* ((f (v + b^*δx) - f (v - b^*δx)) / (2*δx))
@@ -265,7 +251,7 @@ gradient f v = sum [diff b | b <- basis]
 
 
 -- | Returns a set of basis vectors for the given vector space.
-basis :: (Num a, Traversable t, Applicative t) => [t a]
+basis :: DCVector v => [v R]
 basis = toList identity
 
 {-# SPECIALIZE INLINE basis :: [V3 R] #-}
@@ -273,7 +259,7 @@ basis = toList identity
 
 
 -- | Returns all 2ⁿ corners of a bounding box of dimension /n/.
-corners :: (Traversable v, MonadZip v) => BoundingBox (v a) -> [v a]
+corners :: DCVector v => BoundingBox (v a) -> [v a]
 corners (BB l u) = traverse biList $ l `mzip` u
 
 {-# SPECIALIZE INLINE corners :: BoundingBox (V3 R) -> [V3 R] #-}
@@ -283,7 +269,7 @@ corners (BB l u) = traverse biList $ l `mzip` u
 -- | Returns all axis-aligned edges of a bounding box that cross a surface
 --   boundary. Mathematically, this is the set of all pairs of corners that
 --   differ along exactly one axis, and whose function values differ in sign.
-crossing_edges :: Foldable f => [f a] -> [R] -> [(f a, f a)]
+crossing_edges :: DCVector v => [v R] -> [R] -> [(v R, v R)]
 crossing_edges cs xs = map pair $ filter crosses $ edge_pairs (length $ head cs)
   where crosses (i, j) = signum (xs !! i) /= signum (xs !! j)
         pair    (i, j) = (cs !! i, cs !! j)
@@ -306,8 +292,8 @@ edge_pairs n = [(i, i `xor` shiftL 1 x) | i <- [0..(1 `shiftL` (n-1))],
 
 -- | Bisect a bounding box along the specified axis vector. Your warranty is
 --   void if you specify a vector that isn't axis-aligned.
-bisect :: (Metric v, Fractional (v a), Fractional a, Floating a)
-       => v a -> BoundingBox (v a) -> (BoundingBox (v a), BoundingBox (v a))
+bisect :: DCVector v
+       => v R -> BoundingBox (v R) -> (BoundingBox (v R), BoundingBox (v R))
 bisect a (BB l u) = (BB l (l + mp/2 + mo), BB (l + mp/2) u)
   where d  = u - l
         mp = project a d
