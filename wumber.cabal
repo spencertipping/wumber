@@ -117,6 +117,7 @@ executable wumber
   hs-source-dirs:      shell
   main-is:             WumberShell.hs
   other-modules:       WumberShell.Compiler
+                     , WumberShell.ComputedCache
                      , WumberShell.Event
                      , WumberShell.Render
                      , WumberShell.View
@@ -129,6 +130,7 @@ executable wumber
                      , containers >= 0.6.0.1
                      , criterion >= 1.5.6.0
                      , deepseq >= 1.4.4.0
+                     , directory
                      , gloss
                      , hinotify
                      , hint

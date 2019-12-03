@@ -7,6 +7,7 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
@@ -60,7 +61,7 @@ class BoundedObject a v where bounding_box :: a -> BoundingBox v
 --   modeled. You don't have to use this typeclass, but you should if you can
 --   because Wumber will use a disk cache to store outputs that are slow to
 --   compute.
-class (Fingerprintable a, Binary b) => Computed a b | a -> b where
+class (Fingerprintable a, Binary b) => Computed a b where
   compute :: a -> b
 
 instance (AlgConstraints f R,

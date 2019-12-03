@@ -48,7 +48,9 @@ instance Arbitrary (V3 R) where
   arbitrary = V3 <$> arbitrary <*> arbitrary <*> arbitrary
 
 
-instance (Eval R R [a] [b], DeterministicEval R R a b) => DeterministicEval R R [a] [b]
+instance (Eval R R [a] [b], DeterministicEval R R a b) =>
+         DeterministicEval R R [a] [b]
+
 instance DeterministicEval R R a b => Eval R R [a] [b] where
   eval t r = map (eval t r)
 
