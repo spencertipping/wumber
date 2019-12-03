@@ -1,3 +1,5 @@
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE NamedFieldPuns, LambdaCase, BlockArguments #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
@@ -10,7 +12,9 @@ import Control.Concurrent.MVar
 import Control.Monad (forM_)
 import Data.Foldable (toList)
 import Data.Maybe
+import Data.Typeable (Typeable)
 import Linear.Matrix (identity)
+import Linear.V3     (V3(..))
 import System.INotify hiding (Event)
 import System.IO (stderr)
 import System.IO.Unsafe (unsafePerformIO)
@@ -22,6 +26,8 @@ import qualified Language.Haskell.Interpreter as HI
 import Wumber
 import Wumber.DualContour
 import Wumber.SymbolicJIT
+
+import WumberShell.ComputedCache
 
 
 eprintf :: HPrintfType r => String -> r
@@ -64,7 +70,9 @@ recompile model f = do
 
     HI.loadModules [f]
     HI.setTopLevelModules [module_name f]
-    HI.interpret "main" (HI.as :: Wumber ())
+    HI.interpret "main" (HI.as :: Wumber (Sketch (V3 R)))
+
+  putStrLn "got a result"
 
   case r of
     Left (HI.WontCompile xs) -> do
@@ -78,6 +86,8 @@ recompile model f = do
       eprintf "%s\n" (show e)
 
     Right p -> do
+      putStrLn "successful result"
+
       w <- tryTakeMVar worker
       case w of Just t -> killThread t
                 _      -> return ()
@@ -87,12 +97,9 @@ recompile model f = do
       eprintf "\027[2J\027[1;1H%s OK\n" f
 
 
-update_model :: MVar (Maybe [Element]) -> Wumber () -> IO ThreadId
-update_model model m = forkOS do
-  fn <- jit <$> head <$> runWumber init_cursor m
-  forM_ [6..18] \r -> do
-    eprintf "\027[2J\027[1;1Hrendering at %d..." r
-    let ls = map line $ toList $ iso_contour fn (BB (-2) 2) r (max 15 (r + 6)) 0.1
-        line (a, b) = shape_of identity [a, b]
-    eprintf " [%d line(s)]" (length ls) -- NB: force list before swapping mvar
-    swapMVar model $! Just $! ls
+update_model :: MVar (Maybe [Element]) -> Wumber (Sketch (V3 R)) -> IO ThreadId
+update_model model (f, v) = forkOS do
+  s <- cached_compute user_cache f v
+  swapMVar model $ Just (map line (unSketch s))
+  return ()
+  where line (a, b) = shape_of identity [a, b]

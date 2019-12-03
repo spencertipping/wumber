@@ -93,7 +93,6 @@ scs     = spheres `iunion` cube (BB (-1.5) (-0.5))
 cubes   = cube (BB (-1) 1)
 
 
-main :: Wumber ()
-main = do
-  zoom 0.005
-  tell [model (V3 (var 0) (var 1) (var 2))]
+main :: Wumber (Sketch (V3 R))
+main = wumber $ FRep (model (V3 (var 0) (var 1) (var 2)) :: Sym () R)
+                     (BB (-2 :: V3 R) 2)

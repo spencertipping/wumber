@@ -1,4 +1,8 @@
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
@@ -16,6 +20,7 @@ module WumberShell.ComputedCache where
 
 
 import Data.Binary      (Binary(..), encodeFile, decodeFile)
+import GHC.Fingerprint  (Fingerprint)
 import GHC.Generics     (Generic)
 import System.Directory (createDirectoryIfMissing, doesPathExist,
                          getXdgDirectory, XdgDirectory(..))
@@ -26,6 +31,20 @@ import Wumber.Fingerprint
 import Wumber.Model
 
 
+-- | Computes using the cache.
+cached_compute :: Binary a => ComputedCache -> Fingerprint -> a -> IO a
+cached_compute (CC p) f v = do let f' = p ++ "/" ++ show f
+                               createDirectoryIfMissing True p
+                               e <- doesPathExist f'
+                               putStrLn "gonna do the file thing"
+                               if e
+                                 then decodeFile f'
+                                 else do putStrLn "about to encode"
+                                         encodeFile f' v
+                                         putStrLn "encoded"
+                                         return v
+
+
 -- | A directory to store stuff. 'user_cache' will give you a sensible default.
 newtype ComputedCache = CC { unCC :: FilePath }
   deriving (Show, Eq, Generic, Binary)
@@ -34,18 +53,3 @@ newtype ComputedCache = CC { unCC :: FilePath }
 -- | The Right Place (TM) to store computed results.
 user_cache :: ComputedCache
 user_cache = CC $ unsafePerformIO (getXdgDirectory XdgCache "wumber")
-
-
--- | A version of 'compute' that populates and/or uses entries in the specified
---   disk cache.
-cached_compute :: Computed a b => ComputedCache -> a -> IO b
-cached_compute (CC p) v = do
-  let f        = show $ fingerprint v
-      filename = p ++ "/" ++ f
-  createDirectoryIfMissing True p
-  e <- doesPathExist filename
-  if e
-    then decodeFile filename
-    else do let c = compute v
-            encodeFile filename c
-            return c

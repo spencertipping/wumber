@@ -50,61 +50,54 @@ import Wumber.VectorConversion
 -- | Objects whose volume can be reduced to an N-dimensional isofunction. Most
 --   objects should implement this because it makes it possible for Wumber to
 --   derive most other interfaces.
-class BoundedObject a v => FRep a v f | a -> f, a -> v where frep :: a -> Sym f R
+class FReppable a v f | a -> f, a -> v where frep :: a -> FRep v f
+
+data FRep v f = FRep { frep_fn :: Sym f R,
+                       frep_bb :: BoundingBox v }
+  deriving (Show, Eq, Generic, Binary)
+
+instance (Binary f, Binary v) => Fingerprintable (FRep v f) where
+  fingerprint = binary_fingerprint
 
 
 -- | Objects whose extents are known.
 class BoundedObject a v where bounding_box :: a -> BoundingBox v
+
+instance BoundedObject (FRep v f) v where bounding_box = frep_bb
 
 
 -- | Objects that undergo a compilation or solving step before they can be
 --   modeled. You don't have to use this typeclass, but you should if you can
 --   because Wumber will use a disk cache to store outputs that are slow to
 --   compute.
-class (Fingerprintable a, Binary b) => Computed a b where
-  compute :: a -> b
+class (Fingerprintable a, Binary b) => Computed a b where compute :: a -> b
 
-instance (AlgConstraints f R,
+instance {-# OVERLAPPABLE #-}
+         (AlgConstraints f R,
           Fingerprintable (Constrained f a),
           DeterministicEval R R a b,
           Binary b) =>
          Computed (Constrained f a) b where
   compute = fst . solve 1e-6 10000
 
-  -- FIXME
-  -- Hard-coded constants
 
-
--- | The computed boundary of an 'FRep' object.
-newtype ComputedBoundary v = CB { unCB :: [(v, v)] }
+-- | An object sketched using a given type of point. This is used for live
+--   previews.
+newtype Sketch v = Sketch { unSketch :: [(v, v)] }
   deriving (Show, Eq, Generic, Binary)
 
--- TODO
--- This is terrible.
-
-instance Sketch (ComputedBoundary v) v where sketch = unCB
-
-
--- | Objects that can be sketched using N-dimensional lines.
-class Sketch a v where sketch :: a -> [(v, v)]
-
--- TODO
--- What's the canonical way to offer a foldable collection, not necessarily a
--- list? I don't want a forall; the caller doesn't get to choose.
 
 -- TODO
 -- Add level-of-detail based on view
 
-instance (AlgConstraints f R,
+instance {-# OVERLAPPABLE #-}
+         (AlgConstraints f R,
           Binary (v R),
-          FRep a (v R) f,
-          Fingerprintable a,
+          Binary f,
           DCVector v,
           VectorConversion (v R) (VS.Vector R)) =>
-         Computed a (ComputedBoundary (v R)) where
+         Computed (FRep (v R) f) (Sketch (v R)) where
 
-  compute o = CB $ toList $ iso_contour f bb 6 18 0.1 where f  = jit (frep o)
-                                                            bb = bounding_box o
-
-  -- FIXME
-  -- Hard-coded constants above, major fail
+  compute o = Sketch $ toList $ iso_contour f bb 6 18 0.1
+    where f  = jit (frep_fn o)
+          bb = frep_bb o

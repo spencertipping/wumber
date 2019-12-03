@@ -1,6 +1,9 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
+
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 module Wumber.Fingerprint where
@@ -10,6 +13,7 @@ import Crypto.Hash.SHA256   (hash)
 import Data.Binary          (Binary(..), decode, encode)
 import Data.ByteString      (ByteString(..))
 import Data.ByteString.Lazy (fromStrict, toStrict)
+import Data.Word            (Word64)
 import GHC.Fingerprint      (Fingerprint(..))
 
 
@@ -19,9 +23,11 @@ import GHC.Fingerprint      (Fingerprint(..))
 --   that.
 class Fingerprintable a where fingerprint :: a -> Fingerprint
 
-instance {-# OVERLAPPABLE #-} Binary a => Fingerprintable a where
-  fingerprint = fingerprint . toStrict . encode
-
 instance Fingerprintable ByteString where
   fingerprint b = Fingerprint l h
-    where (l, h) = decode $ fromStrict (hash b)
+    where (l :: Word64, h :: Word64) = decode $ fromStrict (hash b)
+
+
+-- | A handy function you can use to instantly become 'Fingerprintable'.
+binary_fingerprint :: Binary a => a -> Fingerprint
+binary_fingerprint = fingerprint . toStrict . encode

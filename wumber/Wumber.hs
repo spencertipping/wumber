@@ -11,12 +11,13 @@ module Wumber (
   module Wumber.Numeric,
   module Wumber.Symbolic,
 
-  Wumber,
-  runWumber,
+  Wumber(..),
+  Fingerprint,
+  wumber,
   sincos
 ) where
 
-import Control.Monad.RWS.Strict
+import GHC.Fingerprint (Fingerprint)
 
 import Wumber.BoundingBox
 import Wumber.ClosedComparable
@@ -29,16 +30,13 @@ import Wumber.Numeric
 import Wumber.Symbolic
 
 
--- | The 'Wumber' monad, which is how you convey state to the shell and render
---   stuff.
-type Wumber = RWST () [Sym () Double] Cursor IO
+type Wumber a = (Fingerprint, a)
+
+wumber :: Computed a b => a -> Wumber b
+wumber x = (fingerprint x, compute x)
 
 
 -- TODO
 -- WTF is this doing here
 
 sincos θ = (sin r, cos r) where r = θ / 360 * τ
-
-
-runWumber :: Cursor -> Wumber () -> IO [Sym () Double]
-runWumber c m = snd <$> execRWST m () c
