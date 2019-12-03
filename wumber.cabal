@@ -23,6 +23,7 @@ library
                      , binary >= 0.8.6.0
                      , bytestring
                      , containers >= 0.6.0.1
+                     , cryptohash-sha256
                      , deepseq >= 1.4.4.0
                      , gloss
                      , hmatrix
@@ -50,6 +51,7 @@ library
                      , Wumber.GeometricConstraints
                      , Wumber.Cursor
                      , Wumber.Element
+                     , Wumber.Fingerprint
                      , Wumber.JIT
                      , Wumber.JITIR
                      , Wumber.Model

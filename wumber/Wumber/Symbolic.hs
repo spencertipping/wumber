@@ -125,6 +125,7 @@ module Wumber.Symbolic (
   OrdSym(..),
   VarID,
   Eval(..),
+  DeterministicEval(..),
   SymFn1(..),
   SymFn2(..),
   Functionable(..),
@@ -273,6 +274,10 @@ instance ShowConstraints f a => Show (SymVar f a) where
 class Eval t r a b | a b -> t, a b -> r where
   eval :: (t -> r) -> (VarID -> r) -> a -> b
 
+-- | A more specific form of 'Eval' that provides @a -> b@ as a functional
+--   dependency.
+class Eval t r a b => DeterministicEval t r a b | a -> b
+
 type SymConstraints2 f a b = (SymConstraints f a, SymConstraints f b)
 
 instance SymConstraints2 f a b => Eval a b (Sym f a) b where
@@ -290,6 +295,8 @@ instance SymConstraints2 f a b => Eval a b (SymVar f a) b where
   eval t f (Fn1 op _ (OS x))        = fn op (eval t f x)
   eval t f (Fn2 op _ (OS x) (OS y)) = fn op (eval t f x) (eval t f y)
   eval t f (FnN op _ xs)            = fn op (map (eval t f . unOS) xs)
+
+instance SymConstraints f a => DeterministicEval a a (Sym f a) a
 
 
 -- | Re-evaluates a symbolic structure, allowing it to potentially collapse

@@ -7,6 +7,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE DeriveGeneric #-}
+
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 -- | Numerically specified constraint equations. These are solved with a hybrid
@@ -18,17 +19,19 @@
 module Wumber.Constraint where
 
 
-import Control.Monad.RWS (RWS, get, modify', tell)
+import Control.Monad.RWS (RWS, evalRWS, get, modify', tell)
 import Data.Binary       (Binary)
 import Data.Either       (lefts, rights)
 import Data.Foldable     (toList)
 import Data.Maybe        (isJust)
 import GHC.Generics      (Generic(..))
 
+import qualified Data.Binary as B
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 
 import Wumber.ClosedComparable
+import Wumber.Fingerprint
 import Wumber.Numeric
 import Wumber.Symbolic
 import Wumber.SymbolicAlgebra
@@ -44,6 +47,11 @@ type CVal f = Sym f R
 --   although it's fine to combine many into one: Wumber will figure out when
 --   you have separable subsystems and solve them independently.
 type Constrained f = RWS () [Either (VarID, R) (CVal f)] VarID
+
+instance (Binary a, Binary f) => Binary (Constrained f a) where
+  put m = B.put $ evalRWS m () 0
+  get = do (a, cs) <- B.get
+           return $ tell cs >> return a
 
 
 -- | Create a new constrained variable initialized to the specified value.

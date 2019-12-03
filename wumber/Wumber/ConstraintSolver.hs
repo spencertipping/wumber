@@ -35,17 +35,6 @@ import Wumber.Symbolic
 import Wumber.SymbolicJIT
 
 
--- | Un-monadifies a 'Constrained' monad into a series of independent
---   subsystems, simplifying each algebraically.
-ccompile :: AlgConstraints f R => Constrained f a -> (a, [Subsystem f])
-ccompile m = (a, subs)
-  where (a, cs) = evalRWS m () 0
-        subs    = subsystems init (rights cs)
-        init    = V.replicate (maxid + 1) 0 V.// inits
-        inits   = lefts cs
-        maxid   = maximum (map fst inits)
-
-
 -- | Solves a constrained system that returns a rewritable value, and rewrites
 --   that value with the constraint solution.
 --
@@ -56,7 +45,7 @@ ccompile m = (a, subs)
 --   minimizer. The goal is to minimize the amount of work required for complex
 --   constraint sets.
 
-solve :: (AlgConstraints f R, Eval R R a b)
+solve :: (AlgConstraints f R, DeterministicEval R R a b)
       => R -> Int -> Constrained f a -> (b, V.Vector R)
 solve δ n m = (eval id (solved V.!) a, solved)
   where solved    = merge_solution_vector $ map (solve_subsystem δ n) subs
@@ -78,6 +67,17 @@ solve_subsystem δ n ss = remap_solution ss xs
 -- TODO(minor): bypass minimizeV and call the C function directly. This will
 -- save some Haskell/C FFI overhead, although the total impact isn't high (on
 -- the order of ~100ns/iteration)
+
+
+-- | Un-monadifies a 'Constrained' monad into a series of independent
+--   subsystems, simplifying each algebraically.
+ccompile :: AlgConstraints f R => Constrained f a -> (a, [Subsystem f])
+ccompile m = (a, subs)
+  where (a, cs) = evalRWS m () 0
+        subs    = subsystems init (rights cs)
+        init    = V.replicate (maxid + 1) 0 V.// inits
+        inits   = lefts cs
+        maxid   = maximum (map fst inits)
 
 
 -- | The total cost for a list of constraints.

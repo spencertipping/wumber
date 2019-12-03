@@ -1,3 +1,4 @@
+{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -47,7 +48,8 @@ instance Arbitrary (V3 R) where
   arbitrary = V3 <$> arbitrary <*> arbitrary <*> arbitrary
 
 
-instance Eval R R a b => Eval R R [a] [b] where
+instance (Eval R R [a] [b], DeterministicEval R R a b) => DeterministicEval R R [a] [b]
+instance DeterministicEval R R a b => Eval R R [a] [b] where
   eval t r = map (eval t r)
 
 
@@ -59,7 +61,7 @@ instance Eval R R a b => Eval R R [a] [b] where
 --   resulting cost will be at most √δ. There's no mathematical rigor to this
 --   other than saying it's half as precise in log-terms.
 
-solvable :: (Foldable f, Eval R R a R)
+solvable :: (Foldable f, DeterministicEval R R a R)
          => R -> Int -> Constrained () (f a) -> Property
 solvable δ n m | isNaN cost || isInfinite cost = discard
                | isNaN v                       = discard
