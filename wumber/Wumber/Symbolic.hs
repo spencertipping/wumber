@@ -80,9 +80,6 @@
 -- 'Upper' and 'Lower' have no symbolic derivatives within Sym.
 
 
-
-
-
 -- | Symbolic numerical quantities. @Sym f a@ is a symbolic quantity with
 --   'Functionable' type @f@ (or @()@ if you don't need custom functions) and
 --   numeric type @a@.
