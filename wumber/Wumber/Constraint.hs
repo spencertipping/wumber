@@ -14,7 +14,7 @@
 --   strategy: first we partition the equation set into independent subsystems,
 --   then we take each of those and isolate/substitute variables, and finally we
 --   JIT a cost function with whichever variables remain and pass that to the
---   GSL BGFS solver.
+--   GSL minimizer.
 
 module Wumber.Constraint where
 
@@ -37,7 +37,7 @@ import Wumber.Symbolic
 import Wumber.SymbolicAlgebra
 
 
--- | A value being set to zero, symbolically or, failing that, numerically.
+-- | A value being set to zero symbolically or, failing that, numerically.
 type CVal f = Sym f R
 
 
@@ -46,12 +46,20 @@ type CVal f = Sym f R
 --   use one such monad per independent constraint system within a project,
 --   although it's fine to combine many into one: Wumber will figure out when
 --   you have separable subsystems and solve them independently.
+--
+--   'Constrained' monad instances are both serializable and 'Fingerprintable'.
+--   This means you can build a @Computed (Constrained f a) _@ and Wumber will
+--   memoize it.
+
 type Constrained f = RWS () [Either (VarID, R) (CVal f)] VarID
 
 instance (Binary a, Binary f) => Binary (Constrained f a) where
   put m = B.put $ evalRWS m () 0
   get = do (a, cs) <- B.get
            return $ tell cs >> return a
+
+instance (Binary a, Binary f) => Fingerprintable (Constrained f a) where
+  fingerprint = binary_fingerprint
 
 
 -- | Create a new constrained variable initialized to the specified value.

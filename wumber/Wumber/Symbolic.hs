@@ -1,22 +1,21 @@
 {-# LANGUAGE BangPatterns #-}
-{-# LANGUAGE MonoLocalBinds #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE IncoherentInstances #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE BlockArguments #-}
-{-# LANGUAGE TemplateHaskell #-}
-{-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE ConstraintKinds #-}
-{-# LANGUAGE GADTs #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE IncoherentInstances #-}
+{-# LANGUAGE MonoLocalBinds #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE UndecidableInstances #-}
 
--- NOTE: this is required to avoid infinite loops when defining recip and negate
+-- NOTE
+-- This is required to avoid infinite loops at runtime when defining recip and
+-- negate. Remove at your peril.
 {-# LANGUAGE NegativeLiterals #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields -Wincomplete-patterns #-}
@@ -33,6 +32,10 @@
 
 
 -- TODO
+-- Benchmarks for this stuff
+
+
+-- TODO
 -- Replace IntSet with a bitset (can't use the one on hackage, but maybe port
 -- it); then drop a bitset onto every level of this hierarchy.
 
@@ -43,7 +46,8 @@
 
 -- TODO
 -- Lazily calculate the 'Binary' representation for each element on each element
--- for fingerprinting/comparison purposes.
+-- for fingerprinting/comparison purposes. Every element should have a
+-- constant-time identity.
 
 -- TODO
 -- No more infix constructors here; the notation isn't useful and it prevents us
@@ -61,6 +65,10 @@
 
 -- TODO
 -- Implement polynomial long division as a way to get a factored representation.
+
+-- TODO
+-- Implement form ambivalence and use whichever is cheaper to compute, according
+-- to some externally specified model of cheapness.
 
 -- TODO
 -- Is term expansion ever useful from an algebraic perspective? Other options

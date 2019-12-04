@@ -55,11 +55,11 @@ hex_cap r v = foldl' lower maxBound
 bolt od ts = thread_part `iunion` head_part
   where thread_part = (threads (t45 od) 2 . (/ ts)) `iintersect` z_lt 0
         head_part   = hex_cap od `iintersect`
-                      cube (BB (V3 minBound minBound 0) (V3 maxBound maxBound 0.5))
+                      cube (BB (V3 minBound minBound 0) (V3 maxBound maxBound 0.4))
 
 
 -- Isofunctions for testing
-sphere l v = 0.8 - distance v l
+sphere l v = 0.9 - distance v l
 
 cube (BB (V3 x1 y1 z1) (V3 x2 y2 z2)) (V3 x y z) =
   foldl' lower maxBound [ x - x1, x2 - x, y - y1, y2 - y, z - z1, z2 - z ]
@@ -73,7 +73,7 @@ inegate    f v   = negate (f v)
 moved_by t f v = f (v - t)
 
 
-model = moved_by (V3 0 1.1 0) (bolt 0.5 0.4) `iunion` scs
+model = moved_by (V3 0.3 1.3 (-0.4)) (bolt 0.5 0.4) `iunion` scs
 
 spheres = sphere 0 `iunion` sphere 0.9 `iunion` sphere (V3 (-0.4) (-0.4) 1)
 scs     = spheres `iunion` cube (BB (-1.5) (-0.5))

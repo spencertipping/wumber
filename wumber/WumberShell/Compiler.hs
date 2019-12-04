@@ -1,3 +1,5 @@
+{-# LANGUAGE BangPatterns #-}
+{-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE NamedFieldPuns, LambdaCase, BlockArguments #-}
@@ -17,6 +19,7 @@ import Data.Foldable           (toList)
 import Data.Typeable           (Typeable)
 import Linear.Matrix           (identity)
 import Linear.V3               (V3(..))
+import System.Clock            (Clock(..), getTime, toNanoSecs)
 import System.INotify          (addWatch, EventVariety(..), initINotify)
 import System.IO               (stderr)
 import System.IO.Unsafe        (unsafePerformIO)
@@ -59,15 +62,25 @@ worker :: MVar ThreadId
 worker = unsafePerformIO newEmptyMVar
 
 
+nanos :: IO Integer
+nanos = toNanoSecs <$> getTime Realtime
+
+nanos_since :: Integer -> IO Integer
+nanos_since t = flip (-) t <$> nanos
+
+
 recompile :: (Typeable a, Computed a (Sketch (V3 R)))
           => MVar (Maybe [Element]) -> FilePath -> String -> a -> IO ()
 recompile model f expr type_marker = do
   eprintf "\027[2J\027[1;1Hcompiling...\n"
+  start_time <- nanos
 
   r <- HI.runInterpreter do
     HI.loadModules [f]
     HI.setTopLevelModules [module_name f]
     HI.interpret expr type_marker
+
+  compile_nanos <- nanos_since start_time
 
   case r of
     Left (HI.WontCompile xs) -> do
@@ -87,12 +100,17 @@ recompile model f expr type_marker = do
 
       forkOS (update_model model p) >>= putMVar worker
       eprintf "\027[2J\027[1;1H%s OK\n" f
+      eprintf "  compile time: %dms\n" (compile_nanos `quot` 1_000_000)
 
 
 update_model :: Computed a (Sketch (V3 R))
              => MVar (Maybe [Element]) -> a -> IO ()
 update_model model v = do
-  s <- cached_compute user_cache (fingerprint v) (compute v)
+  start_time <- nanos
+  !s <- cached_compute user_cache (fingerprint v) (compute v)
+  compute_nanos <- nanos_since start_time
+  eprintf "  compute/cache time: %dms\n" (compute_nanos `quot` 1_000_000)
+
   swapMVar model $ Just (map line (unSketch s))
   return ()
   where line (a, b) = shape_of identity [a, b]
