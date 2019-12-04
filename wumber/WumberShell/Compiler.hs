@@ -4,7 +4,8 @@
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 module WumberShell.Compiler (
-  compiler_loop
+  compiler_loop,
+  update_model
 ) where
 
 import Control.Concurrent
@@ -88,13 +89,13 @@ recompile model f = do
       case w of Just t -> killThread t
                 _      -> return ()
 
-      w <- update_model model p
+      w <- forkOS $ update_model model p
       swapMVar worker w
       eprintf "\027[2J\027[1;1H%s OK\n" f
 
 
-update_model :: MVar (Maybe [Element]) -> Wumber (Sketch (V3 R)) -> IO ThreadId
-update_model model (f, v) = forkOS do
+update_model :: MVar (Maybe [Element]) -> Wumber (Sketch (V3 R)) -> IO ()
+update_model model (f, v) = do
   s <- cached_compute user_cache f v
   swapMVar model $ Just (map line (unSketch s))
   return ()

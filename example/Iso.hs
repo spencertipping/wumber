@@ -1,35 +1,26 @@
 {-# LANGUAGE TupleSections #-}
-{-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 
 {-# OPTIONS -fobject-code #-}
 
-module Examples.Iso where
+module Iso (example) where
 
 import Control.Monad
-import Control.Monad.Identity
-import Control.Monad.RWS.Strict
-import Control.Concurrent.MVar
-import Criterion
-import Criterion.Main
-import Criterion.Main.Options
 import Data.Foldable
-import Data.Vector.Storable (fromList, unsafeWith)
-import Debug.Trace
-import Graphics.Gloss
 import Linear.Matrix ((*!))
 import Linear.Metric
 import Linear.V3
 import Linear.V4
 import Linear.Vector
-import System.IO (stderr)
-import System.IO.Unsafe (unsafePerformIO)
-import Text.Printf
 
 import Wumber
+
+
+example :: Wumber (Sketch (V3 R))
+example = wumber $ FRep (model (V3 (var 0) (var 1) (var 2)) :: Sym () R)
+                   (BB (-2 :: V3 R) 2)
 
 
 for  = flip map
@@ -91,8 +82,3 @@ scs     = spheres `iunion` cube (BB (-1.5) (-0.5))
                   `iunion` cube (BB (-1.2) (-0.2))
 
 cubes   = cube (BB (-1) 1)
-
-
-main :: Wumber (Sketch (V3 R))
-main = wumber $ FRep (model (V3 (var 0) (var 1) (var 2)) :: Sym () R)
-                     (BB (-2 :: V3 R) 2)
