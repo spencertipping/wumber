@@ -29,6 +29,7 @@ import System.Process
 import qualified Data.ByteString as BS
 
 import Wumber
+import Wumber.SymbolicJIT
 
 
 ndisasm :: BS.ByteString -> IO BS.ByteString
@@ -44,7 +45,7 @@ ndisasm code = do
 
 
 jit_a_fn :: (V3 (Sym () Double) -> Sym () Double) -> V3 Double -> Double
-jit_a_fn m = jit (m (V3 (var 0) (var 1) (var 2))) . to_storable_vector
+jit_a_fn m = jit (m (V3 (var 0) (var 1) (var 2)))
 
 
 type HandcodedIsoFn = (Double, Double, Double) -> Double

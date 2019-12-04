@@ -26,6 +26,8 @@ import Text.Printf (printf)
 import qualified Data.ByteString as BS
 
 import Wumber
+import Wumber.DualContour
+import Wumber.SymbolicJIT
 
 
 just_tree :: IsoFn (V3 R) -> BB3D -> Int -> Int -> R -> Tree (V3 R)
@@ -84,7 +86,7 @@ tiny_model (V3 x y z) = x + y + z + 1
 
 
 jit_a_fn :: (V3 (Sym () Double) -> Sym () Double) -> V3 Double -> Double
-jit_a_fn m = jit (m (V3 (var 0) (var 1) (var 2))) . to_storable_vector
+jit_a_fn m = jit (m (V3 (var 0) (var 1) (var 2)))
 
 
 model_fn = jit_a_fn model

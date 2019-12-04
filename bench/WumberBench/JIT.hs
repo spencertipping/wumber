@@ -13,6 +13,8 @@ import Linear.Metric (distance)
 import Linear.V3
 
 import Wumber
+import Wumber.AMD64JIT
+import Wumber.JITIR
 
 
 -- Test model
