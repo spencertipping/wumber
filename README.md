@@ -1,4 +1,6 @@
 # Wumber: CAD in Haskell
+![build status](https://travis-ci.org/spencertipping/wumber.svg?branch=master)
+
 Very much a work in progress at the moment. In fact, everything's completely
 broken.
 
