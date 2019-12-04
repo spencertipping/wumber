@@ -1,4 +1,4 @@
-sudo: false
+sudo: true
 
 # Caching so the next build will be fast too.
 cache:
@@ -10,6 +10,8 @@ before_install:
 - mkdir -p ~/.local/bin
 - export PATH=$HOME/.local/bin:$PATH
 - travis_retry curl -L https://get.haskellstack.org/stable/linux-x86_64.tar.gz | tar xz --wildcards --strip-components=1 -C ~/.local/bin '*/stack'
+- sudo apt-get update
+- sudo apt-get install -y libgsl-dev freeglut3-dev
 
 install:
 - travis_wait stack --no-terminal setup
