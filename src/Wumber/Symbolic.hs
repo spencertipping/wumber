@@ -429,6 +429,8 @@ padd (!xs :+ a) (!ys :+ b)
   | otherwise = filter nonzero (merge_with te id tadd xs ys) :+ (a + b)
   where nonzero (n :* _) = n /= 0
         te (_ :* es) = es
+
+        -- FIXME: tadd loses values in some cases?
         tadd (a :* x) (b :* _) | a + b /= 0 = (a + b) :* x
                                | otherwise  = 0 :* []
 
@@ -492,7 +494,7 @@ data SymFn1 = Abs
             | Negate
             | Sqrt
 
-  deriving (Show, Ord, Eq, Generic, Binary, Enum)
+  deriving (Show, Ord, Eq, Generic, Binary, Bounded, Enum)
 
 data SymFn2 = Quot
             | Rem
@@ -507,7 +509,7 @@ data SymFn2 = Quot
             | Multiply
             | Divide
 
-  deriving (Show, Ord, Eq, Generic, Binary, Enum)
+  deriving (Show, Ord, Eq, Generic, Binary, Bounded, Enum)
 
 
 class Functionable x t where

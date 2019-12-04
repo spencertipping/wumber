@@ -20,7 +20,7 @@ module Wumber.ConstraintSolver where
 import Control.Monad.RWS        (evalRWS)
 import Data.Either              (lefts, rights)
 import Lens.Micro               ((&))
-import Numeric.GSL.Minimization (minimizeVD, MinimizeMethodD(..))
+import Numeric.GSL.Minimization (minimizeD, minimizeVD, MinimizeMethodD(..))
 
 import qualified Data.Set             as S
 import qualified Data.Vector          as V
@@ -65,6 +65,10 @@ solve_subsystem δ n ss = remap_solution ss xs
         f'      = gradient_function
                   $ zipWith derivative (repeat cost) [0 .. nvars-1]
 
+-- FIXME
+-- The code above produces imprecise and often terrible solutions. Are we
+-- calculating the gradient correctly?
+
 -- TODO(minor): bypass minimizeV and call the C function directly. This will
 -- save some Haskell/C FFI overhead, although the total impact isn't high (on
 -- the order of ~100ns/iteration)
@@ -72,7 +76,8 @@ solve_subsystem δ n ss = remap_solution ss xs
 
 gradient_function :: (AlgConstraints f R, VectorConversion v (VS.Vector R))
                   => [CVal f] -> v -> VS.Vector R
-gradient_function fs v = VS.fromListN (length fs) $ map (flip jit v) fs
+gradient_function fs v = VS.fromListN (length fs) $ map ($! v) js
+  where js = map jit fs
 
 
 -- | Un-monadifies a 'Constrained' monad into a series of independent

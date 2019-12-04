@@ -98,6 +98,7 @@ test-suite wumber-tests
                      , WumberTest.ConstraintSolver
                      , WumberTest.JIT
                      , WumberTest.ModelAffine
+                     , WumberTest.Symbolic
   build-depends:       base >= 4.12
                      , binary
                      , bytestring
