@@ -44,6 +44,7 @@ import Wumber.DualContour
 import Wumber.Fingerprint
 import Wumber.Numeric
 import Wumber.Symbolic
+import Wumber.SymbolicDerivative
 import Wumber.SymbolicJIT
 import Wumber.VectorConversion
 
@@ -106,6 +107,10 @@ instance {-# OVERLAPPABLE #-}
           Binary (v R),
           Binary f,
           DCVector v,
+          SymVars v,
+          Applicative v,
           VectorConversion (v R) (VS.Vector R)) =>
          Computed (FRep v f) (Sketch (v R)) where
-  compute (FRep (SymV f) bb) = Sketch $ toList $ iso_contour (jit f) bb 6 18 0.1
+
+  compute (FRep (SymV f) bb) = Sketch $ toList $ iso_contour (jit f) f' bb 6 18 0.1
+    where f' v = fmap jit (vector_derivative (SymV f)) <*> pure v

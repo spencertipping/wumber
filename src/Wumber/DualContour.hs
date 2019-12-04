@@ -51,17 +51,17 @@ import qualified Numeric.LinearAlgebra as LA
 
 import Wumber.BoundingBox
 import Wumber.Numeric
-import Wumber.SymbolicDerivative
 import Wumber.VectorConversion
 
 
 -- | An isoshape function you want to evaluate.
-type IsoFn a = a -> R
+type IsoFn       a = a -> R
+type IsoGradient a = a -> a
 
 
 -- | Determines whether to split the specified bounding box. Arguments to
 --   'SplitFn' are 'iso', 'n_splits', 'tree_meta', and 'split_axis'.
-type SplitFn a = IsoFn a -> Int -> TreeMeta a -> a -> Bool
+type SplitFn a = IsoFn a -> IsoGradient a -> Int -> TreeMeta a -> a -> Bool
 
 
 -- | A bounding volume hierarchy with one-dimensional bisections. If dual
@@ -97,12 +97,12 @@ t_size _                = 1
 -- | Traces an iso element to the specified non-surface and surface resolutions
 --   and returns a list of lines to contour it.
 iso_contour :: DCVector v
-            => IsoFn (v R) -> BoundingBox (v R)
+            => IsoFn (v R) -> IsoGradient (v R) -> BoundingBox (v R)
             -> Int -> Int -> R -> SQ.Seq (v R, v R)
-iso_contour f b minn maxn bias = trace_lines t
-  where t = build f b sf bias
-        sf _ n (TM b (v:vs)) _ | any ((/= signum v) . signum) vs = n < maxn
-                               | otherwise                       = n < minn
+iso_contour f f' b minn maxn bias = trace_lines t
+  where t = build f f' b sf bias
+        sf _ _ n (TM b (v:vs)) _ | any ((/= signum v) . signum) vs = n < maxn
+                                 | otherwise                       = n < minn
 
 
 -- | Type constraints for vectors that can be used for dual contouring.
@@ -117,32 +117,30 @@ type DCVector v = (Metric v, Traversable v, Applicative v, Fractional (v R),
 --   TODO: almost every vertex is shared by more than one cell, but we
 --   re-evaluate the function instead of reusing data.
 --
---   TODO: accept a symbolic gradient function instead of calculating it
---   ourselves
---
 --   TODO: infer crossing points using normals and 'max_gradient'.
 --
 --   TODO: let 'sf' specify which split it wants, then bisect down to that axis.
 
 build :: DCVector v
-      => IsoFn (v R) -> BoundingBox (v R) -> SplitFn (v R) -> R -> Tree (v R)
+      => IsoFn (v R) -> IsoGradient (v R) -> BoundingBox (v R) -> SplitFn (v R)
+      -> R -> Tree (v R)
 
-build f b sf bias = go b (cycle basis) 0
+build f f' b sf bias = go b (cycle basis) 0
   where go b (v:vs) n
-          | sf f n tm v   = Bisect tm v (go b1 vs (n+1)) (go b2 vs (n+1))
-          | all (> 0) cfs = Inside tm
-          | all (< 0) cfs = Outside tm
-          | otherwise     = Surface tm $ surface_vertex b surface normals bias
+          | sf f f' n tm v = Bisect tm v (go b1 vs (n+1)) (go b2 vs (n+1))
+          | all (> 0) cfs  = Inside tm
+          | all (< 0) cfs  = Outside tm
+          | otherwise      = Surface tm $ surface_vertex b surface normals bias
 
           where tm       = TM b cfs
                 (b1, b2) = bisect v b
                 cs       = corners b
                 cfs      = map f cs
                 surface  = map (surface_point f) $ crossing_edges cs cfs
-                normals  = map (gradient f) surface
+                normals  = map f' surface
 
-{-# SPECIALIZE build :: IsoFn (V3 R) -> BB3D -> SplitFn (V3 R) -> R -> Tree (V3 R) #-}
-{-# SPECIALIZE build :: IsoFn (V2 R) -> BB2D -> SplitFn (V2 R) -> R -> Tree (V2 R) #-}
+{-# SPECIALIZE build :: IsoFn (V3 R) -> IsoGradient (V3 R) -> BB3D -> SplitFn (V3 R) -> R -> Tree (V3 R) #-}
+{-# SPECIALIZE build :: IsoFn (V2 R) -> IsoGradient (V2 R) -> BB2D -> SplitFn (V2 R) -> R -> Tree (V2 R) #-}
 
 
 -- | Shows the outline of tree cells for debugging.
@@ -237,17 +235,6 @@ surface_point f (a, b) = lerp (newton 0.5) b a
                          | f' m > 0    = bisect_solve l m
                          | otherwise   = bisect_solve m u
           where m = (l + u) / 2
-
-
--- | Returns the /n/-dimensional gradient vector of the isofunction at a given
---   point.
-gradient :: DCVector v => IsoFn (v R) -> v R -> v R
-gradient f v = sum [diff b | b <- basis]
-  where δx     = δ 1            -- NOTE: suboptimal (should use vector coords)
-        diff b = b ^* ((f (v + b^*δx) - f (v - b^*δx)) / (2*δx))
-
-{-# SPECIALIZE INLINE gradient :: IsoFn (V3 R) -> V3 R -> V3 R #-}
-{-# SPECIALIZE INLINE gradient :: IsoFn (V2 R) -> V2 R -> V2 R #-}
 
 
 -- | Returns a set of basis vectors for the given vector space.

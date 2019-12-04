@@ -156,6 +156,7 @@ module Wumber.Symbolic (
 
 
 import Data.Binary   (Binary(..))
+import Data.Foldable (find)
 import Data.IntMap   (IntMap(..), (!?), fromList)
 import Data.IntSet   (IntSet(..), empty, singleton, union, unions)
 import Data.List     (intercalate, sort, sortBy)
@@ -243,9 +244,19 @@ class Eq a => StaticOrd a where
   (<<)     :: a -> a -> Bool
   a << b = compare' a b == LT
 
-instance {-# OVERLAPPABLE #-} (Eq a, Ord a) => StaticOrd a where compare' = compare
-instance (Eq a, Eq f, Ord a, Ord f) => StaticOrd (Sym f a) where
-  compare' a b = compare' (OS a) (OS b)
+instance SymConstraints f a => StaticOrd (Sym f a) where
+  compare' a b = compare (OS a) (OS b)
+
+instance SymConstraints f a => StaticOrd (SymTerm f a) where compare' = compare
+instance SymConstraints f a => StaticOrd (SymExp  f a) where compare' = compare
+instance SymConstraints f a => StaticOrd (SymVar  f a) where compare' = compare
+instance SymConstraints f a => StaticOrd (OrdSym  f a) where compare' = compare
+
+instance StaticOrd a => StaticOrd [a] where
+  compare' a b = fromMaybe EQ $ find (/= EQ) $ zipWith compare' a b
+
+instance StaticOrd Double where compare' = compare
+instance StaticOrd Float  where compare' = compare
 
 
 type ShowConstraints f a = (Num a, Eq a, Show a, Show f)
@@ -359,10 +370,13 @@ v4 :: SymConstraints f a => V4 (Sym f a)
 v4 = V4 (var 0) (var 1) (var 2) (var 3)
 
 
-class    SymVars v  where vars :: SymConstraints f a => v (Sym f a)
-instance SymVars V2 where vars = v2
-instance SymVars V3 where vars = v3
-instance SymVars V4 where vars = v4
+class SymVars v where
+  vars :: SymConstraints f a => v (Sym f a)
+  var_ids :: v VarID
+
+instance SymVars V2 where vars = v2; var_ids = V2 0 1
+instance SymVars V3 where vars = v3; var_ids = V3 0 1 2
+instance SymVars V4 where vars = v4; var_ids = V4 0 1 2 3
 
 
 -- | A way to indicate that a symbolic quantity is acting as a vector function.

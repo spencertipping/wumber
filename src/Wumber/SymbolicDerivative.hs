@@ -1,9 +1,11 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MonoLocalBinds #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
 
 -- | TODO
---   Actually implement this. Right now it's @(f(a + δ) - f(a - δ)) / 2δ@.
+--   Actually implement this. Right now it's @(f(a + δ) - f(a - δ)) / 2δ@, which
+--   works fine for a lot of things but isn't optimal.
 module Wumber.SymbolicDerivative where
 
 
@@ -21,6 +23,12 @@ derivative s v = (upper - lower) / (2 * δv)
   where δv    = val (δ 1)
         upper = s //= [(v, var v + δv)]
         lower = s //= [(v, var v - δv)]
+
+
+-- | The symbolic derivative of a vector quantity, as a vector.
+vector_derivative :: (Delta a, AlgConstraints f a, Functor v, SymVars v)
+                  => SymV v f a -> v (Sym f a)
+vector_derivative f = fmap (derivative (unSymV f)) var_ids
 
 
 -- | A Jacobian "matrix" of all variables that appear in a series of syms.
