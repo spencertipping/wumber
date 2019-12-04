@@ -18,16 +18,16 @@ import Linear.Vector
 import Wumber
 
 
-example :: Wumber (Sketch (V3 R))
-example = wumber $ FRep (model (V3 (var 0) (var 1) (var 2)) :: Sym () R)
-                   (BB (-2 :: V3 R) 2)
+example :: FRep (V3 R) ()
+example = FRep (model $ screw 90 (V3 (var 0) (var 1) (var 2)))
+               (BB (-2 :: V3 R) 2)
 
 
 for  = flip map
 cfor = flip concatMap
 
 
-screw :: Double -> V3 Double -> V3 Double
+screw :: Sym () R -> V3 (Sym () R) -> V3 (Sym () R)
 screw dθ v@(V3 x y z) = v *! rotate_z_m (dθ * z)
 
 
@@ -75,10 +75,7 @@ moved_by t f v = f (v - t)
 
 
 model = moved_by (V3 0 1.1 0) (bolt 0.5 0.4) `iunion` scs
---model v = threads (t45 0.5) (v * 3) -- scs v -- `upper` cubearray (v / 2) -- + cubes v * (-0.3)
 
-spheres = sphere 0 `iunion` sphere 0.9
+spheres = sphere 0 `iunion` sphere 0.9 `iunion` sphere (V3 (-0.4) (-0.4) 1)
 scs     = spheres `iunion` cube (BB (-1.5) (-0.5))
                   `iunion` cube (BB (-1.2) (-0.2))
-
-cubes   = cube (BB (-1) 1)

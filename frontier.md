@@ -1,9 +1,5 @@
 # Development frontier
 ## Frontend
-+ Interface
-  + Convert to a library, user code calls into the shell
-  + Provide a hint-file-watcher, but driven by user code (this also solves the
-    stack dependency problem)
 + Dual contour
   + Deduplicate function evaluations
   + Prioritize bisections by expected error

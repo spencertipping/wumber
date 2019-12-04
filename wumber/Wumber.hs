@@ -11,9 +11,7 @@ module Wumber (
   module Wumber.Numeric,
   module Wumber.Symbolic,
 
-  Wumber(..),
   Fingerprint,
-  wumber,
   sincos
 ) where
 
@@ -28,12 +26,6 @@ import Wumber.Fingerprint
 import Wumber.Model
 import Wumber.Numeric
 import Wumber.Symbolic
-
-
-type Wumber a = (Fingerprint, a)
-
-wumber :: Computed a b => a -> Wumber b
-wumber x = (fingerprint x, compute x)
 
 
 -- TODO

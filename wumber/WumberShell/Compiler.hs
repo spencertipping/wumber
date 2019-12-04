@@ -5,21 +5,22 @@
 
 module WumberShell.Compiler (
   compiler_loop,
-  update_model
+  update_model,
+  type_is
 ) where
 
-import Control.Concurrent
-import Control.Concurrent.MVar
-import Control.Monad (forM_)
-import Data.Foldable (toList)
-import Data.Maybe
-import Data.Typeable (Typeable)
-import Linear.Matrix (identity)
-import Linear.V3     (V3(..))
-import System.INotify hiding (Event)
-import System.IO (stderr)
-import System.IO.Unsafe (unsafePerformIO)
-import Text.Printf
+import Control.Concurrent      (ThreadId, forkIO, forkOS, killThread)
+import Control.Concurrent.MVar (MVar, modifyMVar, newEmptyMVar, putMVar,
+                                swapMVar, tryTakeMVar)
+import Control.Monad           (forM_)
+import Data.Foldable           (toList)
+import Data.Typeable           (Typeable)
+import Linear.Matrix           (identity)
+import Linear.V3               (V3(..))
+import System.INotify          (addWatch, EventVariety(..), initINotify)
+import System.IO               (stderr)
+import System.IO.Unsafe        (unsafePerformIO)
+import Text.Printf             (HPrintfType, hPrintf, printf)
 
 import qualified Data.ByteString.UTF8         as B8
 import qualified Language.Haskell.Interpreter as HI
@@ -35,11 +36,17 @@ eprintf :: HPrintfType r => String -> r
 eprintf = hPrintf stderr
 
 
-compiler_loop :: MVar (Maybe [Element]) -> FilePath -> IO ()
-compiler_loop model f = do
+type_is :: Typeable a => a
+type_is = HI.as
+
+
+compiler_loop :: (Typeable a, Computed a (Sketch (V3 R)))
+              => MVar (Maybe [Element]) -> FilePath -> String -> a -> IO ()
+compiler_loop model f expr type_marker = do
   i <- initINotify
-  addWatch i [MoveIn, Modify] (B8.fromString f) (const $ recompile model f)
-  recompile model f
+  addWatch i [MoveIn, Modify] (B8.fromString f)
+    $ const (recompile model f expr type_marker)
+  recompile model f expr type_marker
 
 
 module_name :: FilePath -> String
@@ -52,26 +59,15 @@ worker :: MVar ThreadId
 worker = unsafePerformIO newEmptyMVar
 
 
-recompile :: MVar (Maybe [Element]) -> FilePath -> IO ()
-recompile model f = do
+recompile :: (Typeable a, Computed a (Sketch (V3 R)))
+          => MVar (Maybe [Element]) -> FilePath -> String -> a -> IO ()
+recompile model f expr type_marker = do
   eprintf "\027[2J\027[1;1Hcompiling...\n"
 
   r <- HI.runInterpreter do
-    -- TODO
-    -- For whatever reason, I can't seem to get this to work outside a stack
-    -- build environment. It's possible it never will, but I'd like to figure
-    -- out why hint doesn't load the modules built into our executable.
-    --
-    -- It fails on the loadModules step, before any of our imports/etc. I
-    -- suspect I'm misusing hint by calling loadModules and then trying to mess
-    -- with imports.
-    --
-    -- Worst case we git-clone wumber as source into some temp dir, then add it
-    -- to the search path. (Ugh.)
-
     HI.loadModules [f]
     HI.setTopLevelModules [module_name f]
-    HI.interpret "main" (HI.as :: Wumber (Sketch (V3 R)))
+    HI.interpret expr type_marker
 
   case r of
     Left (HI.WontCompile xs) -> do
@@ -89,14 +85,14 @@ recompile model f = do
       case w of Just t -> killThread t
                 _      -> return ()
 
-      w <- forkOS $ update_model model p
-      swapMVar worker w
+      forkOS (update_model model p) >>= putMVar worker
       eprintf "\027[2J\027[1;1H%s OK\n" f
 
 
-update_model :: MVar (Maybe [Element]) -> Wumber (Sketch (V3 R)) -> IO ()
-update_model model (f, v) = do
-  s <- cached_compute user_cache f v
+update_model :: Computed a (Sketch (V3 R))
+             => MVar (Maybe [Element]) -> a -> IO ()
+update_model model v = do
+  s <- cached_compute user_cache (fingerprint v) (compute v)
   swapMVar model $ Just (map line (unSketch s))
   return ()
   where line (a, b) = shape_of identity [a, b]

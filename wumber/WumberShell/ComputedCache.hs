@@ -6,10 +6,7 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
-
--- NOTE
--- Don't enable 'NoMonomorphismRestriction' for this module. We rely on a fixed
--- type for 'compute' because 'Computed' doesn't have a fundep from a -> b.
+{-# LANGUAGE NoMonomorphismRestriction #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 

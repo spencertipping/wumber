@@ -1,9 +1,11 @@
 module Main where
 
-import Control.Monad (forM_)
+import Control.Monad      (forM_)
+import Linear.V3          (V3)
 import System.Environment (getArgs, getProgName)
 
-import WumberShell (wumber_main)
+import Wumber
+import WumberShell (wumber_main, wumber_live, type_is)
 
 import qualified Iso as Iso
 
@@ -16,11 +18,13 @@ main = do
 
 
 examples :: [(String, IO ())]
-examples = [("iso",    iso_example),
-            ("say_hi", say_hi)]
+examples = [("iso",      iso_example),
+            ("iso-live", iso_live),
+            ("say-hi",   putStrLn "hi!")]
 
-
-say_hi = putStrLn "hi!"
+  where iso_example = wumber_main Iso.example
+        iso_live    = wumber_live "example" "Iso.hs" "example"
+                                  (type_is :: FRep (V3 R) ())
 
 
 usage :: IO ()
@@ -33,6 +37,3 @@ usage = do
   putStrLn "where <example_name> is one of:"
   forM_ (map fst examples) (putStrLn . ("- " ++))
   putStrLn ""
-
-
-iso_example = wumber_main Iso.example
