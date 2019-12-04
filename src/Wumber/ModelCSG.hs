@@ -1,15 +1,24 @@
+{-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveFoldable #-}
+{-# LANGUAGE DeriveFunctor #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE BlockArguments #-}
+
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 -- | Models involving constructive solid geometry.
 module Wumber.ModelCSG where
 
 
+import Data.Binary  (Binary)
+import GHC.Generics (Generic, Generic1)
+
 import Wumber.BoundingBox
 import Wumber.ClosedComparable
+import Wumber.Fingerprint
 import Wumber.Model
 import Wumber.Numeric
 import Wumber.Symbolic
@@ -22,6 +31,10 @@ data CSG a = CSGJust a
            | CSGIntersect (CSG a) (CSG a)
            | CSGUnion     (CSG a) (CSG a)
            | CSGSubtract  (CSG a) (CSG a)
+  deriving (Show, Eq, Generic, Generic1, Functor, Foldable, Binary)
+
+instance Binary a => Fingerprintable (CSG a) where
+  fingerprint = binary_fingerprint
 
 
 -- TODO

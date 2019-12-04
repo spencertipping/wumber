@@ -1,5 +1,3 @@
-{-# LANGUAGE NoMonomorphismRestriction #-}
-
 module Wumber (
   module Wumber.BoundingBox,
   module Wumber.ClosedComparable,

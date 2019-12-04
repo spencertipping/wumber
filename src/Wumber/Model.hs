@@ -1,14 +1,14 @@
-{-# LANGUAGE MonoLocalBinds #-}
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE BlockArguments #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE DeriveGeneric #-}
-{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE MonoLocalBinds #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
@@ -33,8 +33,6 @@ import Data.Binary   (Binary)
 import Data.Foldable (toList)
 import Lens.Micro.TH (makeLenses)
 import GHC.Generics  (Generic, Generic1)
-import Linear.V2     (V2(..))
-import Linear.V3     (V3(..))
 
 import qualified Data.Vector.Storable as VS
 
@@ -101,7 +99,4 @@ instance {-# OVERLAPPABLE #-}
           DCVector v,
           VectorConversion (v R) (VS.Vector R)) =>
          Computed (FRep (v R) f) (Sketch (v R)) where
-
-  compute o = Sketch $ toList $ iso_contour f bb 6 18 0.1
-    where f  = jit (_frep_fn o)
-          bb = _frep_bb o
+  compute (FRep f bb) = Sketch $ toList $ iso_contour (jit f) bb 6 18 0.1
