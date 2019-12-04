@@ -1,7 +1,7 @@
 {-# LANGUAGE NamedFieldPuns, LambdaCase, BlockArguments, TemplateHaskell #-}
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
-module Main where
+module WumberShell where
 
 import Control.Concurrent
 import Control.Concurrent.MVar

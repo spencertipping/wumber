@@ -22,10 +22,15 @@ library
                      , base >= 4.9
                      , binary >= 0.8.6.0
                      , bytestring
+                     , clock
                      , containers >= 0.6.0.1
+                     , criterion >= 1.5.6.0
                      , cryptohash-sha256
                      , deepseq >= 1.4.4.0
+                     , directory
                      , gloss
+                     , hinotify
+                     , hint
                      , hmatrix
                      , hmatrix-gsl
                      , linear
@@ -34,7 +39,8 @@ library
                      , mtl
                      , parallel
                      , random
-                     , text
+                     , text >= 1.2.3.1
+                     , utf8-string
                      , vector >= 0.12.0.3
   exposed-modules:     Wumber
                      , Wumber.AMD64Asm
@@ -60,6 +66,13 @@ library
                      , Wumber.SymbolicAlgebra
                      , Wumber.SymbolicJIT
                      , Wumber.VectorConversion
+
+                     , WumberShell
+                     , WumberShell.Compiler
+                     , WumberShell.ComputedCache
+                     , WumberShell.Event
+                     , WumberShell.Render
+                     , WumberShell.View
 
 
 test-suite wumber-tests
@@ -108,39 +121,5 @@ benchmark wumber-bench
                      , microlens >= 0.4
                      , process
                      , QuickCheck
-                     , vector
-                     , wumber
-
-
--- IDE
-executable wumber
-  hs-source-dirs:      shell
-  main-is:             WumberShell.hs
-  other-modules:       WumberShell.Compiler
-                     , WumberShell.ComputedCache
-                     , WumberShell.Event
-                     , WumberShell.Render
-                     , WumberShell.View
-  ghc-options:         -O2 -threaded -with-rtsopts=-N -rtsopts
-  default-language:    Haskell2010
-  build-depends:       base >= 4.9
-                     , binary >= 0.8.6.0
-                     , bytestring
-                     , clock
-                     , containers >= 0.6.0.1
-                     , criterion >= 1.5.6.0
-                     , deepseq >= 1.4.4.0
-                     , directory
-                     , gloss
-                     , hinotify
-                     , hint
-                     , hmatrix
-                     , linear
-                     , microlens
-                     , microlens-th
-                     , mtl
-                     , random
-                     , text >= 1.2.3.1
-                     , utf8-string
                      , vector
                      , wumber

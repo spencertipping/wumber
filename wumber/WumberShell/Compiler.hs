@@ -72,8 +72,6 @@ recompile model f = do
     HI.setTopLevelModules [module_name f]
     HI.interpret "main" (HI.as :: Wumber (Sketch (V3 R)))
 
-  putStrLn "got a result"
-
   case r of
     Left (HI.WontCompile xs) -> do
       swapMVar model Nothing
@@ -86,8 +84,6 @@ recompile model f = do
       eprintf "%s\n" (show e)
 
     Right p -> do
-      putStrLn "successful result"
-
       w <- tryTakeMVar worker
       case w of Just t -> killThread t
                 _      -> return ()
