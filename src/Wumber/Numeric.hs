@@ -28,10 +28,8 @@ type R = Double
 --   halfway into the mantissa, which for doubles is about 26 bits.
 --
 --   Deltas are always positive.
---
---   NOTE: these types are intentionally fixed to 'Double' instead of using 'R'.
---   That way the code will break if you change 'R', which is correct -- the
---   delta would need to be updated.
 
-δ :: Double -> Double
-δ x = max 1 (abs x) * 2**(-26)
+class Num a => Delta a where δ :: a -> a
+
+instance Delta Double where δ x = max 1 (abs x) * 2**(-26)
+instance Delta Float  where δ x = max 1 (abs x) * 2**(-12)

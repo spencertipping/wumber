@@ -148,6 +148,7 @@ module Wumber.Symbolic (
   sym,
   normalize,
   rewrite_vars,
+  (//=),
   v2,
   v3,
   v4
@@ -155,7 +156,7 @@ module Wumber.Symbolic (
 
 
 import Data.Binary   (Binary(..))
-import Data.IntMap   (IntMap(..), (!?))
+import Data.IntMap   (IntMap(..), (!?), fromList)
 import Data.IntSet   (IntSet(..), empty, singleton, union, unions)
 import Data.List     (intercalate, sort, sortBy)
 import Data.Maybe    (fromMaybe)
@@ -334,6 +335,11 @@ var_maybe f i = fromMaybe (var i) (f i)
 
 rewrite_vars :: AlgConstraints f a => IntMap (Sym f a) -> Sym f a -> Sym f a
 rewrite_vars m = eval val (var_maybe (m !?))
+
+(//=) :: AlgConstraints f a => Sym f a -> [(VarID, Sym f a)] -> Sym f a
+s //= vs = rewrite_vars (fromList vs) s
+
+infixl 1 //=
 
 
 class    ToSym t       where sym :: SymConstraints f a => t f a -> Sym f a

@@ -13,6 +13,7 @@ import Control.Monad (foldM)
 import Control.Monad.RWS (evalRWS)
 import Data.Either (rights)
 import Data.Foldable (toList)
+import Data.List (nub)
 import Lens.Micro
 import Linear.Metric (norm, distance)
 import Linear.V2
@@ -68,14 +69,14 @@ solvable :: (Foldable f, DeterministicEval R R a R)
 solvable δ n m | isNaN cost || isInfinite cost = discard
                | isNaN v                       = discard
                | otherwise = counterexample (show (solution, cost, v, a))
-                             $ v <= sqrt δ
+                             $ v <= 1e-2
   where (a :: [R], solution) = solve δ n (toList <$> m)
         (_, subs) = ccompile m
         cost      = constraint_cost (concatMap _ss_constraints subs)
         v         = eval id (solution V.!) cost
 
 
-solve_δ    = 1e-6
+solve_δ    = δ 1
 iterations = 10000
 
 t = solvable solve_δ iterations
@@ -126,48 +127,45 @@ prop_v3dist vec (NonNegative d) = t do
 
 prop_hexagon :: V2 R -> V2 R -> V2 R -> V2 R -> V2 R -> V2 R
              -> Positive R -> Property
-prop_hexagon a b c d e f (Positive dist) = t do
-  av :: V2 (CVal ()) <- cvars a
-  bv :: V2 (CVal ()) <- cvars b
-  cv :: V2 (CVal ()) <- cvars c
-  dv :: V2 (CVal ()) <- cvars d
-  ev :: V2 (CVal ()) <- cvars e
-  fv :: V2 (CVal ()) <- cvars f
+prop_hexagon a b c d e f (Positive dist) =
+  length (nub [a, b, c, d, e, f]) == 6 ==> t do
+    av :: V2 (CVal ()) <- cvars a
+    bv :: V2 (CVal ()) <- cvars b
+    cv :: V2 (CVal ()) <- cvars c
+    dv :: V2 (CVal ()) <- cvars d
+    ev :: V2 (CVal ()) <- cvars e
+    fv :: V2 (CVal ()) <- cvars f
 
-  all_equal [val dist,
-             distance av bv,
-             distance bv cv,
-             distance cv dv,
-             distance dv ev,
-             distance ev fv,
-             distance fv av]
+    all_equal [val dist,
+               distance av bv,
+               distance bv cv,
+               distance cv dv,
+               distance dv ev,
+               distance ev fv,
+               distance fv av]
 
-  -- TODO: these fail to converge if all points have equal starting values (and
-  -- possibly in other cases).
-  {-
-  all_equal [cos $ val (τ / 6),
-             inner_angle_cos av bv cv,
-             inner_angle_cos bv cv dv,
-             inner_angle_cos cv dv ev,
-             inner_angle_cos dv ev fv,
-             inner_angle_cos ev fv av,
-             inner_angle_cos fv av bv]
-  -}
+    {-
+    all_equal [cos $ val (τ / 6),
+               inner_angle_cos av bv cv,
+               inner_angle_cos bv cv dv,
+               inner_angle_cos cv dv ev,
+               inner_angle_cos dv ev fv,
+               inner_angle_cos ev fv av,
+               inner_angle_cos fv av bv]
+    -}
 
-  aligned _x [av, ev]
-  aligned _x [bv, dv]
+    aligned _x [av, ev]
+    aligned _x [bv, dv]
 
-  aligned _y   [av, bv]
-  aligned _y [fv,     cv]
-  aligned _y   [ev, dv]
+    aligned _y   [av, bv]
+    aligned _y [fv,     cv]
+    aligned _y   [ev, dv]
 
-  {-
-  all_equal [distance av dv,
-             distance bv ev,
-             distance cv fv]
-  -}
+    all_equal [distance av dv,
+               distance bv ev,
+               distance cv fv]
 
-  return av
+    return av
 
 
 prop_vec_varchains :: V2 R -> Property

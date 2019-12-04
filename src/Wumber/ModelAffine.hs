@@ -5,10 +5,10 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
-{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
@@ -27,6 +27,7 @@ import Linear.Matrix     (M33, M44, (!*!), (*!), identity, inv33, inv44)
 import Linear.V2         (V2(..))
 import Linear.V3         (V3(..), _xy, _xyz)
 import Linear.V4         (V4(..))
+import Text.Printf       (printf)
 
 import Wumber.BoundingBox
 import Wumber.ClosedComparable
@@ -40,14 +41,17 @@ import Wumber.Symbolic
 --   vectors.
 
 class AffineMatrix m v n => Affine a m v n | a -> m, a -> n where
-  transform :: m n -> a -> a
-  translate :: v n -> a -> a
-  rotate    :: v n -> n -> a -> a
-  scale     :: v n -> a -> a
+  transform   :: m n -> a -> a
 
-  translate = transform . mtranslate
-  scale     = transform . mscale
-  rotate v  = transform . mrotate v
+  untransform :: m n -> a -> a
+  translate   :: v n -> a -> a
+  rotate      :: v n -> n -> a -> a
+  scale       :: v n -> a -> a
+
+  untransform = transform . minvert
+  translate   = transform . mtranslate
+  scale       = transform . mscale
+  rotate v    = transform . mrotate v
 
 
 instance Floating a => Affine (V3 a) AffineM3 V3 a where
@@ -101,10 +105,20 @@ class Monoid (m n) =>
   mrotate    :: v n -> n -> m n
 
 newtype AffineM3 a = AM3 { unAM3 :: M44 a }
-  deriving (Show, Eq, Functor, Generic, Binary)
+  deriving (Eq, Functor, Generic, Binary)
 
 newtype AffineM2 a = AM2 { unAM2 :: M33 a }
-  deriving (Show, Eq, Functor, Generic, Binary)
+  deriving (Eq, Functor, Generic, Binary)
+
+instance Show a => Show (AffineM3 a) where
+  show (AM3 (V4 a b c d)) = concatMap showrow [a, b, c, d]
+    where showrow (V4 x y z t) = printf "%.16s  %.16s  %.16s  %.16s\n"
+                                 (show x) (show y) (show z) (show t)
+
+instance Show a => Show (AffineM2 a) where
+  show (AM2 (V3 a b c)) = concatMap showrow [a, b, c]
+    where showrow (V3 x y z) = printf "%.16s  %.16s  %.16s\n"
+                               (show x) (show y) (show z)
 
 
 instance Num a => Semigroup (AffineM2 a) where AM2 x <> AM2 y = AM2 (x !*! y)
@@ -118,16 +132,20 @@ instance Floating a => AffineMatrix AffineM2 V2 a where
   minvert             = AM2 . inv33 . unAM2
   mtranslate (V2 x y) = AM2 $ V3 (V3 1 0 0) (V3 0 1 0) (V3 x y 1)
   mscale     (V2 x y) = AM2 $ V3 (V3 x 0 0) (V3 0 y 0) (V3 0 0 1)
-  mrotate v θ         = mtranslate v
+  mrotate v θ         = mtranslate (-v)
                         <> AM2 (V3 (V3 c (-s) 0) (V3 s c 0) (V3 0 0 1))
-                        <> mtranslate (-v)
-    where s = sin θ
-          c = cos θ
+                        <> mtranslate (transform r' v)
+                        <> error "FIXME: mrotate V2"
+    where s  = sin θ
+          c  = cos θ
+          r' = AM2 (V3 (V3 c s 0) (V3 (-s) c 0) (V3 0 0 1))
 
 instance Floating a => AffineMatrix AffineM3 V3 a where
   minvert                 = AM3 . inv44 . unAM3
-  mtranslate (V3 x y z)   = AM3 $ V4 (V4 1 0 0 0) (V4 0 1 0 0) (V4 0 0 1 0) (V4 x y z 1)
-  mscale     (V3 x y z)   = AM3 $ V4 (V4 x 0 0 0) (V4 0 y 0 0) (V4 0 0 z 0) (V4 0 0 0 1)
+  mtranslate (V3 x y z)   = AM3 $ V4 (V4 1 0 0 0) (V4 0 1 0 0)
+                                     (V4 0 0 1 0) (V4 x y z 1)
+  mscale     (V3 x y z)   = AM3 $ V4 (V4 x 0 0 0) (V4 0 y 0 0)
+                                     (V4 0 0 z 0) (V4 0 0 0 1)
   mrotate    (V3 x y z) θ = AM3 $
     V4 (V4 (x*x*(1-c) + c)   (x*y*(1-c) - z*s) (x*z*(1-c) + y*s) 0)
        (V4 (x*y*(1-c) + z*s) (y*y*(1-c) + c)   (y*z*(1-c) - x*s) 0)

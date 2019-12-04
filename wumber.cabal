@@ -65,6 +65,7 @@ library
                      , Wumber.Numeric
                      , Wumber.Symbolic
                      , Wumber.SymbolicAlgebra
+                     , Wumber.SymbolicDerivative
                      , Wumber.SymbolicJIT
                      , Wumber.VectorConversion
 

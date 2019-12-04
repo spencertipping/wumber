@@ -51,6 +51,7 @@ import qualified Numeric.LinearAlgebra as LA
 
 import Wumber.BoundingBox
 import Wumber.Numeric
+import Wumber.SymbolicDerivative
 import Wumber.VectorConversion
 
 
