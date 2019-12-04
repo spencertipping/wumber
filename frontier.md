@@ -27,8 +27,6 @@
   + Support for text/labels?
   + Diagrams/lines/graphs/etc?
     + This is more like sketching than modeling per se
-+ Object model
-  + Parts as objects, not just implicit fns (this way we get constraints)
 + Parts
   + Iso-libraries for screws, beams, etc
   + Bearings
@@ -52,7 +50,6 @@
   + Algebraic simplification of sign expressions?
   + BVH primitives?
 + Isosurfaces
-  + Bounding-box metadata as part of the function spec
   + BVH for CSG
 + Assembler
   + Multi-branch assembly with conditionals
