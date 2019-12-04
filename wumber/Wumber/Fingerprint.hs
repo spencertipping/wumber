@@ -1,12 +1,13 @@
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE BlockArguments #-}
-{-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE NoMonomorphismRestriction #-}
-
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
-module Wumber.Fingerprint where
+-- | Fingerprintable objects, a feature that Wumber uses to cache expensive
+--   objects to disk.
+module Wumber.Fingerprint (
+  Fingerprintable(..),
+  binary_fingerprint,
+  Fingerprint(..)
+) where
 
 
 import Crypto.Hash.SHA256   (hash)
@@ -24,8 +25,7 @@ import GHC.Fingerprint      (Fingerprint(..))
 class Fingerprintable a where fingerprint :: a -> Fingerprint
 
 instance Fingerprintable ByteString where
-  fingerprint b = Fingerprint l h
-    where (l :: Word64, h :: Word64) = decode $ fromStrict (hash b)
+  fingerprint = decode . fromStrict . hash
 
 
 -- | A handy function you can use to instantly become 'Fingerprintable'.

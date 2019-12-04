@@ -11,11 +11,7 @@ module Wumber (
   module Wumber.ModelCSG,
   module Wumber.Numeric,
   module Wumber.Symbolic,
-
-  Fingerprint
 ) where
-
-import GHC.Fingerprint (Fingerprint)
 
 import Wumber.BoundingBox
 import Wumber.ClosedComparable

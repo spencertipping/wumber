@@ -19,8 +19,7 @@ library
   hs-source-dirs:      wumber
   default-language:    Haskell2010
 
-  build-depends:       array
-                     , base >= 4.9
+  build-depends:       base >= 4.9
                      , binary >= 0.8.6.0
                      , bytestring
                      , clock
@@ -53,11 +52,11 @@ library
                      , Wumber.ConstraintSimplify
                      , Wumber.ConstraintSolver
                      , Wumber.ConstraintSplit
-                     , Wumber.DualContour
-                     , Wumber.GeometricConstraints
                      , Wumber.Cursor
+                     , Wumber.DualContour
                      , Wumber.Element
                      , Wumber.Fingerprint
+                     , Wumber.GeometricConstraints
                      , Wumber.JIT
                      , Wumber.JITIR
                      , Wumber.Model
