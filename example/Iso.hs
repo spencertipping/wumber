@@ -7,7 +7,6 @@
 
 module Iso (example) where
 
-import Control.Monad
 import Data.Foldable
 import Linear.Matrix ((*!))
 import Linear.Metric
@@ -19,7 +18,7 @@ import Wumber
 
 
 example :: FRep (V3 R) ()
-example = FRep (model $ screw 90 (V3 (var 0) (var 1) (var 2)))
+example = FRep (model $ screw 0 (V3 (var 0) (var 1) (var 2)))
                (BB (-2 :: V3 R) 2)
 
 

@@ -60,6 +60,7 @@
 + JIT
   + Flexible register allocation (not all threads need extra registers)
   + Reverse-engineer instruction latency/throughput
+  + Benchmark reg/reg and reg/memory parallelization
   + Preload operands into registers while ALUs are busy
     + Model processor ports at some level
 + JITIR

@@ -8,11 +8,11 @@ module Wumber (
   module Wumber.Element,
   module Wumber.Fingerprint,
   module Wumber.Model,
+  module Wumber.ModelCSG,
   module Wumber.Numeric,
   module Wumber.Symbolic,
 
-  Fingerprint,
-  sincos
+  Fingerprint
 ) where
 
 import GHC.Fingerprint (Fingerprint)
@@ -24,11 +24,6 @@ import Wumber.Cursor
 import Wumber.Element
 import Wumber.Fingerprint
 import Wumber.Model
+import Wumber.ModelCSG
 import Wumber.Numeric
 import Wumber.Symbolic
-
-
--- TODO
--- WTF is this doing here
-
-sincos θ = (sin r, cos r) where r = θ / 360 * τ

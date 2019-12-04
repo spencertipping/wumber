@@ -8,6 +8,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
@@ -30,6 +31,7 @@ module Wumber.Model where
 
 import Data.Binary   (Binary)
 import Data.Foldable (toList)
+import Lens.Micro.TH (makeLenses)
 import GHC.Generics  (Generic, Generic1)
 import Linear.V2     (V2(..))
 import Linear.V3     (V3(..))
@@ -52,18 +54,20 @@ import Wumber.VectorConversion
 --   derive most other interfaces.
 class FReppable a v f | a -> f, a -> v where frep :: a -> FRep v f
 
-data FRep v f = FRep { frep_fn :: Sym f R,
-                       frep_bb :: BoundingBox v }
+data FRep v f = FRep { _frep_fn :: Sym f R,
+                       _frep_bb :: BoundingBox v }
   deriving (Show, Eq, Generic, Binary)
 
 instance (Binary f, Binary v) => Fingerprintable (FRep v f) where
   fingerprint = binary_fingerprint
 
+makeLenses ''FRep
+
 
 -- | Objects whose extents are known.
 class BoundedObject a v where bounding_box :: a -> BoundingBox v
 
-instance BoundedObject (FRep v f) v where bounding_box = frep_bb
+instance BoundedObject (FRep v f) v where bounding_box = _frep_bb
 
 
 -- | Objects that undergo a compilation or solving step before they can be
@@ -99,5 +103,5 @@ instance {-# OVERLAPPABLE #-}
          Computed (FRep (v R) f) (Sketch (v R)) where
 
   compute o = Sketch $ toList $ iso_contour f bb 6 18 0.1
-    where f  = jit (frep_fn o)
-          bb = frep_bb o
+    where f  = jit (_frep_fn o)
+          bb = _frep_bb o
