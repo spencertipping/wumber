@@ -27,14 +27,8 @@ import qualified Data.ByteString as BS
 
 import Wumber
 import Wumber.DualContour
+import Wumber.SymbolicDerivative
 import Wumber.SymbolicJIT
-
-
-just_tree :: IsoFn (V3 R) -> BB3D -> Int -> Int -> R -> Tree (V3 R)
-just_tree f b minn maxn bias = build f b sf bias
-  where sf _ n (TM b (v:vs)) _
-          | any ((/= signum v) . signum) vs = n < maxn
-          | otherwise                       = n < minn
 
 
 -- Test model
@@ -77,49 +71,29 @@ scs     = spheres `iunion` cube (BB (-1.5) (-0.5))
 moved_by t f v = f (v - t)
 
 
-model :: FConstraints f R => V3 (Sym f R) -> Sym f R
+model :: V3 (Sym () R) -> Sym () R
 model = moved_by (V3 0 1.1 0) (bolt 0.5 0.4) `iunion` scs
 
 
-tiny_model :: FConstraints f R => V3 (Sym f R) -> Sym f R
+tiny_model :: V3 (Sym () R) -> Sym () R
 tiny_model (V3 x y z) = x + y + z + 1
 
 
-jit_a_fn :: (V3 (Sym () Double) -> Sym () Double) -> V3 Double -> Double
-jit_a_fn m = jit (m (V3 (var 0) (var 1) (var 2)))
+model_frep = FRep (SymV (model v3)) (BB (-2) 2)
+
+inline_compute f f' bb = toList $ iso_contour f f' bb 6 18 0.1
+
+pre_jit :: Sym () R -> (IsoFn (V3 R), IsoGradient (V3 R))
+pre_jit s = fv `seq` (f, f')
+  where fv   = fmap jit (vector_derivative (SymV s)) :: V3 (V3 R -> R)
+        f    = jit s
+        f' v = fv <*> pure v
 
 
-model_fn = jit_a_fn model
-tiny_fn  = jit_a_fn tiny_model
-
--- With FFI overhead, model2_fn is ~2x slower than model_fn but produces
--- identical results
-model2_fn = jit_a_fn \v -> (model v + model v + model v + model v) / 4
-
-
-isotree12 = just_tree model_fn (BB (-2) 2) 6  12 0.1
-isotree18 = just_tree model_fn (BB (-2) 2) 12 18 0.1
-isotree24 = just_tree model_fn (BB (-2) 2) 18 24 0.1
-
-
-benchmarks = bs
-  where info = printf "isotree12: %d; isotree18: %d; isotree24: %d\n"
-                      (t_size isotree12) (t_size isotree18) (t_size isotree24)
-        bs = [
-          bench "model/jittiny" (nf tiny_fn  (V3 0.5 1 2 :: V3 Double)),
-          bench "model/jit"     (nf model_fn (V3 0.5 1 2 :: V3 Double))
-          -- bench "model/jit2" (nf model2_fn (V3 0.5 1 2 :: V3 Double)),
-          -- bench "model/ghc"  (nf model     (V3 0.5 1 2 :: V3 Double)),
-
-          -- bench "tree/jit"  (nf (t_size . just_tree model_fn  (BB (-2) 2) 6 12) 0.1),
-          -- bench "tree/jit2" (nf (t_size . just_tree model2_fn (BB (-2) 2) 6 12) 0.1),
-          -- bench "tree/hs"   (nf (t_size . just_tree model     (BB (-2) 2) 6 12) 0.1),
-
-          -- bench "contour/trace/12" (nf (length . trace_lines) isotree12),
-          -- bench "contour/trace/18" (nf (length . trace_lines) isotree18),
-          -- bench "contour/trace/24" (nf (length . trace_lines) isotree24),
-
-          -- bench "contour12/jit"  (nf (length . iso_contour model_fn  (BB (-2) 2) 6 12) 0.1)
-          -- bench "contour12/jit2" (nf (length . iso_contour model2_fn (BB (-2) 2) 6 12) 0.1),
-          -- bench "contour12/hs"   (nf (length . iso_contour model     (BB (-2) 2) 6 12) 0.1)
-          ]
+benchmarks = [
+  bench "model/jittiny" (nf (jit (tiny_model v3)) (V3 0.5 1 2 :: V3 Double)),
+  bench "model/jit"     (nf (jit (model v3))      (V3 0.5 1 2 :: V3 Double)),
+  bench "model/frep"    (nf (unSketch . compute :: FRep V3 () -> [(V3 R, V3 R)]) model_frep),
+  bench "model/frep-pre" (nf (inline_compute f f') (BB (-2) 2))
+  ]
+  where (f, f') = pre_jit (model v3)

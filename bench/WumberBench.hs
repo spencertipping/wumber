@@ -13,8 +13,8 @@ import qualified WumberBench.JIT          as J
 
 
 main = defaultMain bs
-  where bs = concat [ J.benchmarks,
+  where bs = concat [ BB.benchmarks,
                       C.benchmarks,
-                      BB.benchmarks,
+                      J.benchmarks,
                       HF.benchmarks,
                       HL.benchmarks ]

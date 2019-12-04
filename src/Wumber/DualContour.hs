@@ -17,6 +17,7 @@ module Wumber.DualContour (
   Tree(..),
   TreeMeta(..),
   IsoFn,
+  IsoGradient,
   SplitFn,
   DCVector,
 
@@ -139,9 +140,6 @@ build f f' b sf bias = go b (cycle basis) 0
                 surface  = map (surface_point f) $ crossing_edges cs cfs
                 normals  = map f' surface
 
-{-# SPECIALIZE build :: IsoFn (V3 R) -> IsoGradient (V3 R) -> BB3D -> SplitFn (V3 R) -> R -> Tree (V3 R) #-}
-{-# SPECIALIZE build :: IsoFn (V2 R) -> IsoGradient (V2 R) -> BB2D -> SplitFn (V2 R) -> R -> Tree (V2 R) #-}
-
 
 -- | Shows the outline of tree cells for debugging.
 trace_cells :: DCVector v => Tree (v R) -> [(v R, v R)]
@@ -150,9 +148,6 @@ trace_cells t                = map pair $ edge_pairs (length l)
   where b@(BB l u)  = t ^. t_bound
         cs          = corners b
         pair (i, j) = (cs !! i, cs !! j)
-
-{-# SPECIALIZE trace_cells :: Tree (V3 R) -> [(V3 R, V3 R)] #-}
-{-# SPECIALIZE trace_cells :: Tree (V2 R) -> [(V2 R, V2 R)] #-}
 
 
 -- | Uses dual contouring to find lines along an isosurface. The lines end up
@@ -241,9 +236,6 @@ surface_point f (a, b) = lerp (newton 0.5) b a
 basis :: DCVector v => [v R]
 basis = toList identity
 
-{-# SPECIALIZE INLINE basis :: [V3 R] #-}
-{-# SPECIALIZE INLINE basis :: [V2 R] #-}
-
 
 -- | Returns all axis-aligned edges of a bounding box that cross a surface
 --   boundary. Mathematically, this is the set of all pairs of corners that
@@ -252,8 +244,6 @@ crossing_edges :: DCVector v => [v R] -> [R] -> [(v R, v R)]
 crossing_edges cs xs = map pair $ filter crosses $ edge_pairs (length $ head cs)
   where crosses (i, j) = signum (xs !! i) /= signum (xs !! j)
         pair    (i, j) = (cs !! i, cs !! j)
-
-{-# INLINE crossing_edges #-}
 
 
 -- | /n/-dimensional cubes have n·2ⁿ⁻¹ edges: each vertex has /n/ edges
@@ -266,7 +256,6 @@ edge_pairs :: Int -> [(Int, Int)]
 edge_pairs n = [(i, i `xor` shiftL 1 x) | i <- [0..(1 `shiftL` (n-1))],
                                           x <- [0..(n-1)],
                                           i .&. shiftL 1 x == 0]
-{-# INLINE edge_pairs #-}
 
 
 -- | Bisect a bounding box along the specified axis vector. Your warranty is
@@ -277,6 +266,3 @@ bisect a (BB l u) = (BB l (l + mp/2 + mo), BB (l + mp/2) u)
   where d  = u - l
         mp = project a d
         mo = d - mp
-
-{-# SPECIALIZE INLINE bisect :: V3 R -> BB3D -> (BB3D, BB3D) #-}
-{-# SPECIALIZE INLINE bisect :: V2 R -> BB2D -> (BB2D, BB2D) #-}

@@ -60,24 +60,15 @@ singleton = pure
 size :: Num a => BoundingBox a -> a
 size (BB l u) = u - l
 
-{-# SPECIALIZE INLINE size :: BB3D -> V3 Double #-}
-{-# SPECIALIZE INLINE size :: BB2D -> V2 Double #-}
-
 
 -- | Clips a point into the box.
 clip :: ClosedComparable a => BoundingBox a -> a -> a
 clip (BB l u) x = upper l (lower u x)
 
-{-# SPECIALIZE INLINE clip :: BB3D -> V3 Double -> V3 Double #-}
-{-# SPECIALIZE INLINE clip :: BB2D -> V2 Double -> V2 Double #-}
-
 
 -- | Returns the center point of this bounding box.
 center :: Fractional a => BoundingBox a -> a
 center (BB l u) = (l + u) / 2
-
-{-# SPECIALIZE INLINE center :: BB3D -> V3 Double #-}
-{-# SPECIALIZE INLINE center :: BB2D -> V2 Double #-}
 
 
 -- | Determine whether two bounding boxes intersect; i.e. whether they share any
@@ -86,16 +77,10 @@ intersects :: (Applicative f, Foldable f, Ord a, ClosedComparable a)
            => BoundingBox (f a) -> BoundingBox (f a) -> Bool
 intersects a b = exists $ intersect a b
 
-{-# SPECIALIZE INLINE intersects :: BB3D -> BB3D -> Bool #-}
-{-# SPECIALIZE INLINE intersects :: BB2D -> BB2D -> Bool #-}
-
 
 -- | Returns all 2ⁿ corners of a bounding box of dimension /n/.
 corners :: (MonadZip v, Traversable v) => BoundingBox (v a) -> [v a]
 corners (BB l u) = traverse biList $ l `mzip` u
-
-{-# SPECIALIZE INLINE corners :: BB3D -> [V3 Double] #-}
-{-# SPECIALIZE INLINE corners :: BB2D -> [V2 Double] #-}
 
 
 -- | Returns the number of dimensions which become trivial when two bounding
@@ -106,9 +91,6 @@ collapsed_dimensions :: (Applicative f, Foldable f, Ord a, ClosedComparable a)
 collapsed_dimensions a@(BB l u) b =
   length l - nontrivial_dimensions (a `intersect` b)
 
-{-# SPECIALIZE INLINE collapsed_dimensions :: BB3D -> BB3D -> Int #-}
-{-# SPECIALIZE INLINE collapsed_dimensions :: BB2D -> BB2D -> Int #-}
-
 
 -- | Returns the number of axes along which this bounding box has nonzero size.
 nontrivial_dimensions :: (Applicative f, Foldable f, Ord a)
@@ -116,16 +98,10 @@ nontrivial_dimensions :: (Applicative f, Foldable f, Ord a)
 nontrivial_dimensions (BB l u) = foldl' (\n b -> if b then n else n+1) 0 each
   where each = liftA2 (>=) l u
 
-{-# SPECIALIZE INLINE nontrivial_dimensions :: BB3D -> Int #-}
-{-# SPECIALIZE INLINE nontrivial_dimensions :: BB2D -> Int #-}
-
 
 -- | Returns 'True' if this bounding box contains any points.
 exists :: (Foldable f, Applicative f, Ord a) => BoundingBox (f a) -> Bool
 exists b@(BB a _) = inside b a
-
-{-# SPECIALIZE INLINE exists :: BB3D -> Bool #-}
-{-# SPECIALIZE INLINE exists :: BB2D -> Bool #-}
 
 
 -- | Constructs a minimal bounding box to contain the specified list of points.
@@ -133,24 +109,16 @@ of_points :: (Foldable f, Bounded a, ClosedComparable a) => f a -> BoundingBox a
 of_points ps = BB l u where l = foldl' lower maxBound ps
                             u = foldl' upper minBound ps
 
-{-# SPECIALIZE INLINE of_points :: [V3 Double] -> BB3D #-}
-{-# SPECIALIZE INLINE of_points :: [V2 Double] -> BB2D #-}
-
 
 -- | Point-inside-box check. Points on the boundaries are inside.
 inside :: (Foldable f, Applicative f, Ord a) => BoundingBox (f a) -> f a -> Bool
 inside (BB a b) x = and lower && and upper where lower = liftA2 (<=) a x
                                                  upper = liftA2 (<=) x b
 
-{-# SPECIALIZE INLINE inside :: BB3D -> V3 Double -> Bool #-}
-{-# SPECIALIZE INLINE inside :: BB2D -> V2 Double -> Bool #-}
-
 
 union :: ClosedComparable a => BoundingBox a -> BoundingBox a -> BoundingBox a
 union (BB a b) (BB c d) = BB (lower a c) (upper b d)
-{-# INLINE union #-}
 
 
 intersect :: ClosedComparable a => BoundingBox a -> BoundingBox a -> BoundingBox a
 intersect (BB a b) (BB c d) = BB (upper a c) (lower b d)
-{-# INLINE intersect #-}

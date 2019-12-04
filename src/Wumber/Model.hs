@@ -1,5 +1,5 @@
-{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -8,6 +8,7 @@
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE UndecidableInstances #-}
 
@@ -33,6 +34,9 @@ module Wumber.Model where
 import Data.Binary   (Binary)
 import Data.Foldable (toList)
 import Lens.Micro.TH (makeLenses)
+import Linear.V2     (V2)
+import Linear.V3     (V3)
+import Linear.V4     (V4)
 import GHC.Generics  (Generic, Generic1)
 
 import qualified Data.Vector.Storable as VS
@@ -102,15 +106,15 @@ newtype Sketch v = Sketch { unSketch :: [(v, v)] }
 -- TODO
 -- Add level-of-detail based on view
 
-instance {-# OVERLAPPABLE #-}
-         (AlgConstraints f R,
-          Binary (v R),
-          Binary f,
-          DCVector v,
-          SymVars v,
-          Applicative v,
-          VectorConversion (v R) (VS.Vector R)) =>
-         Computed (FRep v f) (Sketch (v R)) where
+type ComputedContext f v = (AlgConstraints f R,
+                            Binary (v R),
+                            Binary f,
+                            DCVector v,
+                            SymVars v,
+                            Applicative v,
+                            VectorConversion (v R) (VS.Vector R))
 
+instance {-# OVERLAPPABLE #-} ComputedContext f v =>
+         Computed (FRep v f) (Sketch (v R)) where
   compute (FRep (SymV f) bb) = Sketch $ toList $ iso_contour (jit f) f' bb 6 18 0.1
     where f' v = fmap jit (vector_derivative (SymV f)) <*> pure v
