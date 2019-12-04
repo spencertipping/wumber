@@ -1,3 +1,4 @@
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
@@ -47,16 +48,24 @@ import Wumber.SymbolicJIT
 import Wumber.VectorConversion
 
 
+-- TODO
+-- Use a Reader monad with configuration lenses?
+
+
 -- | Objects whose volume can be reduced to an N-dimensional isofunction. Most
 --   objects should implement this because it makes it possible for Wumber to
 --   derive most other interfaces.
 class FReppable a v f | a -> f, a -> v where frep :: a -> FRep v f
 
-data FRep v f = FRep { _frep_fn :: Sym f R,
-                       _frep_bb :: BoundingBox v }
-  deriving (Show, Eq, Generic, Binary)
+data FRep v f = FRep { _frep_fn :: SymV v f R,
+                       _frep_bb :: BoundingBox (v R) }
+  deriving (Generic)
 
-instance (Binary f, Binary v) => Fingerprintable (FRep v f) where
+deriving instance (Show   f,   Show (v R)) => Show   (FRep v f)
+deriving instance (Eq     f,     Eq (v R)) => Eq     (FRep v f)
+deriving instance (Binary f, Binary (v R)) => Binary (FRep v f)
+
+instance (Binary f, Binary (v R)) => Fingerprintable (FRep v f) where
   fingerprint = binary_fingerprint
 
 makeLenses ''FRep
@@ -65,7 +74,7 @@ makeLenses ''FRep
 -- | Objects whose extents are known.
 class BoundedObject a v where bounding_box :: a -> BoundingBox v
 
-instance BoundedObject (FRep v f) v where bounding_box = _frep_bb
+instance BoundedObject (FRep v f) (v R) where bounding_box = _frep_bb
 
 
 -- | Objects that undergo a compilation or solving step before they can be
@@ -98,5 +107,5 @@ instance {-# OVERLAPPABLE #-}
           Binary f,
           DCVector v,
           VectorConversion (v R) (VS.Vector R)) =>
-         Computed (FRep (v R) f) (Sketch (v R)) where
-  compute (FRep f bb) = Sketch $ toList $ iso_contour (jit f) bb 6 18 0.1
+         Computed (FRep v f) (Sketch (v R)) where
+  compute (FRep (SymV f) bb) = Sketch $ toList $ iso_contour (jit f) bb 6 18 0.1

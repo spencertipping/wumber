@@ -5,6 +5,7 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
@@ -43,18 +44,19 @@ instance Binary a => Fingerprintable (CSG a) where
 -- FReps for those, since the CSG can be lifted into the result domain.
 
 
-instance (FConstraints f R, ClosedComparable v, Ord v) =>
+instance (FConstraints f R, Applicative v, ClosedComparable (v R), Ord (v R)) =>
          FReppable (CSG (FRep v f)) v f where
+
   frep (CSGJust x) = x
 
-  frep (CSGIntersect x y) = FRep (upper xf yf) (intersect xb yb)
-    where FRep xf xb = frep x
-          FRep yf yb = frep y
+  frep (CSGIntersect x y) = FRep (SymV $ upper xf yf) (intersect xb yb)
+    where FRep (SymV xf) xb = frep x
+          FRep (SymV yf) yb = frep y
 
-  frep (CSGUnion x y) = FRep (lower xf yf) (union xb yb)
-    where FRep xf xb = frep x
-          FRep yf yb = frep y
+  frep (CSGUnion x y) = FRep (SymV $ lower xf yf) (union xb yb)
+    where FRep (SymV xf) xb = frep x
+          FRep (SymV yf) yb = frep y
 
-  frep (CSGSubtract x y) = FRep (upper xf (negate yf)) xb
-    where FRep xf xb = frep x
-          FRep yf _  = frep y
+  frep (CSGSubtract x y) = FRep (SymV $ upper xf (negate yf)) xb
+    where FRep (SymV xf) xb = frep x
+          FRep (SymV yf) _  = frep y

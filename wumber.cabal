@@ -60,6 +60,7 @@ library
                      , Wumber.JIT
                      , Wumber.JITIR
                      , Wumber.Model
+                     , Wumber.ModelAffine
                      , Wumber.ModelCSG
                      , Wumber.Numeric
                      , Wumber.Symbolic
@@ -95,6 +96,7 @@ test-suite wumber-tests
   other-modules:       WumberTest.AMD64Asm
                      , WumberTest.ConstraintSolver
                      , WumberTest.JIT
+                     , WumberTest.ModelAffine
   build-depends:       base >= 4.12
                      , binary
                      , bytestring

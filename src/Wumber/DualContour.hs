@@ -257,14 +257,6 @@ basis = toList identity
 {-# SPECIALIZE INLINE basis :: [V2 R] #-}
 
 
--- | Returns all 2ⁿ corners of a bounding box of dimension /n/.
-corners :: DCVector v => BoundingBox (v a) -> [v a]
-corners (BB l u) = traverse biList $ l `mzip` u
-
-{-# SPECIALIZE INLINE corners :: BoundingBox (V3 R) -> [V3 R] #-}
-{-# SPECIALIZE INLINE corners :: BoundingBox (V2 R) -> [V2 R] #-}
-
-
 -- | Returns all axis-aligned edges of a bounding box that cross a surface
 --   boundary. Mathematically, this is the set of all pairs of corners that
 --   differ along exactly one axis, and whose function values differ in sign.

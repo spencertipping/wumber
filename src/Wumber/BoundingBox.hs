@@ -7,16 +7,16 @@
 
 module Wumber.BoundingBox where
 
-import Control.Applicative
-import Data.Binary (Binary(..))
-import Data.Foldable
-import GHC.Generics (Generic(..))
-import Lens.Micro
-import Lens.Micro.TH
-import Linear.V2
-import Linear.V3
 
-import Prelude hiding (all)
+import Control.Applicative (pure, (<*>), liftA2)
+import Control.Monad.Zip   (MonadZip, mzip)
+import Data.Bifoldable     (biList)
+import Data.Binary         (Binary(..))
+import Data.Foldable       (foldl')
+import GHC.Generics        (Generic, Generic1)
+import Lens.Micro.TH       (makeLenses)
+import Linear.V2           (V2(..))
+import Linear.V3           (V3(..))
 
 import Wumber.ClosedComparable
 
@@ -88,6 +88,14 @@ intersects a b = exists $ intersect a b
 
 {-# SPECIALIZE INLINE intersects :: BB3D -> BB3D -> Bool #-}
 {-# SPECIALIZE INLINE intersects :: BB2D -> BB2D -> Bool #-}
+
+
+-- | Returns all 2ⁿ corners of a bounding box of dimension /n/.
+corners :: (MonadZip v, Traversable v) => BoundingBox (v a) -> [v a]
+corners (BB l u) = traverse biList $ l `mzip` u
+
+{-# SPECIALIZE INLINE corners :: BB3D -> [V3 Double] #-}
+{-# SPECIALIZE INLINE corners :: BB2D -> [V2 Double] #-}
 
 
 -- | Returns the number of dimensions which become trivial when two bounding

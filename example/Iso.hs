@@ -17,9 +17,8 @@ import Linear.Vector
 import Wumber
 
 
-example :: FRep (V3 R) ()
-example = FRep (model $ screw 0 (V3 (var 0) (var 1) (var 2)))
-               (BB (-2 :: V3 R) 2)
+example :: FRep V3 ()
+example = FRep (SymV $ model $ screw 0 v3) (BB (-2 :: V3 R) 2)
 
 
 for  = flip map

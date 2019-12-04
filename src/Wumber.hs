@@ -6,6 +6,7 @@ module Wumber (
   module Wumber.Element,
   module Wumber.Fingerprint,
   module Wumber.Model,
+  module Wumber.ModelAffine,
   module Wumber.ModelCSG,
   module Wumber.Numeric,
   module Wumber.Symbolic,
@@ -18,6 +19,7 @@ import Wumber.Cursor
 import Wumber.Element
 import Wumber.Fingerprint
 import Wumber.Model
+import Wumber.ModelAffine
 import Wumber.ModelCSG
 import Wumber.Numeric
 import Wumber.Symbolic

@@ -7,6 +7,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE IncoherentInstances #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
@@ -123,10 +124,12 @@
 
 module Wumber.Symbolic (
   Sym(..),
+  SymV(..),
   SymConstraints(..),
   FConstraints(..),
   NumConstraints(..),
   AlgConstraints(..),
+  SymVars(..),
   SymTerm(..),
   SymExp(..),
   SymVar(..),
@@ -144,7 +147,10 @@ module Wumber.Symbolic (
   is_val,
   sym,
   normalize,
-  rewrite_vars
+  rewrite_vars,
+  v2,
+  v3,
+  v4
 ) where
 
 
@@ -155,6 +161,9 @@ import Data.List     (intercalate, sort, sortBy)
 import Data.Maybe    (fromMaybe)
 import Foreign.Ptr   (FunPtr(..))
 import GHC.Generics  (Generic(..))
+import Linear.V2     (V2(..))
+import Linear.V3     (V3(..))
+import Linear.V4     (V4(..))
 import Text.Printf   (printf)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -332,6 +341,28 @@ instance ToSym Sym     where sym   = id
 instance ToSym SymTerm where sym a = [a] :+ 0
 instance ToSym SymExp  where sym a = sym $ 1 :* [a]
 instance ToSym SymVar  where sym a = sym $ a :** 1
+
+
+v2 :: SymConstraints f a => V2 (Sym f a)
+v2 = V2 (var 0) (var 1)
+
+v3 :: SymConstraints f a => V3 (Sym f a)
+v3 = V3 (var 0) (var 1) (var 2)
+
+v4 :: SymConstraints f a => V4 (Sym f a)
+v4 = V4 (var 0) (var 1) (var 2) (var 3)
+
+
+class    SymVars v  where vars :: SymConstraints f a => v (Sym f a)
+instance SymVars V2 where vars = v2
+instance SymVars V3 where vars = v3
+instance SymVars V4 where vars = v4
+
+
+-- | A way to indicate that a symbolic quantity is acting as a vector function.
+--   For example, @SymV V3 () R@ should refer to vars 0, 1, and 2.
+newtype SymV (v :: * -> *) f a = SymV { unSymV :: Sym f a }
+  deriving (Show, Eq, Generic, Binary)
 
 
 val :: a -> Sym f a

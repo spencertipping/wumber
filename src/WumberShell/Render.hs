@@ -15,7 +15,7 @@ import Linear.V4
 import Linear.Vector
 import Text.Printf
 
-import Wumber
+import Wumber hiding (scale)
 
 import WumberShell.View
 
