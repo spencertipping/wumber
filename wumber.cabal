@@ -35,6 +35,7 @@ library
                      , microlens
                      , microlens-th
                      , mtl
+                     , template-haskell
                      , text >= 1.2.3.1
                      , unix
                      , utf8-string
@@ -57,9 +58,11 @@ library
                      , Wumber.DualContour
                      , Wumber.Element
                      , Wumber.Fingerprint
+                     , Wumber.Functionable
                      , Wumber.GeometricConstraints
                      , Wumber.JIT
                      , Wumber.JITIR
+                     , Wumber.Macros
                      , Wumber.Model
                      , Wumber.ModelAffine
                      , Wumber.ModelCSG

@@ -35,9 +35,9 @@ module Wumber.SymExpr (
   Sym(..),
   SymMeta,
   VarID,
-  val,
-  var,
-  val_of,
+  sym_val,
+  sym_var,
+  sym_val_of,
   vars_in,
   tree_size,
   operands,
@@ -69,8 +69,8 @@ import qualified Wumber.BitSet as BS
 --   @p@ as profiles (profiles are used by @f@ to optimize pattern matching; see
 --   below).
 --
---   Don't construct 'Sym' instances by hand; instead, use 'var', 'val', and
---   'SymbolicApply'. This will build consistent 'SymMeta' objects for you.
+--   Don't construct 'Sym' instances by hand; instead, use 'sym_var', 'sym_val',
+--   and 'SymbolicApply'. This will build consistent 'SymMeta' objects for you.
 
 data Sym p f a = SymV !VarID
                | SymC !a
@@ -120,12 +120,12 @@ instance (Ord f, Ord a) => Ord (Sym p f a) where
 
 
 -- | Promotes a constant into a symbolic value.
-val :: a -> Sym p f a
-val = SymC
+sym_val :: a -> Sym p f a
+sym_val = SymC
 
 -- | Returns a symbolic quantity referring to the given indexed variable.
-var :: VarID -> Sym p f a
-var = SymV
+sym_var :: VarID -> Sym p f a
+sym_var = SymV
 
 
 -- | If the symbolic expression can be reduced to a constant value, returns
@@ -134,9 +134,9 @@ var = SymV
 --   Symbolic expressions have constant values exactly when they refer to no
 --   variables.
 
-val_of :: ValApply f a => Sym p f a -> Maybe a
-val_of s | BS.is_empty (vars_in s) = Just $ eval_constant s
-         | otherwise               = Nothing
+sym_val_of :: ValApply f a => Sym p f a -> Maybe a
+sym_val_of s | BS.is_empty (vars_in s) = Just $ eval_constant s
+             | otherwise               = Nothing
 
 
 -- | Returns the set of variables referred to by the given tree.
@@ -166,7 +166,7 @@ sym_apply_fold :: (Fingerprintable f, Fingerprintable (Sym p f a),
                    ProfileApply p f a, ValApply f a)
                => f -> [Sym p f a] -> Sym p f a
 sym_apply_fold f xs
-  | all (BS.is_empty . vars_in) xs = val (val_apply f (map eval_constant xs))
+  | all (BS.is_empty . vars_in) xs = sym_val (val_apply f (map eval_constant xs))
   | otherwise                      = sym_apply_cons f xs
 
 -- | This function conses a new tree node. This is the way you should implement
