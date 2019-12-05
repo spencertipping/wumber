@@ -178,7 +178,7 @@ sym_apply_cons f xs = SymF f v (SM b id p s)
   where b  = BS.unions $ map vars_in xs
         id = tree_fingerprint $ fingerprint f : map fingerprint xs
         s  = 1 + sum (map tree_size xs)
-        p  = prof_combine $ prof_fn f : map prof xs
+        p  = prof_fn f $ map prof xs
         v  = V.fromList xs
 
         prof (SymV i)                = prof_var i
@@ -195,26 +195,28 @@ sym_apply_cons f xs = SymF f v (SM b id p s)
 --   don't want to go to the trouble.
 
 class ProfileApply p f a | p -> f, p -> a where
-  prof_combine :: [p] -> p
-  prof_fn      :: f -> p
-  prof_val     :: a -> p
-  prof_var     :: VarID -> p
+  prof_fn  :: f -> [p] -> p
+  prof_val :: a -> p
+  prof_var :: VarID -> p
 
 -- | A type you can use to bypass profile calculation. If you don't
 --   pattern-match against 'Sym' quantities, this probably makes sense.
 newtype NoProfiles f a = NP ()
 
 instance ProfileApply (NoProfiles f a) f a where
-  prof_combine _ = NP ()
-  prof_fn      _ = NP ()
-  prof_val     _ = NP ()
-  prof_var     _ = NP ()
+  prof_fn  _ _ = NP ()
+  prof_val _   = NP ()
+  prof_var _   = NP ()
 
 
 -- | The class of functions that can be applied to values of type @a@, yielding
 --   another value of type @a@. If your function type implements 'sym_apply'
 --   using 'sym_apply_fold', then 'val_apply' will be used to handle constant
 --   folding.
+--
+--   Instances are provided for @a -> a@ and @a -> a -> a@ even though you
+--   wouldn't use either of these types for @f@.
+
 class ValApply f a where val_apply :: f -> [a] -> a
 
 instance ValApply (a -> a) a where
@@ -222,8 +224,8 @@ instance ValApply (a -> a) a where
   val_apply _ xs  = error $ "wrong arity for unary fn: " ++ show (length xs)
 
 instance ValApply (a -> a -> a) a where
-  val_apply f [x, y] = f x y
-  val_apply _ xs     = error $ "wrong arity for binary fn: " ++ show (length xs)
+  val_apply f (x:xs) = foldl f x xs
+  val_apply _ []     = error "can't apply binary function to zero arguments"
 
 
 -- | An internal function that reduces constant 'Sym' expressions to their

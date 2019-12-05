@@ -69,6 +69,7 @@ library
                      , Wumber.SymbolicDerivative
                      , Wumber.SymbolicJIT
                      , Wumber.SymExpr
+                     , Wumber.SymMath
                      , Wumber.VectorConversion
 
                      , WumberShell
