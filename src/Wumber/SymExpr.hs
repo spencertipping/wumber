@@ -158,7 +158,8 @@ operands (SymF _ v _) = v
 --   another symbolic argument. Symbolic application often just amounts to
 --   creating a new node, but some operations, particularly associative and/or
 --   commutative ones, will flatten the tree when possible.
-class SymbolicApply f where sym_apply :: f -> [Sym p f a] -> Sym p f a
+class (Fingerprintable a, ProfileApply p f a) => SymbolicApply p f a where
+  sym_apply :: f -> [Sym p f a] -> Sym p f a
 
 -- | Apply a function to symbolic quantities with constant folding.
 sym_apply_fold :: (Fingerprintable f, Fingerprintable (Sym p f a),
