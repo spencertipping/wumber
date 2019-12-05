@@ -3,6 +3,12 @@
 
 -- | Fingerprintable objects, a feature that Wumber uses to cache expensive
 --   objects to disk.
+--
+--   __WARNING:__ fingerprints are not required to be consistent across
+--   machines, operating systems, or architectures. The only guarantee is that
+--   multiple runs of the same build of Wumber on the same machine should yield
+--   the same results.
+
 module Wumber.Fingerprint (
   Fingerprintable(..),
   binary_fingerprint,
