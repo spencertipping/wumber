@@ -1,5 +1,5 @@
 # Wumber: CAD in Haskell
-![build status](https://travis-ci.org/spencertipping/wumber.svg?branch=master)
+[![build status](https://travis-ci.org/spencertipping/wumber.svg?branch=master)](https://travis-ci.org/spencertipping/wumber)
 
 Don't believe the Travis icon. I promise it's totally broken.
 
