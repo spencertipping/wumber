@@ -8,10 +8,8 @@
   + More accurate edge rendering, particularly for nonaligned corners
   + Incremental/progressive scanning (reuse already-computed data)
   + Mesh to quads/prisms, not just lines
-  + View contouring? i.e. dual contouring in 2D wrt the view matrix?
 + Shell
   + LOD based on view matrix: incorporate "visually perceptible error" into DC
-  + Restrict DC to small bounds, possibly integrated with model
   + Augment/rewrite Gloss so we can use real fonts/etc
 + Shell CLI
   + Select variable(s) to be rendered
@@ -40,17 +38,11 @@
 
 ## Backend
 + Boundary-aware CSG
-  + DC isn't sufficient for realtime modeling: we need boundary/corner hints
   + LOD-variant feature hinting
   + Calculate LOD by view prominence
 + Sym compiler/algebra
-  + `ifpos` conditional instead of `upper`/`lower`
-  + Cache `Binary` encodings for fast deduplication within `JITIR`
   + Symbolic derivatives
   + Algebraic simplification of sign expressions?
-  + BVH primitives?
-+ Isosurfaces
-  + BVH for CSG
 + Assembler
   + Multi-branch assembly with conditionals
   + Constant vector + indexing
@@ -60,8 +52,6 @@
   + Benchmark reg/reg and reg/memory parallelization
   + Preload operands into registers while ALUs are busy
     + Model processor ports at some level
-+ JITIR
-  + Full `Sym` deduplication
 + Simulation
   + 4D meshing for animation/object-through-time collision detection
     + Collisions happen only at the `t` coordinates of 4D vertices
