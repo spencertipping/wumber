@@ -46,6 +46,7 @@ library
                      , Wumber.AMD64JIT
                      , Wumber.AMD64RE
                      , Wumber.Assembler
+                     , Wumber.BitSet
                      , Wumber.BoundingBox
                      , Wumber.ClosedComparable
                      , Wumber.Constraint
@@ -67,6 +68,7 @@ library
                      , Wumber.SymbolicAlgebra
                      , Wumber.SymbolicDerivative
                      , Wumber.SymbolicJIT
+                     , Wumber.SymExpr
                      , Wumber.VectorConversion
 
                      , WumberShell
@@ -95,6 +97,7 @@ test-suite wumber-tests
   hs-source-dirs:      test
   main-is:             WumberTest.hs
   other-modules:       WumberTest.AMD64Asm
+                     , WumberTest.BitSet
                      , WumberTest.ConstraintSolver
                      , WumberTest.JIT
                      , WumberTest.ModelAffine

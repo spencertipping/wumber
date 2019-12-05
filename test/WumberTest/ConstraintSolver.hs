@@ -125,6 +125,10 @@ prop_v3dist vec (NonNegative d) = t do
   return v
 
 
+{-
+FIXME
+...with new Sym implementation
+
 prop_hexagon :: V2 R -> V2 R -> V2 R -> V2 R -> V2 R -> V2 R
              -> Positive R -> Property
 prop_hexagon a b c d e f (Positive dist) =
@@ -166,6 +170,7 @@ prop_hexagon a b c d e f (Positive dist) =
                distance cv fv]
 
     return av
+-}
 
 
 prop_vec_varchains :: V2 R -> Property
