@@ -17,13 +17,6 @@
 --   >
 --   > -- without constant folding:
 --   > sym_apply = normalize_with sym_apply_cons
---
---   If you want to do things like collapsing common terms, then you should
---   provide that functionality by layering it onto 'sym_apply_cons'. You need
---   to do it there rather than after the fact because 'normalize_with' looks at
---   the output from whichever cons function you give it and in some cases will
---   choose the smallest of multiple possibilities. This behavior is governed by
---   'tree_size' via 'amb'.
 
 module Wumber.AlgebraicSymFn where
 
@@ -44,19 +37,17 @@ import Wumber.SymExpr
 --   structures are parameterized.
 class (Ord p, Eq f, Fingerprintable f, ProfileApply p f a) =>
       AlgebraicSymFn p f a | f -> p where
-  commutativity  :: f -> Maybe (p -> p)
-  associativity  :: f -> Maybe f
-  distributivity :: f -> Maybe (f -> Bool)
+  commutativity :: f -> Maybe (p -> p)
+  associativity :: f -> Maybe f
 
 
 -- | An algebraically-norming symbolic cons function wrapper.
 normalize_with :: (Fingerprintable a, AlgebraicSymFn p f a)
                => (f -> [Sym p f a] -> Sym p f a)
                -> f -> [Sym p f a] -> Sym p f a
-normalize_with cons f = cons f . cfn . afn . dfn
-  where cfn = fromMaybe id (normalize_commutative    <$> commutativity f)
-        afn = fromMaybe id (normalize_associative    <$> associativity f)
-        dfn = fromMaybe id (normalize_distributive f <$> distributivity f)
+normalize_with cons f = cons f . cfn . afn
+  where cfn = fromMaybe id (normalize_commutative <$> commutativity f)
+        afn = fromMaybe id (normalize_associative <$> associativity f)
 
 
 -- | Chooses the simpler of two equivalent representations of the same logical
@@ -64,11 +55,6 @@ normalize_with cons f = cons f . cfn . afn . dfn
 amb :: [Sym p f a] -> [Sym p f a] -> [Sym p f a]
 amb a b | sum (map tree_size a) < sum (map tree_size b) = a
         | otherwise                                     = b
-
-
--- | Considers applying distributivity, if the end result is more compact.
-normalize_distributive :: f -> (f -> Bool) -> [Sym p f a] -> [Sym p f a]
-normalize_distributive _ _ = id      -- TODO
 
 
 -- | Normalizes operands to an associative operator by inlining any children
