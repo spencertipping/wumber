@@ -72,14 +72,14 @@ val_of = sym_val_of . unSM
 
 
 instance SymMathC MathFn a => AlgebraicSymFn (NoProfiles MathFn) MathFn a where
-  left_identity Add = Just (== SymV 0)
-  left_identity Mul = Just (== SymV 1)
-  left_identity Pow = Just (== SymV 1)
+  left_identity Add = Just (== SymC 0)
+  left_identity Mul = Just (== SymC 1)
+  left_identity Pow = Just (== SymC 1)
   left_identity _   = Nothing
 
-  right_identity Add = Just (== SymV 0)
-  right_identity Mul = Just (== SymV 1)
-  right_identity Pow = Just (== SymV 1)
+  right_identity Add = Just (== SymC 0)
+  right_identity Mul = Just (== SymC 1)
+  right_identity Pow = Just (== SymC 1)
   right_identity _   = Nothing
 
   commutativity Add = Just compare

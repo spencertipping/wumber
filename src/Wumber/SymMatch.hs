@@ -26,6 +26,14 @@ data Match a = Is a | As VarID
   deriving (Show, Ord, Eq, Functor, Generic, Binary)
 
 
+pattern_of :: (Fingerprintable f, Fingerprintable a, ProfileApply p f)
+           => (f -> [Sym p f (Match a)] -> Sym p f (Match a))
+           -> Sym p f a -> Sym p f (Match a)
+pattern_of _    (SymC x)      = SymC (Is x)
+pattern_of _    (SymV i)      = SymC (As i)
+pattern_of cons (SymF f xs _) = cons f $ map (pattern_of cons) $ V.toList xs
+
+
 match_nvars :: Sym p f (Match a) -> VarID
 match_nvars = (1 +) . flip foldr (-1) \case As v -> max v
                                             Is a -> id
