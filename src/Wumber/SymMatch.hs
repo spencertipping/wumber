@@ -39,6 +39,10 @@ match_nvars = (1 +) . flip foldr (-1) \case As v -> max v
                                             Is a -> id
 
 
+-- FIXME
+-- match needs to know about basic algebraic structure like commutativity and
+-- associativity. If it doesn't, it won't be able to handle normal forms.
+
 match :: (Eq a, Eq f)
       => Sym p f (Match a) -> Sym p f a -> Maybe (Vector (Sym p f a))
 match p e = (V.generate (match_nvars p) undefined V.//) <$> go p e

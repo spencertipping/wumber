@@ -71,7 +71,7 @@ t_ = var 3  -- ^ An alias for @var 3@
 val_of = sym_val_of . unSM
 
 
-instance SymMathC MathFn a => AlgebraicSymFn (NoProfiles MathFn) MathFn a where
+instance (Eq a, Ord a, Num a) => AlgebraicSymFn (NoProfiles MathFn) MathFn a where
   left_identity Add = Just (== SymC 0)
   left_identity Mul = Just (== SymC 1)
   left_identity Pow = Just (== SymC 1)
