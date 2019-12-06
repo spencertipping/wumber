@@ -42,7 +42,10 @@
   + Calculate LOD by view prominence
 + Sym compiler/algebra
   + Symbolic derivatives
-  + Algebraic simplification of sign expressions?
+  + Tree traversal for new Sym library
+  + Lensing/traversal by profile
+  + `AlgebraicFunctionable`
+  + Generalized normal form collection
 + Assembler
   + Multi-branch assembly with conditionals
   + Constant vector + indexing
