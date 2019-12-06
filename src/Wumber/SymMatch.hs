@@ -43,6 +43,11 @@ match_nvars = (1 +) . flip foldr (-1) \case As v -> max v
 -- match needs to know about basic algebraic structure like commutativity and
 -- associativity. If it doesn't, it won't be able to handle normal forms.
 
+-- TODO
+-- If we have inverses, then does 'match' synthesize operands? Algebraically it
+-- could; but in practical terms it probably shouldn't. Should we have a
+-- typeclass to provide algebraic pattern matching?
+
 match :: (Eq a, Eq f)
       => Sym p f (Match a) -> Sym p f a -> Maybe (Vector (Sym p f a))
 match p e = (V.generate (match_nvars p) undefined V.//) <$> go p e

@@ -213,7 +213,7 @@ sym_apply_foldwith :: (Fingerprintable f, Fingerprintable (Sym p f a),
                    => (f -> [Sym p f a] -> Sym p f a)
                    -> f -> [Sym p f a] -> Sym p f a
 sym_apply_foldwith cons f xs
-  | all (BS.is_empty . vars_in) xs = sym_val (val_apply f (map sym_eval xs))
+  | all (BS.is_empty . vars_in) xs = sym_val $ val_apply f $ map sym_eval xs
   | otherwise                      = cons f xs
 
 -- | Apply a function to symbolic quantities with constant folding.
