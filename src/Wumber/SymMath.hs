@@ -4,6 +4,8 @@
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -23,9 +25,15 @@ module Wumber.SymMath (
 
 import Data.Binary   (Binary)
 import Data.Foldable (foldl')
+import Data.Function (on)
+import Data.List     (intercalate)
+import Data.Vector   ((!))
 import GHC.Generics  (Generic)
 import Unsafe.Coerce (unsafeCoerce)
 
+import qualified Data.Vector as V
+
+import Wumber.AlgebraicSymFn
 import Wumber.ClosedComparable
 import Wumber.Fingerprint
 import Wumber.Functionable
@@ -37,7 +45,7 @@ import Wumber.SymExpr
 --   convertible from @MathFn@.
 newtype SymMath f a = SM { unSM :: Sym (NoProfiles f a) f a }
 
--- | The typeclass context you'll need to instantiate 'SymMath'.
+-- | The typeclass context you'll need in order to instantiate 'SymMath'.
 type SymMathC f a = (Fingerprintable a,
                      Functionable MathFn f,
                      SymbolicApply (NoProfiles f a) f a,
@@ -48,17 +56,58 @@ type SymMathC f a = (Fingerprintable a,
 -- | Promotes a value into a 'SymMath' expression.
 val = SM . sym_val
 
--- | Constructs a 'SymMath' expression that refers to a variable.
+-- | Constructs a 'SymMath' expression that refers to a variable. Variables 0-3
+--   are aliased as 'x_', 'y_', 'z_', and 't_' respectively.
 var = SM . sym_var
+
+x_ = var 0  -- ^ An alias for @var 0@
+y_ = var 1  -- ^ An alias for @var 1@
+z_ = var 2  -- ^ An alias for @var 2@
+t_ = var 3  -- ^ An alias for @var 3@
 
 -- | Reduces the symbolic expression to a constant, or 'Nothing' if it has
 --   unknown dependencies.
 val_of = sym_val_of . unSM
 
 
-instance (Fingerprintable a, MathFnC a, ProfileApply p MathFn a) =>
-         SymbolicApply p MathFn a where
-  sym_apply = sym_apply_fold
+instance SymMathC MathFn a => AlgebraicSymFn (NoProfiles MathFn a) MathFn a where
+  left_identity Add = Just (== SymV 0)
+  left_identity Mul = Just (== SymV 1)
+  left_identity Pow = Just (== SymV 1)
+  left_identity _   = Nothing
+
+  right_identity Add = Just (== SymV 0)
+  right_identity Mul = Just (== SymV 1)
+  right_identity Pow = Just (== SymV 1)
+  right_identity _   = Nothing
+
+  commutativity Add = Just compare
+  commutativity Mul = Just compare
+  commutativity _   = Nothing
+
+  associativity Add = Just $ fn_is Add
+  associativity Mul = Just $ fn_is Mul
+  associativity _   = Nothing
+
+
+instance (Show a, FnShow f) => Show (SymMath f a) where
+  show (SM (SymC x)) = show x
+  show (SM (SymV i)) | i == 0 = "x_"
+                     | i == 1 = "y_"
+                     | i == 2 = "z_"
+                     | i == 3 = "t_"
+                     | otherwise = "v" ++ show i
+
+  show (SM (SymF f xs _)) = fshow f $ map (show . SM) $ V.toList xs
+
+instance (Fingerprintable a,
+          MathFnC a,
+          ProfileApply (NoProfiles MathFn a) MathFn a) =>
+         SymbolicApply (NoProfiles MathFn a) MathFn a where
+  sym_apply Negate [SymF Negate xs _] = xs ! 0
+  sym_apply Recip  [SymF Recip  xs _] = xs ! 0
+
+  sym_apply f xs = sym_apply_foldwith (normalize_with sym_apply_cons) f xs
 
 instance MathFnC a => ValApply MathFn a where
   val_apply mf [x]    | Just f <- fn mf = f x

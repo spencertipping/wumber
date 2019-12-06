@@ -13,6 +13,7 @@ module Wumber.Functionable where
 
 
 import Data.Binary  (Binary)
+import Data.List    (intercalate)
 import GHC.Generics (Generic)
 
 import Wumber.Fingerprint
@@ -27,6 +28,28 @@ instance Functionable a a where fn = id
 
 instance Functionable () a where
   fn _ = error "Functionable is disabled for the () instance"
+
+
+-- | 'Show' functionality for functions. Most functions can either be shown with
+--   their arguments infix (e.g. @+@), or prefix (e.g. @sin@).
+class Show f => FnShow f where
+  fshow_style :: f -> Maybe FnShowStyle
+  fshow_fn    :: f -> String
+  fshow       :: f -> [String] -> String
+
+  fshow_fn   = show
+  fshow f xs = case fshow_style f of
+    Just ShowPrefix
+      | [x] <- xs -> fshow_fn f ++ "(" ++ x ++ ")"
+      | otherwise -> fshow_fn f ++ "(" ++ intercalate ", " xs ++ ")"
+    Just ShowPostfix
+      | [x] <- xs -> "(" ++ x ++ ")" ++ fshow_fn f
+      | otherwise -> "(" ++ intercalate ", " xs ++ ")" ++ fshow_fn f
+    Just ShowInfix -> "(" ++ intercalate (" " ++ fshow_fn f ++ " ") xs ++ ")"
+    _              -> error "must implement fshow or use builtin style"
+
+data FnShowStyle = ShowPrefix | ShowInfix | ShowPostfix
+  deriving (Show, Eq, Ord, Bounded, Enum, Generic, Binary)
 
 
 -- | An enumeration of all functions Haskell provides for mathematical
@@ -68,6 +91,32 @@ data MathFn = Add | Negate              -- binary functions
 type MathFnC a = (Num a, Fractional a, Integral a, Floating a, RealFloat a)
 
 instance Fingerprintable MathFn where fingerprint = binary_fingerprint
+
+instance FnShow MathFn where
+  fshow_style f = Just case f of
+    Add    -> ShowInfix
+    Negate -> ShowPrefix
+    Mul    -> ShowInfix
+    Recip  -> ShowPostfix
+    Rem    -> ShowInfix
+    Quot   -> ShowInfix
+    Mod    -> ShowInfix
+    Div    -> ShowInfix
+    Pow    -> ShowInfix
+    Atan2  -> ShowPrefix
+    _      -> ShowPrefix
+
+  fshow_fn f = case f of
+    Add    -> "+"
+    Negate -> "-"
+    Mul    -> "*"
+    Recip  -> "⁻¹"
+    Rem    -> "%%"
+    Quot   -> "//"
+    Mod    -> "%"
+    Div    -> "/"
+    Pow    -> "^"
+    _      -> show f
 
 instance MathFnC a => Functionable MathFn (Maybe (a -> a)) where
   fn Negate   = Just negate

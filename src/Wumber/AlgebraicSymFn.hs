@@ -1,3 +1,4 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE LambdaCase #-}
@@ -25,7 +26,7 @@
 module Wumber.AlgebraicSymFn where
 
 
-import Data.List  (groupBy, sortOn)
+import Data.List  (groupBy, sortBy)
 import Data.Maybe (fromMaybe)
 
 import qualified Data.Vector as V
@@ -40,16 +41,42 @@ import Wumber.SymExpr
 --   property can be declined. Once you've implemented this class, you can get a
 --   normalizing variant of 'sym_apply_cons' using 'normalize_with' and/or
 --   'normalize'.
-class (Ord p, Eq f, Fingerprintable f, ProfileApply p f a) =>
-      AlgebraicSymFn p f a | f -> p where
-  associativity :: f -> Maybe f
-  commutativity :: f -> Maybe (p -> p)
-  fusion        :: f -> Maybe (Sym p f a -> Sym p f a -> Bool,
-                               [Sym p f a] -> [Sym p f a])
+--
+--   'associativity' can be implemented with the helper function 'fn_is'.
+--   'commutativity' can be done with 'compare' for decent results, although
+--   that isn't sufficient to reduce polynomial terms.
+
+-- FIXME
+-- This is a huge mess. We'll do a lot better with a pattern-matching approach;
+-- let's keep the functions below but remove this typeclass.
+
+class AlgebraicSymFn p f a where
+  left_identity  :: f -> Maybe (Sym p f a -> Bool)
+  right_identity :: f -> Maybe (Sym p f a -> Bool)
+  inversion      :: f -> Maybe (Sym p f a -> Bool)
+  associativity  :: f -> Maybe (Sym p f a -> Bool)
+  commutativity  :: f -> Maybe (Sym p f a -> Sym p f a -> Ordering)
+  fusion         :: f -> Maybe (Sym p f a -> Sym p f a -> Bool)
+  fuse           :: f -> [Sym p f a] -> [Sym p f a]
+
+  left_identity  _ = Nothing
+  right_identity _ = Nothing
+  inversion      _ = Nothing
+  associativity  _ = Nothing
+  commutativity  _ = Nothing
+  fusion         _ = Nothing
+  fuse           _ = id
+
+
+-- | A function you can use with 'associative' to select operands that are
+--   function applications and whose function is the one specified.
+fn_is :: Eq f => f -> Sym p f a -> Bool
+fn_is f (SymF g _ _) = f == g
+fn_is _ _            = False
 
 
 -- | A 'sym_apply_cons' modifier that 'normalize's its arguments first.
-normalize_with :: (Fingerprintable a, AlgebraicSymFn p f a)
+normalize_with :: AlgebraicSymFn p f a
                => (f -> [Sym p f a] -> Sym p f a)
                -> f -> [Sym p f a] -> Sym p f a
 normalize_with cons f = cons f . normalize f
@@ -62,34 +89,31 @@ normalize_with cons f = cons f . normalize f
 --   2. Sort operands if commutative
 --   3. Fuse operand groups if fuseable
 
-normalize :: (Fingerprintable a, AlgebraicSymFn p f a)
-          => f -> [Sym p f a] -> [Sym p f a]
-normalize f = ffn . cfn . afn
-  where afn = fromMaybe id $ normalize_associative <$> associativity f
-        cfn = fromMaybe id $ normalize_commutative <$> commutativity f
-        ffn = fromMaybe id $ normalize_fusion      <$> fusion f
+normalize :: AlgebraicSymFn p f a => f -> [Sym p f a] -> [Sym p f a]
+normalize f = ffn . cfn . afn . lifn . rifn
+  where afn  = fromMaybe id $ normalize_associative <$> associativity f
+        cfn  = fromMaybe id $ normalize_commutative <$> commutativity f
+        ffn  = fromMaybe id $ (concatMap (fuse f) .) <$> groupBy <$> fusion f
+        lifn = fromMaybe id $ normalize_lidentity <$> left_identity f
+        rifn = fromMaybe id $ normalize_ridentity <$> right_identity f
 
 
--- | Normalizes groups of adjacent operands, bounded by the specified
---   equivalence function. This is usually used in conjunction with
---   commutativity, but it doesn't have to be.
---
---   A typical use case for fusion is collapsing like terms within polynomials.
+normalize_lidentity :: (Sym p f a -> Bool) -> [Sym p f a] -> [Sym p f a]
+normalize_lidentity f [] = []
+normalize_lidentity f [x] = [x]
+normalize_lidentity f (x:xs) | f x       =     normalize_lidentity f xs
+                             | otherwise = x : normalize_lidentity f xs
 
-normalize_fusion ::
-  (Eq p, ProfileApply p f a)
-  => ((Sym p f a -> Sym p f a -> Bool), [Sym p f a] -> [Sym p f a])
-  -> [Sym p f a] -> [Sym p f a]
-normalize_fusion (f, g) = concatMap g . groupBy f
+normalize_ridentity :: (Sym p f a -> Bool) -> [Sym p f a] -> [Sym p f a]
+normalize_ridentity f = reverse . normalize_lidentity f . reverse
 
 
 -- | Normalizes operands to an associative operator by inlining any children
 --   that have the same operator; that is, @(f (f x y) z)@ would become
 --   @(f x y z)@.
-normalize_associative :: Eq f => f -> [Sym p f a] -> [Sym p f a]
-normalize_associative f =
-  concatMap \case SymF g xs _ | g == f -> V.toList xs
-                  x                    -> [x]
+normalize_associative :: (Sym p f a -> Bool) -> [Sym p f a] -> [Sym p f a]
+normalize_associative f = concatMap \case o | f o -> V.toList (operands o)
+                                          o       -> [o]
 
 
 -- | Normalizes operands to a commutative operator by sorting them, not
@@ -98,9 +122,6 @@ normalize_associative f =
 --   term groupings; for example, if we're commuting @+@ to normalize terms
 --   within a polynomial, we'd want @2x@ and @3x@ to end up next to each other,
 --   while @2x²@ would be grouped with other @x²@ terms.
-normalize_commutative :: (Fingerprintable a,
-                          Fingerprintable f,
-                          ProfileApply p f a,
-                          Ord p)
-                      => (p -> p) -> [Sym p f a] -> [Sym p f a]
-normalize_commutative f = sortOn \s -> (f (profile s), fingerprint s)
+normalize_commutative :: (Sym p f a -> Sym p f a -> Ordering)
+                      -> [Sym p f a] -> [Sym p f a]
+normalize_commutative = sortBy

@@ -26,6 +26,8 @@
 --   Of these, only the tree complexity is calculated eagerly.
 --
 --   'Sym's provide /O(1)/ equality and comparison after the first invocation.
+--   Ordering is delegated to profiles, then fingerprints and/or terminals.
+--   Constants sort first, then variables, then function applications.
 --
 --   Don't @import@ this module directly unless you're writing Wumber-internal
 --   code. Instead, import @Wumber@ to get relevant @Show@ instances and other
@@ -111,17 +113,17 @@ instance (Eq f, Eq a) => Eq (Sym p f a) where
   SymF _ _ (SM _ i _ _) == SymF _ _ (SM _ j _ _) = i == j
   _                     == _                     = False
 
-instance (Ord p, Ord f, Ord a) => Ord (Sym p f a) where
-  SymV i `compare` SymV j     = compare i j
-  SymV _ `compare` SymC _     = LT
-  SymV _ `compare` SymF _ _ _ = LT
+instance (Ord f, Ord a, Ord p, ProfileApply p f a) => Ord (Sym p f a) where
+  a@(SymC av) `compare` b@(SymC bv) = compare (profile a, av) (profile b, bv)
+  SymC _      `compare` SymV _      = LT
+  SymC _      `compare` SymF _ _ _  = LT
 
-  SymC _ `compare` SymV _     = GT
-  SymC a `compare` SymC b     = compare a b
-  SymC _ `compare` SymF _ _ _ = LT
+  SymV _      `compare` SymC _      = GT
+  a@(SymV ai) `compare` b@(SymV bi) = compare (profile a, ai) (profile b, bi)
+  SymV _      `compare` SymF _ _ _  = LT
 
-  SymF _ _ _            `compare` SymV _                = GT
   SymF _ _ _            `compare` SymC _                = GT
+  SymF _ _ _            `compare` SymV _                = GT
   SymF _ _ (SM _ i p _) `compare` SymF _ _ (SM _ j q _) = compare (p, i) (q, j)
 
 
@@ -241,7 +243,7 @@ class ProfileApply p f a | p -> f, p -> a where
 
 -- | A type you can use to bypass profile calculation. If you don't
 --   pattern-match against 'Sym' quantities, this probably makes sense.
-newtype NoProfiles f a = NP ()
+newtype NoProfiles f a = NP () deriving (Show, Eq, Ord)
 
 instance ProfileApply (NoProfiles f a) f a where
   prof_fn  _ _ = NP ()
