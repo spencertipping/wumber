@@ -101,6 +101,11 @@ data SymMeta p = SM { _sm_vars :: BS.BitSet,
   deriving (Show, Eq, Ord, Generic, Binary)
 
 
+instance Foldable (Sym p f) where
+  foldr _ x (SymV _)      = x
+  foldr f x (SymC y)      = f y x
+  foldr f x (SymF _ xs _) = foldr (flip $ foldr f) x xs
+
 instance (Fingerprintable f, Fingerprintable a) =>
          Fingerprintable (Sym p f a) where
   fingerprint (SymV v) = binary_fingerprint (False, binary_fingerprint v)
@@ -113,7 +118,7 @@ instance (Eq f, Eq a) => Eq (Sym p f a) where
   SymF _ _ (SM _ i _ _) == SymF _ _ (SM _ j _ _) = i == j
   _                     == _                     = False
 
-instance (Ord f, Ord a, Ord p, ProfileApply p f a) => Ord (Sym p f a) where
+instance (Ord f, Ord a, Ord p, ProfileApply p f) => Ord (Sym p f a) where
   a@(SymC av) `compare` b@(SymC bv) = compare (profile a, av) (profile b, bv)
   SymC _      `compare` SymV _      = LT
   SymC _      `compare` SymF _ _ _  = LT
@@ -187,9 +192,9 @@ operands (SymF _ v _) = v
 
 
 -- | Returns the profile of the given node.
-profile :: ProfileApply p f a => Sym p f a -> p
-profile (SymV i)                = prof_var i
-profile (SymC x)                = prof_val x
+profile :: ProfileApply p f => Sym p f a -> p
+profile (SymV i)                = prof_var
+profile (SymC x)                = prof_val
 profile (SymF _ _ (SM _ _ p _)) = p
 
 
@@ -197,14 +202,14 @@ profile (SymF _ _ (SM _ _ p _)) = p
 --   another symbolic argument. Symbolic application often just amounts to
 --   creating a new node, but some operations, particularly associative and/or
 --   commutative ones, will flatten the tree when possible.
-class (Fingerprintable a, ProfileApply p f a) => SymbolicApply p f a where
+class (Fingerprintable a, ProfileApply p f) => SymbolicApply p f a where
   sym_apply :: f -> [Sym p f a] -> Sym p f a
 
 -- | A generalized way to add constant folding to a tree-consing function. We
 --   use this generality when we introduce algebraic normalization in
 --   'Wumber.AlgebraicSymFn'.
 sym_apply_foldwith :: (Fingerprintable f, Fingerprintable (Sym p f a),
-                       ProfileApply p f a, ValApply f a)
+                       ProfileApply p f, ValApply f a)
                    => (f -> [Sym p f a] -> Sym p f a)
                    -> f -> [Sym p f a] -> Sym p f a
 sym_apply_foldwith cons f xs
@@ -218,7 +223,7 @@ sym_apply_fold = sym_apply_foldwith sym_apply_cons
 --   'sym_apply' if no algebraic rules apply, and if constant folding isn't
 --   possible/desirable. (Otherwise you should back into 'sym_apply_fold'.)
 sym_apply_cons :: (Fingerprintable f, Fingerprintable (Sym p f a),
-                   ProfileApply p f a)
+                   ProfileApply p f)
                => f -> [Sym p f a] -> Sym p f a
 sym_apply_cons f xs = SymF f v (SM b id p s)
   where b  = BS.unions $ map vars_in xs
@@ -233,22 +238,22 @@ sym_apply_cons f xs = SymF f v (SM b id p s)
 --   of 'Sym' expressions; the purpose of this is to rapidly pattern-match
 --   against a function, its arity, and metadata about its arguments.
 --
---   Implementing profiles is optional; you can use @NoProfiles f a@ if you
---   don't want to go to the trouble.
+--   Implementing profiles is optional; you can use @NoProfiles f@ if you don't
+--   want to go to the trouble.
 
-class ProfileApply p f a | p -> f, p -> a where
+class ProfileApply p f | p -> f, f -> p where
   prof_fn  :: f -> [p] -> p
-  prof_val :: a -> p
-  prof_var :: VarID -> p
+  prof_val :: p
+  prof_var :: p
 
 -- | A type you can use to bypass profile calculation. If you don't
 --   pattern-match against 'Sym' quantities, this probably makes sense.
-newtype NoProfiles f a = NP () deriving (Show, Eq, Ord)
+newtype NoProfiles f = NP () deriving (Show, Eq, Ord)
 
-instance ProfileApply (NoProfiles f a) f a where
+instance ProfileApply (NoProfiles f) f where
   prof_fn  _ _ = NP ()
-  prof_val _   = NP ()
-  prof_var _   = NP ()
+  prof_val     = NP ()
+  prof_var     = NP ()
 
 
 -- | The class of functions that can be applied to values of type @a@, yielding

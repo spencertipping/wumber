@@ -38,17 +38,18 @@ import Wumber.ClosedComparable
 import Wumber.Fingerprint
 import Wumber.Functionable
 import Wumber.SymExpr
+import Wumber.SymMatch
 
 
 -- | Symbolic math expressions. Structurally identical to 'Sym', but typed to
 --   implement Haskell numeric classes. @f@ should be specified to be
 --   convertible from @MathFn@.
-newtype SymMath f a = SM { unSM :: Sym (NoProfiles f a) f a }
+newtype SymMath f a = SM { unSM :: Sym (NoProfiles f) f a }
 
 -- | The typeclass context you'll need in order to instantiate 'SymMath'.
 type SymMathC f a = (Fingerprintable a,
                      Functionable MathFn f,
-                     SymbolicApply (NoProfiles f a) f a,
+                     SymbolicApply (NoProfiles f) f a,
                      ValApply f a,
                      MathFnC a)
 
@@ -70,7 +71,7 @@ t_ = var 3  -- ^ An alias for @var 3@
 val_of = sym_val_of . unSM
 
 
-instance SymMathC MathFn a => AlgebraicSymFn (NoProfiles MathFn a) MathFn a where
+instance SymMathC MathFn a => AlgebraicSymFn (NoProfiles MathFn) MathFn a where
   left_identity Add = Just (== SymV 0)
   left_identity Mul = Just (== SymV 1)
   left_identity Pow = Just (== SymV 1)
@@ -102,8 +103,8 @@ instance (Show a, FnShow f) => Show (SymMath f a) where
 
 instance (Fingerprintable a,
           MathFnC a,
-          ProfileApply (NoProfiles MathFn a) MathFn a) =>
-         SymbolicApply (NoProfiles MathFn a) MathFn a where
+          ProfileApply (NoProfiles MathFn) MathFn) =>
+         SymbolicApply (NoProfiles MathFn) MathFn a where
   sym_apply Negate [SymF Negate xs _] = xs ! 0
   sym_apply Recip  [SymF Recip  xs _] = xs ! 0
 
