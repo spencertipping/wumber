@@ -43,6 +43,7 @@ library
                      , zlib >= 0.6.2
 
   exposed-modules:     Wumber
+                     , Wumber.AlgebraicSymFn
                      , Wumber.AMD64Asm
                      , Wumber.AMD64JIT
                      , Wumber.AMD64RE

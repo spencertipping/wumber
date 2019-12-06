@@ -123,8 +123,7 @@ instance Ord (SymMath f a) where
 --   TODO: is the fix as simple as having 'qr' use 'truncate' and 'divmod' use
 --   'floor'?
 
-qr a b = (q, r) where q = truncate (a / b)
-                      r = a - q*b
+qr a b = (q, r) where q = truncate (a / b); r = a - q*b
 
 
 instance Integral Double where toInteger = truncate; quotRem = qr
