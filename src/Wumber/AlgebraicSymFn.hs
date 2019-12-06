@@ -16,14 +16,17 @@
 --   > sym_apply = sym_apply_foldwith (normalize_with sym_apply_cons)
 --   >
 --   > -- without constant folding:
---   > sym_apply = normalize_with sym_apply_cons
+--   > sym_apply = normalize_wtih sym_apply_cons
+
+-- TODO
+-- Add support for distributivity. This is complicated by the fact that we'll
+-- amb-reduce potentially many levels above where we do the expansion.
 
 module Wumber.AlgebraicSymFn where
 
 
-import Data.List  (sortOn)
+import Data.List  (groupBy, sortOn)
 import Data.Maybe (fromMaybe)
-import Lens.Micro ((&))
 
 import qualified Data.Vector as V
 
@@ -33,28 +36,51 @@ import Wumber.SymExpr
 
 
 -- | The class of functions that can specify algebraic structure. Idiomatically,
---   all of these are specified in terms of 'Maybe' because some algebraic
---   structures are parameterized.
+--   all of these are specified in terms of 'Maybe' because any algebraic
+--   property can be declined. Once you've implemented this class, you can get a
+--   normalizing variant of 'sym_apply_cons' using 'normalize_with' and/or
+--   'normalize'.
 class (Ord p, Eq f, Fingerprintable f, ProfileApply p f a) =>
       AlgebraicSymFn p f a | f -> p where
-  commutativity :: f -> Maybe (p -> p)
   associativity :: f -> Maybe f
+  commutativity :: f -> Maybe (p -> p)
+  fusion        :: f -> Maybe (Sym p f a -> Sym p f a -> Bool,
+                               [Sym p f a] -> [Sym p f a])
 
 
--- | An algebraically-norming symbolic cons function wrapper.
+-- | A 'sym_apply_cons' modifier that 'normalize's its arguments first.
 normalize_with :: (Fingerprintable a, AlgebraicSymFn p f a)
                => (f -> [Sym p f a] -> Sym p f a)
                -> f -> [Sym p f a] -> Sym p f a
-normalize_with cons f = cons f . cfn . afn
-  where cfn = fromMaybe id (normalize_commutative <$> commutativity f)
-        afn = fromMaybe id (normalize_associative <$> associativity f)
+normalize_with cons f = cons f . normalize f
 
 
--- | Chooses the simpler of two equivalent representations of the same logical
---   value.
-amb :: [Sym p f a] -> [Sym p f a] -> [Sym p f a]
-amb a b | sum (map tree_size a) < sum (map tree_size b) = a
-        | otherwise                                     = b
+-- | Normalizes the operands to the given function by applying whichever
+--   algebraic structures the function supports, always in this order:
+--
+--   1. Flatten sub-invocations if associative
+--   2. Sort operands if commutative
+--   3. Fuse operand groups if fuseable
+
+normalize :: (Fingerprintable a, AlgebraicSymFn p f a)
+          => f -> [Sym p f a] -> [Sym p f a]
+normalize f = ffn . cfn . afn
+  where afn = fromMaybe id $ normalize_associative <$> associativity f
+        cfn = fromMaybe id $ normalize_commutative <$> commutativity f
+        ffn = fromMaybe id $ normalize_fusion      <$> fusion f
+
+
+-- | Normalizes groups of adjacent operands, bounded by the specified
+--   equivalence function. This is usually used in conjunction with
+--   commutativity, but it doesn't have to be.
+--
+--   A typical use case for fusion is collapsing like terms within polynomials.
+
+normalize_fusion ::
+  (Eq p, ProfileApply p f a)
+  => ((Sym p f a -> Sym p f a -> Bool), [Sym p f a] -> [Sym p f a])
+  -> [Sym p f a] -> [Sym p f a]
+normalize_fusion (f, g) = concatMap g . groupBy f
 
 
 -- | Normalizes operands to an associative operator by inlining any children

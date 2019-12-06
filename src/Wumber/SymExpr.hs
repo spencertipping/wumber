@@ -39,6 +39,7 @@ module Wumber.SymExpr (
   sym_var,
   sym_val_of,
   vars_in,
+  amb,
   tree_size,
   operands,
   profile,
@@ -52,7 +53,7 @@ module Wumber.SymExpr (
   NoProfiles,
 
   ValApply(..),
-  eval_constant,
+  sym_eval,
 ) where
 
 
@@ -140,8 +141,17 @@ sym_var = SymV
 --   variables.
 
 sym_val_of :: ValApply f a => Sym p f a -> Maybe a
-sym_val_of s | BS.is_empty (vars_in s) = Just $ eval_constant s
+sym_val_of s | BS.is_empty (vars_in s) = Just $ sym_eval s
              | otherwise               = Nothing
+
+
+-- | Reduces constant 'Sym' expressions to their terminal values. This function
+--   is used by 'sym_apply_fold'. Throws an error if the 'Sym' depends on
+--   unknown quantities (i.e. variables).
+sym_eval :: ValApply f a => Sym p f a -> a
+sym_eval (SymV i) = error $ "unexpected variable in constexpr " ++ show i
+sym_eval (SymC x) = x
+sym_eval (SymF f xs _) = val_apply f (map sym_eval $ V.toList xs)
 
 
 -- | Returns the set of variables referred to by the given tree.
@@ -149,6 +159,21 @@ vars_in :: Sym p f a -> BS.BitSet
 vars_in (SymV i) = BS.singleton i
 vars_in (SymC _) = BS.empty
 vars_in (SymF _ _ (SM b _ _ _)) = b
+
+
+-- | Chooses the simpler of two equivalent representations of the same logical
+--   value.
+amb :: Sym p f a -> Sym p f a -> Sym p f a
+amb a b | tree_size a < tree_size b = a
+        | otherwise                 = b
+
+-- | Returns the total number of elements in the given tree: nodes and
+--   functions. When algebraic rewriting provides multiple representations, we
+--   usually choose the one with the smallest 'tree_size'.
+tree_size :: Sym p f a -> Int
+tree_size (SymV _) = 1
+tree_size (SymC _) = 1
+tree_size (SymF _ _ (SM _ _ _ s)) = s
 
 
 -- | Returns the operands of the given node, or an empty vector if the node is a
@@ -181,7 +206,7 @@ sym_apply_foldwith :: (Fingerprintable f, Fingerprintable (Sym p f a),
                    => (f -> [Sym p f a] -> Sym p f a)
                    -> f -> [Sym p f a] -> Sym p f a
 sym_apply_foldwith cons f xs
-  | all (BS.is_empty . vars_in) xs = sym_val (val_apply f (map eval_constant xs))
+  | all (BS.is_empty . vars_in) xs = sym_val (val_apply f (map sym_eval xs))
   | otherwise                      = cons f xs
 
 -- | Apply a function to symbolic quantities with constant folding.
@@ -228,33 +253,4 @@ instance ProfileApply (NoProfiles f a) f a where
 --   another value of type @a@. If your function type implements 'sym_apply'
 --   using 'sym_apply_fold', then 'val_apply' will be used to handle constant
 --   folding.
---
---   Instances are provided for @a -> a@ and @a -> a -> a@ even though you
---   wouldn't use either of these types for @f@.
-
 class ValApply f a where val_apply :: f -> [a] -> a
-
-instance ValApply (a -> a) a where
-  val_apply f [x] = f x
-  val_apply _ xs  = error $ "wrong arity for unary fn: " ++ show (length xs)
-
-instance ValApply (a -> a -> a) a where
-  val_apply f (x:xs) = foldl f x xs
-  val_apply _ []     = error "can't apply binary function to zero arguments"
-
-
--- | An internal function that reduces constant 'Sym' expressions to their
---   terminal values. This function is used by 'sym_apply_fold'.
-eval_constant :: ValApply f a => Sym p f a -> a
-eval_constant (SymV i) = error $ "unexpected variable in constexpr " ++ show i
-eval_constant (SymC x) = x
-eval_constant (SymF f xs _) = val_apply f (map eval_constant $ V.toList xs)
-
-
--- | Returns the total number of elements in the given tree: nodes and
---   functions. When algebraic rewriting provides multiple representations, we
---   usually choose the one with the smallest 'tree_size'.
-tree_size :: Sym p f a -> Int
-tree_size (SymV _) = 1
-tree_size (SymC _) = 1
-tree_size (SymF _ _ (SM _ _ _ s)) = s
