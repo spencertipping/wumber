@@ -17,12 +17,30 @@ functions][jit] for numerical steps.
 Wumber is designed to be fast enough for interactive use, even for large
 designs. Expensive steps are [cached to disk][disk] for reuse, and Wumber
 supports live code reloading with [hint][hint] so you can iterate without
-running `stack build`. The JIT compiler currently produces vector code that runs
-5-30x faster than compiled GHC (I assume because it avoids all memory allocation
-and function calls).
+running `stack build`. The JIT compiler currently produces code that runs 5-30x
+faster than compiled GHC (I assume because it avoids all memory allocation and
+function calls) -- and that's without any support for SSE vector intrinsics or
+AVX.
 
++ [Dev channel](https://dev.spencertipping.com/channel/wumber)
 + [What I'm reading to build this.](reading.md)
 + [Here's what I'm working on.](frontier.md)
+
+
+## What Wumber isn't
+Like most things I write, this project is pure [dogfood][dog] so it's unlikely
+to have a number of things people might care about:
+
+1. An easy-to-use, accessible frontend like [OpenSCAD][oscad]
+2. Any sort of GUI beyond previewing
+3. AVX support (my main compute server runs pre-AVX Xeons)
+4. LLVM support (I wanted practice writing JIT compilers)
+5. G-code generation (I plan to implement custom CNC hardware)
+
+If you want features I don't have planned, I highly recommend that you fork the
+project and make it your own. There's some chance I'll accept major-change PRs,
+but I want to keep the core code tight and maintainable more than I want it to
+have features that don't immediately relate to the project I'm working on.
 
 
 ## Code spelunking guide
@@ -57,7 +75,9 @@ Some places to start:
 [ss]: http://solvespace.com/index.pl
 [fr]: https://en.wikipedia.org/wiki/Function_representation
 [dc]: https://www.boristhebrave.com/2018/04/15/dual-contouring-tutorial/
+[dog]: https://en.wikipedia.org/wiki/Eating_your_own_dog_food
 [hint]: https://hackage.haskell.org/package/hint
+[oscad]: https://en.wikipedia.org/wiki/OpenSCAD
 
 [sym]: src/Wumber/SymMath.hs
 [sym0]: src/Wumber/Symbolic.hs
