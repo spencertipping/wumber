@@ -33,6 +33,16 @@ Things under active construction:
 + [`AMD64RE`][amdre]: on-the-fly processor profiling
 + [`AMD64JIT`][amdjit]: AMD64 JIT backend
 
+Code that's going away or will be unrecognizably refactored:
+
++ [`ConstraintSimplify`](src/Wumber/ConstraintSimplify.hs)
++ [`Cursor`](src/Wumber/Cursor.hs)
++ [`Element`](src/Wumber/Element.hs)
++ [`GeometricConstraints`](src/Wumber/GeometricConstraints.hs)
++ [`Symbolic`](src/Wumber/Symbolic.hs)
++ [`SymbolicAlgebra`](src/Wumber/SymbolicAlgebra.hs)
++ [`SymbolicDerivative`](src/Wumber/SymbolicDerivative.hs)
+
 Some places to start:
 
 + [`Wumber`](src/Wumber.hs): backend library
