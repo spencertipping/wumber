@@ -50,6 +50,7 @@ Some places to start:
 [hint]: https://hackage.haskell.org/package/hint
 
 [sym]: src/Wumber/SymMath.hs
+[sym0]: src/Wumber/Symbolic.hs
 [der]: src/Wumber/SymbolicDerivative.hs
 [jit]: src/Wumber/SymbolicJIT.hs
 [disk]: src/WumberShell/ComputedCache.hs
