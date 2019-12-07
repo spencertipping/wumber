@@ -1,12 +1,12 @@
-{-# LANGUAGE MonoLocalBinds #-}
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE TypeSynonymInstances #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE FunctionalDependencies #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE MonoLocalBinds #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE TypeSynonymInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
@@ -15,7 +15,6 @@
 --   then we take each of those and isolate/substitute variables, and finally we
 --   JIT a cost function with whichever variables remain and pass that to the
 --   GSL minimizer.
-
 module Wumber.Constraint where
 
 
@@ -50,6 +49,13 @@ type CVal f = Sym f R
 --   'Constrained' monad instances are both serializable and 'Fingerprintable'.
 --   This means you can build a @Computed (Constrained f a) _@ and Wumber will
 --   memoize it.
+
+-- TODO
+-- Rewrite constraint variables as we discover equivalence. This means we need
+-- to replace [] with something that does more active management.
+--
+-- I think we can replace ConstraintSimplify with an incremental approach,
+-- probably just Monoid.
 
 type Constrained f = RWS () [Either (VarID, R) (CVal f)] VarID
 
@@ -102,5 +108,5 @@ instance {-# OVERLAPPABLE #-} AlgConstraints f R => CEq f (CVal f) where
   (<-=) = set_below
 
 instance {-# OVERLAPPABLE #-} (Foldable f, CEq t a) => CEq t (f a) where
-  a =-= b = sum <$> (sequence $ zipWith (=-=) (toList a) (toList b))
-  a <-= b = sum <$> (sequence $ zipWith (<-=) (toList a) (toList b))
+  a =-= b = sum <$> sequence (zipWith (=-=) (toList a) (toList b))
+  a <-= b = sum <$> sequence (zipWith (<-=) (toList a) (toList b))
