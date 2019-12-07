@@ -32,6 +32,9 @@
 + [SINGULAR](https://github.com/Singular/Sources)
 + [Multivariate FFT-based polynomial multiplication](https://math.stackexchange.com/questions/2175774/multivariate-polynomial-multiplication-using-fast-fourier-transform-fft)
 + [Taylor series of √x](https://math.stackexchange.com/questions/1106344/taylor-series-for-sqrtx#1106350)
++ [Horner's method](https://en.wikipedia.org/wiki/Horner%27s_method)
++ [Fast Fourier transform](https://en.wikipedia.org/wiki/Fast_Fourier_transform)
++ [Goertzel algorithm](https://en.wikipedia.org/wiki/Goertzel_algorithm)
 
 
 ## Spline-oriented modeling
