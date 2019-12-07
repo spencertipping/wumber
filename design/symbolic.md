@@ -36,9 +36,29 @@ Not storing them means we don't have any space risk.
 `SymFn1` etc are good abstractions. I think we can merge even though they have
 different arities; those can become runtime failures.
 
-`Sym` won't own any control flow beyond `ifzpos(x, a, b)`, a derivative-closed
-way to calculate max and min.
+`Sym` won't own any control flow beyond `ifnn(x, a, b)`, a derivative-closed way
+to calculate max and min.
 
-`Sym` should be a `Functor` and work with `Storable` from a JIT perspective.
-Then `jacobian` can give us a `V3 (Sym R)`, which we can turn into a
-`V3 R -> V3 R`.
+
+## Use cases
+1. Constructing values, some of which refer to `var` quantities
+2. Fast algebraic constraint simplification
+3. Fast isofunction JIT
+4. Fast pre-JIT algebraic simplification, e.g. constant folding
+5. Symbolic differentiation
+6. Fast rewriting, e.g. "turn `var 0` into `var 2 + 5` and simplify"
+7. Fast linear subsystem simplification
+
+(2), (4), (6), and (7) are all similar problems: we want to avoid full _O(n)_
+scans and rewrite operations; statistically, most subnodes are likely not to
+interact with our variables.
+
+
+## Algebraic structure and normalization
+Generally speaking, we'll want to be able to normalize any expression after
+rewriting -- but only insofar as that normalization simplifies things related to
+that rewrite.
+
+For example, the rewrite `x -> y` in a form that doesn't mention `y` offers no
+new opportunities for simplification. I think we can observe this from the
+profile, which should be the same in each case.

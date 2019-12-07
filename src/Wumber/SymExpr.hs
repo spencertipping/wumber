@@ -85,7 +85,7 @@ data Sym p f a = SymV !VarID
                | SymF { _sym_fn   :: !f,
                         _sym_args :: !(V.Vector (Sym p f a)),
                         _sym_meta :: !(SymMeta p) }
-  deriving (Show, Generic)
+  deriving (Generic)
 
 
 -- | The way 'Sym' quantities refer to variables. For now this is 'Int' so that
@@ -100,6 +100,12 @@ data SymMeta p = SM { _sm_vars :: BS.BitSet,
                       _sm_size :: !Int }
   deriving (Show, Eq, Ord, Generic, Binary)
 
+
+instance (Show f, Show a) => Show (Sym p f a) where
+  show (SymV i) = "v" ++ show i
+  show (SymC x) = show x
+  show (SymF f xs _) = "(" ++ show f
+                       ++ concatMap ((" " ++) . show) (V.toList xs) ++ ")"
 
 instance Foldable (Sym p f) where
   foldr _ x (SymV _)      = x
@@ -240,6 +246,10 @@ sym_apply_cons f xs = SymF f v (SM b id p s)
 --
 --   Implementing profiles is optional; you can use @NoProfiles f@ if you don't
 --   want to go to the trouble.
+
+-- TODO
+-- These fundeps make it impossible to combine function types with Either. That
+-- seems wrong. Maybe just have profiles be Word64 and call it a day?
 
 class ProfileApply p f | p -> f, f -> p where
   prof_fn  :: f -> [p] -> p
