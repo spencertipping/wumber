@@ -54,6 +54,18 @@ scans and rewrite operations; statistically, most subnodes are likely not to
 interact with our variables.
 
 
+## FEA and differential equations
+I want to have electrical simulation back into constraint variables, and ideally
+yield differential equations for certain cases. It's unclear whether we should
+go with things like [Bhaskara's sine approximation][bsine] or whether we should
+use Taylor series and lean on polynomial algorithms.
+
+(Bhaskara's approximation is a rational over polynomial terms, which should be
+easy enough to work with.)
+
+[bsine]: https://en.wikipedia.org/wiki/Bhaskara_I%27s_sine_approximation_formula
+
+
 ## Algebraic structure and normalization
 Generally speaking, we'll want to be able to normalize any expression after
 rewriting -- but only insofar as that normalization simplifies things related to

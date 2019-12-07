@@ -1,4 +1,7 @@
 # Things I read and/or looked at to figure out how to write this
++ [General: why I use tau instead of pi](https://tauday.com/tau-manifesto)
+
+
 ## Numerical programming
 + [Wikipedia: GNU scientific library](https://en.wikipedia.org/wiki/GNU_Scientific_Library)
 + [GSL docs](https://www.gnu.org/software/gsl/doc/html/index.html)
@@ -19,6 +22,13 @@
 ## General solid modeling
 + [Wikipedia/solid modeling](https://en.wikipedia.org/wiki/Solid_modeling)
 + [StackOverflow: kdtrees vs octrees](https://cstheory.stackexchange.com/questions/8470/why-would-one-ever-use-an-octree-over-a-kd-tree)
+
+
+## Computer algebra systems
++ [Polynomial representation](https://ocw.mit.edu/courses/electrical-engineering-and-computer-science/6-046j-design-and-analysis-of-algorithms-spring-2015/lecture-notes/MIT6_046JS15_lec03.pdf)
++ [Vandermonde matrix](https://en.wikipedia.org/wiki/Vandermonde_matrix)
++ [Approximating the sine function](http://datagenetics.com/blog/july12019/index.html)
++ [PARI/GP](https://en.wikipedia.org/wiki/PARI/GP)
 
 
 ## Spline-oriented modeling
