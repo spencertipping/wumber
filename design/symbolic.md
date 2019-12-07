@@ -65,6 +65,9 @@ easy enough to work with.)
 
 [bsine]: https://en.wikipedia.org/wiki/Bhaskara_I%27s_sine_approximation_formula
 
+Maybe we support both polynomial and transcendental math as two separate
+backends.
+
 
 ## Algebraic structure and normalization
 Generally speaking, we'll want to be able to normalize any expression after

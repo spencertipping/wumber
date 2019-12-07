@@ -29,6 +29,9 @@
 + [Vandermonde matrix](https://en.wikipedia.org/wiki/Vandermonde_matrix)
 + [Approximating the sine function](http://datagenetics.com/blog/july12019/index.html)
 + [PARI/GP](https://en.wikipedia.org/wiki/PARI/GP)
++ [SINGULAR](https://github.com/Singular/Sources)
++ [Multivariate FFT-based polynomial multiplication](https://math.stackexchange.com/questions/2175774/multivariate-polynomial-multiplication-using-fast-fourier-transform-fft)
++ [Taylor series of √x](https://math.stackexchange.com/questions/1106344/taylor-series-for-sqrtx#1106350)
 
 
 ## Spline-oriented modeling
