@@ -1,3 +1,5 @@
+{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE DeriveAnyClass #-}
@@ -32,6 +34,16 @@
 --   Don't @import@ this module directly unless you're writing Wumber-internal
 --   code. Instead, import @Wumber@ to get relevant @Show@ instances and other
 --   helpful interfacing.
+
+-- TODO
+-- Fully defer to the function type for operand storage. The only requirement
+-- should be that we have a way to linearize the results.
+
+-- TODO
+-- Functions should opt into term reduction when they observe
+-- associative/commutative collapse. Let's keep profiles and use them to store
+-- things like polynomial term members, e.g. "[x², x, y³]". Then we'll know
+-- whether we need to expand distributively.
 
 module Wumber.SymExpr (
   Sym(..),
@@ -80,11 +92,15 @@ import qualified Wumber.BitSet as BS
 --   'Sym's compare first using the profile value, then using the fingerprint
 --   within that. This creates properties we can use in 'Wumber.AlgebraicSymFn'.
 
-data Sym p f a = SymV !VarID
-               | SymC !a
-               | SymF { _sym_fn   :: !f,
-                        _sym_args :: !(V.Vector (Sym p f a)),
-                        _sym_meta :: !(SymMeta p) }
+-- TODO
+-- What's the point of this abstraction when we could have the functions do all
+-- the work? It seems like all we get for this is inline _sym_meta, but that
+-- seems better handled by a new type of collection.
+
+data Sym (f :: * -> *) p a = SymV !VarID
+                           | SymC !a
+                           | SymF { _sym_fn   :: !(f (Sym f p a)),
+                                    _sym_meta :: !(SymMeta p) }
   deriving (Generic)
 
 
@@ -101,24 +117,23 @@ data SymMeta p = SM { _sm_vars :: BS.BitSet,
   deriving (Show, Eq, Ord, Generic, Binary)
 
 
-instance (Show f, Show a) => Show (Sym p f a) where
-  show (SymV i) = "v" ++ show i
-  show (SymC x) = show x
-  show (SymF f xs _) = "(" ++ show f
-                       ++ concatMap ((" " ++) . show) (V.toList xs) ++ ")"
+instance (Show (f (Sym f p a)), Show a) => Show (Sym f p a) where
+  show (SymV i)   = "v" ++ show i
+  show (SymC x)   = show x
+  show (SymF f _) = show f
 
-instance Foldable (Sym p f) where
+instance Foldable (Sym f p) where
   foldr _ x (SymV _)      = x
   foldr f x (SymC y)      = f y x
   foldr f x (SymF _ xs _) = foldr (flip $ foldr f) x xs
 
-instance (Fingerprintable f, Fingerprintable a) =>
-         Fingerprintable (Sym p f a) where
+instance (Fingerprintable (f (Sym f p a)), Fingerprintable a) =>
+         Fingerprintable (Sym f p a) where
   fingerprint (SymV v) = binary_fingerprint (False, binary_fingerprint v)
   fingerprint (SymC c) = binary_fingerprint (True,  fingerprint c)
   fingerprint (SymF _ _ (SM _ i _ _)) = i
 
-instance (Eq f, Eq a) => Eq (Sym p f a) where
+instance (Eq (f (Sym f p a)), Eq a) => Eq (Sym f p a) where
   SymV i                == SymV j                = i == j
   SymC a                == SymC b                = a == b
   SymF _ _ (SM _ i _ _) == SymF _ _ (SM _ j _ _) = i == j

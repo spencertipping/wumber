@@ -12,8 +12,18 @@
 
 {-# OPTIONS_GHC -funbox-strict-fields -Wincomplete-patterns #-}
 
--- | Wrapper types around 'Sym' that provide Haskell 'Num', 'Floating', and
---   other such support.
+-- | A @newtype@ around 'Sym' that provides Haskell 'Num', 'Floating', and other
+--   such support. You can construct 'SymMath' quantities using 'val' and 'var',
+--   e.g.
+--
+--   > x :: SymMath MathFn Double
+--   > x = var 0 ** 2 + 1
+--
+--   Not all math operators are supported. Unsupported operators will
+--   immediately throw a runtime error when used, regardless of the const-ness
+--   of your symbolic expression. To extract a constant as a non-symbolic
+--   quantity, use 'val_of'.
+
 module Wumber.SymMath (
   SymMath(..),
   SymMathC,
