@@ -38,10 +38,9 @@ import Data.Binary   (Binary)
 import Data.Foldable (foldl')
 import Data.Either   (lefts, rights)
 import Data.Function (on)
-import Data.List     (groupBy, intercalate, sort, sortOn)
+import Data.List     (groupBy, intercalate, partition, sort, sortOn)
 import Data.Maybe    (fromJust, isJust)
 import GHC.Generics  (Generic)
-import Lens.Micro    ((&))
 import Unsafe.Coerce (unsafeCoerce)
 
 import Wumber.ClosedComparable
@@ -113,7 +112,7 @@ instance (Show a, FnShow f) => Show (SymMath f a) where
 instance (MathFnC a, SymVal a a, Fingerprintable a,
           ProfileApply (MathProfile MathFn) MathFn) =>
          SymbolicApply (MathProfile MathFn) MathFn a where
-  sym_apply = sym_apply_foldwith math_sym_apply
+  sym_apply = sym_apply_foldwith fn
 
 instance MathFnC a => ValApply MathFn a where
   val_apply Add [] = 0
@@ -148,34 +147,42 @@ instance (MathFnC a, SymVal a a, Fingerprintable a) =>
 --   up front that each operand is normalized by the time we're 'sym_apply'ing
 --   something on top of it.
 
-math_sym_apply :: (Eq a, MathFnC a, Fingerprintable a, SymVal a a)
-               => MathFn
-               -> [Sym (MathProfile MathFn) MathFn a]
-               -> Sym (MathProfile MathFn) MathFn a
-math_sym_apply f xs = case (f, xs) of
-  (Negate, [x]) -> sym_apply Mul [x, val (-1)]
-  (Recip,  [x]) -> sym_apply Pow [x, val (-1)]
-  (Pow, [x, y]) -> sym_apply RPow [y, x]
+instance (Eq a, MathFnC a, Fingerprintable a, SymVal a a) =>
+         Functionable MathFn ([SymMath' MathFn a] -> SymMath' MathFn a) where
+  fn = \case
+    Negate -> \[x]    -> sym_apply Mul  [x, val (-1)]
+    Recip  -> \[x]    -> sym_apply Pow  [x, val (-1)]
+    Pow    -> \[x, y] -> sym_apply RPow [y, x]
 
-  (RPow, [SymC x, SymF RPow [SymC y, z] _]) -> sym_apply RPow [SymC (x*y), z]
-  (RPow, [x@(SymC _), y@(SymF Mul ys _)])   -> try_distribute RPow Mul x ys y
+    -- NOTE
+    -- RPow is more useful to us because it stores the exponent in head
+    -- position. That's consistent with the sort order for Add and Mul values,
+    -- so we can reuse factor-handling logic.
+    RPow -> \case
+      [x, SymF RPow [y, z] _] -> sym_apply RPow [sym_apply Mul [x, y], z]
+      --[x@(SymC _), y@(SymF Mul ys _)]   -> ambs [sym_apply_cons RPow [x, y],
+      --                                           distribute RPow Mul [x] ys]
+      [x, y] -> sym_apply_cons RPow [x, y]
+      _      -> error "RPow is strictly binary"
 
-  (Add, []) -> val 0
-  (Mul, []) -> val 1
-  (Add, xs) -> comm_assoc_fold Add Mul xs
-  (Mul, xs) -> comm_assoc_fold Mul RPow xs
-  _         -> sym_apply_cons f xs
+    Add -> \case [] -> val 0
+                 xs -> cons_or (val 0) Add $ comm_assoc_fold Add Mul xs
+
+    Mul -> \case [] -> val 1
+                 xs -> cons_or (val 1) Mul $ comm_assoc_fold Mul RPow xs
+
+    f -> sym_apply_cons f
 
 
 -- | Commutative, associative normalization with constant folding.
 comm_assoc_fold f g = term_collapse f g . commute_constants f . associative f
 
+cons_or v f xs | null xs   = v
+               | otherwise = sym_apply_cons f xs
+
 associative f = concatMap \case SymF f' xs _ | f' == f -> xs
                                 x                      -> [x]
 
-try_distribute f g x ys y = amb a b
-  where a = sym_apply_cons f [x, y]
-        b = sym_apply g $ map (sym_apply f . (x :) . (: [])) ys
 
 commute_constants :: (ValApply f a, SymVal a a)
                   => f -> [Sym p f a] -> [Sym p f a]
@@ -191,14 +198,11 @@ sum_subterms = filter ((/= 0) . snd)
                . map (\l@((x, _):_) -> (x, sum $ map snd l))
                . groupBy ((==) `on` fst)
 
-term_collapse f g xs | null ns   = val 0
-                     | otherwise = sym_apply_cons f ns
-  where ns = xs
-             & expand_subterms g
-             & sum_subterms
-             & map (\case ([x], 1) -> x
-                          (xs, v)  -> sym_apply g (val v : xs))
-             & sort
+term_collapse f g = sort
+                    . map (\case ([x], 1) -> x
+                                 (xs, v)  -> sym_apply g (val v : xs))
+                    . sum_subterms
+                    . expand_subterms g
 
 
 -- TODO

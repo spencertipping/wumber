@@ -54,6 +54,7 @@ module Wumber.SymExpr (
   SymLift(..),
   vars_in,
   amb,
+  ambs,
   tree_size,
   operands,
   profile,
@@ -183,6 +184,8 @@ vars_in (SymF _ _ (SM b _ _ _)) = b
 amb :: Sym p f a -> Sym p f a -> Sym p f a
 amb a b | tree_size a < tree_size b = a
         | otherwise                 = b
+
+ambs = foldl1 amb
 
 -- | Returns the total number of elements in the given tree: nodes and
 --   functions. When algebraic rewriting provides multiple representations, we
