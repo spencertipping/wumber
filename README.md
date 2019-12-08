@@ -56,7 +56,7 @@ have features that don't immediately relate to the project I'm working on.
 ## Code spelunking guide
 Things under active construction:
 
-+ [`Symbolic`][sym0] -> [`SymMath`][sym]: bugfixes and much better performance
++ [`SymMath`][sym]: bugfixes and much better performance
 + [`JITIR`][jitir]: faster compilation and better superscalar codegen
 + [`AMD64RE`][amdre]: on-the-fly processor profiling
 + [`AMD64JIT`][amdjit]: AMD64 JIT backend
@@ -67,19 +67,19 @@ Code that's going away or will be unrecognizably refactored:
 + [`Cursor`](src/Wumber/Cursor.hs)
 + [`Element`](src/Wumber/Element.hs)
 + [`GeometricConstraints`](src/Wumber/GeometricConstraints.hs)
-+ [`Symbolic`](src/Wumber/Symbolic.hs)
-+ [`SymbolicAlgebra`](src/Wumber/SymbolicAlgebra.hs)
-+ [`SymbolicDerivative`](src/Wumber/SymbolicDerivative.hs)
++ [`SymDerivative`](src/Wumber/SymbolicDerivative.hs)
 
 Some places to start:
 
 + [`Wumber`](src/Wumber.hs): backend library
   + [`Wumber.Model`](src/Wumber/Model.hs): all supported modeling domains
   + [`Wumber.SymMath`](src/Wumber/SymMath.hs): symbolic math expressions
-  + [`Wumber.SymbolicJIT`][jit]: JIT compilation for symbolic expressions
+  + [`Wumber.SymJIT`][jit]: JIT compilation for symbolic expressions
   + [`Wumber.Constraint`][const]: constraint specification DSL
   + [`Wumber.ConstraintSolver`][csolv]: algebraic + numerical solver
 + [`WumberShell`](src/WumberShell.hs): display and interactive reloading
+  + [`Wumber.Element`](src/Wumber/Element.hs): graphics we render (yes, they're
+    in the wrong namespace)
 
 [ic]: http://implicitcad.org
 [ss]: http://solvespace.com/index.pl
@@ -90,9 +90,8 @@ Some places to start:
 [oscad]: https://en.wikipedia.org/wiki/OpenSCAD
 
 [sym]: src/Wumber/SymMath.hs
-[sym0]: src/Wumber/Symbolic.hs
-[der]: src/Wumber/SymbolicDerivative.hs
-[jit]: src/Wumber/SymbolicJIT.hs
+[der]: src/Wumber/SymDerivative.hs
+[jit]: src/Wumber/SymJIT.hs
 [disk]: src/WumberShell/ComputedCache.hs
 [jitir]: src/Wumber/JITIR.hs
 [amdre]: src/Wumber/AMD64RE.hs

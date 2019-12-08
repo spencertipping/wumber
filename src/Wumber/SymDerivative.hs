@@ -5,7 +5,7 @@
 -- | TODO
 --   Actually implement this. Right now it's @(f(a + δ) - f(a - δ)) / 2δ@, which
 --   works fine for a lot of things but isn't optimal.
-module Wumber.SymbolicDerivative where
+module Wumber.SymDerivative where
 
 
 import Data.IntMap (IntMap, fromList)

@@ -13,7 +13,7 @@
 -- | Algebraic simplification/rewriting for 'SymMath' quantities. The most
 --   important operation here is 'isolate', which attempts to isolate a variable
 --   within an equation.
-module Wumber.SymbolicAlgebra (
+module Wumber.SymAlgebra (
   isolate,
   Invertible(..)
 ) where

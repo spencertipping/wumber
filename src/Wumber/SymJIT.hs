@@ -1,7 +1,6 @@
-{-# LANGUAGE MonoLocalBinds #-}
-{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE CPP #-}
+{-# LANGUAGE FlexibleContexts #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
@@ -14,7 +13,7 @@
 --
 --   TODO: provide a bytecode interpreter to make the fallback case less awful
 
-module Wumber.SymbolicJIT (
+module Wumber.SymJIT (
   is_jit_supported,
   jit_as_machinecode,
   jit
@@ -22,10 +21,11 @@ module Wumber.SymbolicJIT (
 
 
 import System.IO.Unsafe (unsafePerformIO)
-import qualified Data.ByteString      as BS
-import qualified Data.Vector.Storable as VS
 
 import Wumber.VectorConversion
+
+import qualified Data.ByteString      as BS
+import qualified Data.Vector.Storable as VS
 
 
 #if __amd64__ || __amd64 || __x86_64__ || __x86_64
@@ -49,13 +49,13 @@ import Wumber.SymMath
 --   given 'Arg' state vector. In general, 'jit sym v == eval (v !) sym', but
 --   'jit' will usually be faster if JIT is supported for your platform. You can
 --   use 'is_jit_supported' to determine this.
-jit :: (AlgConstraints f R, VectorConversion v (VS.Vector R))
-    => Sym f R -> v -> R
+jit :: (SymMathC f R, VectorConversion v (VS.Vector R))
+    => SymMath f R -> v -> R
 
 
 -- | Compiles a 'Sym' expression to machine code, but doesn't coerce that code
 --   to a function pointer.
-jit_as_machinecode :: AlgConstraints f R => Sym f R -> BS.ByteString
+jit_as_machinecode :: SymMathC f R => SymMath f R -> BS.ByteString
 
 
 -- | Returns 'True' if we support JIT on the platform being compiled. You can
@@ -68,7 +68,7 @@ is_jit_supported :: Bool
 
 is_jit_supported = True
 
-jit_as_machinecode sym = assemble_graph (PM 10) $ thread sym
+jit_as_machinecode = assemble_ir . compile . unMath
 
 jit sym = unsafePerformIO do
   f <- compile_machinecode dblfn (jit_as_machinecode sym)
