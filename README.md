@@ -3,16 +3,20 @@
 
 **Work in progress: don't trust CI output**
 
-Wumber will be a programmatic CAD DSL for Haskell. The focus is on multidomain
-modeling: you describe the thing you're designing as Haskell data structures,
-then have your model implement Wumber typeclasses to project it into views, FEA
-simulations, constraint spaces, etc.
+Wumber will be a programmatic CAD library for Haskell. The focus is on
+multidomain modeling: you describe the thing you're designing as Haskell data
+structures, then have your model implement Wumber typeclasses to project it into
+views, FEA simulations, constraint spaces, etc. My goal is to be able to have
+simulations that cross domains: e.g. simulate mechanical and thermal output for
+a given workload with respect to the microcontroller pins that drive a motor
+controller.
 
-Wumber takes a lot from [colah's ImplicitCAD][ic] and [SolveSpace][ss]: it uses
-[F-Rep][fr] with [dual contouring][dc] to compute boundary meshes, and both
-isofunctions and constraint sets are described with [symbolic math][sym] that
-provides [automatic differentiation][der] and backs into [JIT-compiled
-functions][jit] for numerical steps.
+From a mechanical engineering perspective, Wumber takes a lot from [colah's
+ImplicitCAD][ic] and [SolveSpace][ss]: it uses [F-Rep][fr] with [dual
+contouring][dc] to compute boundary meshes, and both isofunctions and constraint
+sets are described with [symbolic math][sym] that provides [automatic
+differentiation][der] and backs into [JIT-compiled functions][jit] for numerical
+steps.
 
 Wumber is designed to be fast enough for interactive use, even for large
 designs. Expensive steps are [cached to disk][disk] for reuse, and Wumber
@@ -22,9 +26,15 @@ faster than compiled GHC (I assume because it avoids all memory allocation and
 function calls) -- and that's without any support for SSE vector intrinsics or
 AVX.
 
+More importantly than interaction, though, I want Wumber to scale well enough
+that you can use it for computational optimization. For example, I'd like to be
+able to have it derive a part that satisfies a series of mechanical load
+specifications and minimizes manufacturing cost or weight, based on iterated FEA
+and process simulation.
+
 + [Dev channel](https://dev.spencertipping.com/channel/wumber)
-+ [What I'm reading to build this.](reading.md)
-+ [Here's what I'm working on.](frontier.md)
++ [What I'm reading to build this.](design/reading.md)
++ [Here's what I'm working on.](design/frontier.md)
 
 
 ## What Wumber isn't

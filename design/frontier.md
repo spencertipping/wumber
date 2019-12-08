@@ -43,8 +43,8 @@
 + Sym compiler/algebra
   + Symbolic derivatives
   + Tree traversal for new Sym library
-  + Lensing/traversal by profile
-  + `AlgebraicFunctionable`
+  + Lensing/traversal by profile?
+  + ~~`AlgebraicFunctionable`~~ ... walk this back
   + Generalized normal form collection
 + Assembler
   + Multi-branch assembly with conditionals

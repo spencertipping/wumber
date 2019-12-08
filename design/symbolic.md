@@ -40,6 +40,18 @@ different arities; those can become runtime failures.
 to calculate max and min.
 
 
+## Short-term roadmap
+I want to get things working enough to implement some FEA domains, so let's get
+`SymExpr` to an MVP.
+
+1. Roll back functions-as-containers and use `sym_apply` to locally normalize
+   polynomial terms. Let's have `sym_apply` do some input checking.
+2. Apply simple inverses and try poly-expanding any bivariant terms.
+3. Redo `ConstraintSimplify` to work incrementally.
+4. Implement symbolic partial derivatives.
+5. Port JIT stuff, adding vector-output support.
+
+
 ## Use cases
 1. Constructing values, some of which refer to `var` quantities
 2. Fast algebraic constraint simplification
@@ -52,6 +64,14 @@ to calculate max and min.
 (2), (4), (6), and (7) are all similar problems: we want to avoid full _O(n)_
 scans and rewrite operations; statistically, most subnodes are likely not to
 interact with our variables.
+
+I think we care about term normalization for only two purposes:
+
+1. To simplify fictitious complexity from polynomial subtraction/division
+2. To enable specific optimizations for JIT
+
+In every other case, including for most function inversion, we should be able to
+use un-normalized expressions.
 
 
 ## FEA and differential equations
