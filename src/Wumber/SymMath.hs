@@ -1,11 +1,10 @@
-{-# LANGUAGE StandaloneDeriving #-}
-{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
@@ -71,19 +70,13 @@ data SymMathPhantom
 
 type SymMath' f = Sym (MathProfile f) f
 
+-- | Class constraints that make most 'SymMath' things work.
 type SymMathC f a = (MathFnC a,
-                     SymLift a (SymMath f a),
-                     Rewritable (SymMath f a),
+                     SymbolicApply (MathProfile f) f a,
                      MathApply a (SymMath f a))
 
 -- TODO: support real profiles
 type MathProfile f = NoProfiles f
-
-
--- | A way to indicate that a symbolic quantity is acting as a vector function.
---   For example, @SymV V3 MathFn R@ should refer to vars 0, 1, and 2.
-newtype SymMathV (v :: * -> *) f a = SymMathV { unSymMathV :: SymMath f a }
-  deriving (Show, Eq, Generic, Binary)
 
 
 instance Rewritable (SymMath' f a) =>
@@ -111,6 +104,11 @@ c_ = val (Math (As 2)) :: SymMath f (Match a)
 d_ = val (Math (As 3)) :: SymMath f (Match a)
 
 
+-- | A way to indicate that a symbolic quantity is acting as a vector function.
+--   For example, @SymV V3 MathFn R@ should refer to vars 0, 1, and 2.
+newtype SymMathV (v :: * -> *) f a = SymMathV { unSymMathV :: SymMath f a }
+  deriving (Show, Eq, Generic, Binary)
+
 v2 :: SymMathC f a => V2 (SymMath f a)
 v2 = V2 (var 0) (var 1)
 
@@ -120,6 +118,8 @@ v3 = V3 (var 0) (var 1) (var 2)
 v4 :: SymMathC f a => V4 (SymMath f a)
 v4 = V4 (var 0) (var 1) (var 2) (var 3)
 
+-- | The class of vector spaces that can enumerate their dimensions in terms of
+--   'Sym' variables and IDs. This is used by 'SymbolicDerivative'.
 class SymVars (v :: * -> *) where
   vars :: SymMathC f a => v (SymMath f a)
   var_ids :: v VarID
