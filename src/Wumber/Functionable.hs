@@ -1,8 +1,11 @@
+{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 
@@ -159,3 +162,30 @@ instance MathFnC a => Functionable MathFn (Maybe (a -> a -> a)) where
 instance MathFnC a => Functionable MathFn (Maybe (a -> a -> a -> a)) where
   fn IfNN = Just \x a b -> if x >= 0 then a else b
   fn _    = Nothing
+
+
+-- | Semi-automatic Haskell math derivation for stuff. Implementing all of the
+--   instance functions by hand is a lot of work, so let's factor it all into a
+--   @newtype@ instead.
+newtype Math a b = Math { unMath :: a }
+  deriving (Eq, Ord, Generic, Binary)
+
+instance Show a => Show (Math a b) where show (Math x) = show x
+
+class MathApply a where
+  fn1 :: MathFn -> a -> a
+  fn2 :: MathFn -> a -> a -> a
+
+
+fn1' f x   = Math $ fn1 f (unMath x)
+fn2' f x y = Math $ fn2 f (unMath x) (unMath y)
+
+instance (MathApply a, MathFnC a) => Num (Math a b) where
+  fromInteger = Math . fromInteger
+  (+)    = fn2' Add
+  (*)    = fn2' Mul
+  negate = fn1' Negate
+  signum = fn1' Signum
+  abs    = fn1' Abs
+
+-- TODO: the rest of these

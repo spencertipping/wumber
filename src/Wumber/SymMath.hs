@@ -66,15 +66,6 @@ type SymMathC f a = (Fingerprintable a,
                      Fractional a,
                      Floating a)
 
--- | A marker type to indicate that a value can be subject to 'ValApply' within
---   a math context. Most values are, but pattern-matching terms aren't.
-
--- TODO
--- This is wrong. We really do need a runtime partial-function thing to figure
--- out whether to val_apply stuff.
-newtype Val a = V { unV :: a }
-  deriving (Eq, Ord, Generic, Binary)
-
 
 -- | Promotes a value into a 'SymMath' expression.
 val = SM . sym_val
@@ -117,16 +108,11 @@ instance (Show a, FnShow f) => Show (SymMath f a) where
 
   show (SM (SymF f xs _)) = fshow f $ map (show . SM) $ V.toList xs
 
-instance (Fingerprintable (Constant a),
-          MathFnC (Constant a),
-          ProfileApply (MathProfile MathFn) MathFn) =>
-         SymbolicApply (MathProfile MathFn) MathFn (Constant a) where
-  sym_apply = sym_apply_foldwith math_sym_apply
-
 instance (Fingerprintable a,
+          MathFnC a,
           ProfileApply (MathProfile MathFn) MathFn) =>
-         SymbolicApply (MathProfile MathFn) MathFn (Match a) where
-  sym_apply = math_sym_apply
+         SymbolicApply (MathProfile MathFn) MathFn a where
+  sym_apply = sym_apply_foldwith math_sym_apply
 
 instance MathFnC a => ValApply MathFn a where
   val_apply mf [x]    | Just f <- fn mf = f x

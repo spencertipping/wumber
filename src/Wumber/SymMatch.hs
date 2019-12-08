@@ -34,9 +34,8 @@ instance Show a => Show (Match a) where
 
 -- | Matches a pattern against an expression and returns the subexpressions
 --   bound by 'As' terminals.
-match :: (Eq a, Eq f,
-          Fingerprintable f, Fingerprintable a, Fingerprintable (t a))
-      => Sym p f (Match a) -> Sym p f (t a) -> Maybe [Sym p f (t a)]
+match :: (Eq a, Eq f, Fingerprintable f, Fingerprintable a)
+      => Sym p f (Match a) -> Sym p f a -> Maybe [Sym p f a]
 match p e = V.toList <$> (V.generate (match_nvars p) undefined V.//) <$> go p e
   where go a b | fingerprint a == fingerprint b = Just []
         go (SymC (As i)) x                      = Just [(i, x)]
