@@ -51,8 +51,7 @@ module Wumber.SymExpr (
   SymMeta,
   VarID,
   SymVal(..),
-  sym_val,
-  sym_var,
+  SymLift(..),
   vars_in,
   amb,
   tree_size,
@@ -65,7 +64,7 @@ module Wumber.SymExpr (
   sym_apply_cons,
 
   ProfileApply(..),
-  NoProfiles,
+  NoProfiles(..),
 
   ValApply(..),
 ) where
@@ -87,8 +86,8 @@ import qualified Wumber.BitSet as BS
 --   @p@ as profiles (profiles are used by @f@ to optimize pattern matching; see
 --   below).
 --
---   Don't construct 'Sym' instances by hand; instead, use 'sym_var', 'sym_val',
---   and 'SymbolicApply'. This will build consistent 'SymMeta' objects for you.
+--   Don't construct 'Sym' instances by hand; instead, use 'var', 'val', and
+--   'SymbolicApply'. This will build consistent 'SymMeta' objects for you.
 --
 --   'Sym's compare first using the profile value, then using the fingerprint
 --   within that. This creates properties we can use in 'Wumber.AlgebraicSymFn'.
@@ -156,13 +155,14 @@ instance (Ord f, Ord a, Ord p, ProfileApply p f) => Ord (Sym p f a) where
   SymF _ _ (SM _ i p _) `compare` SymF _ _ (SM _ j q _) = compare (p, i) (q, j)
 
 
--- | Promotes a constant into a symbolic value.
-sym_val :: a -> Sym p f a
-sym_val = SymC
+-- | Promotes a constant or variable into a symbolic value.
+class SymLift a s | s -> a where
+  val :: a -> s
+  var :: VarID -> s
 
--- | Returns a symbolic quantity referring to the given indexed variable.
-sym_var :: VarID -> Sym p f a
-sym_var = SymV
+instance SymLift a (Sym p f a) where
+  val = SymC
+  var = SymV
 
 
 -- | The class of symbolic things that can sometimes be reduced to non-symbolic
@@ -220,13 +220,8 @@ class (Fingerprintable a, ProfileApply p f) => SymbolicApply p f a where
 -- | A generalized way to add constant folding to a tree-consing function. We
 --   use this generality when we introduce algebraic normalization in
 --   'Wumber.AlgebraicSymFn'.
-sym_apply_foldwith :: (Fingerprintable f, Fingerprintable (Sym p f b),
-                       SymVal (Sym p f a) b,
-                       ProfileApply p f, ValApply f b)
-                   => (f -> [Sym p f a] -> Sym p f b)
-                   -> f -> [Sym p f a] -> Sym p f b
 sym_apply_foldwith cons f xs
-  | all isJust vs = sym_val $ val_apply f $ map fromJust vs
+  | all isJust vs = val $ val_apply f $ map fromJust vs
   | otherwise     = cons f xs
   where vs = map val_of xs
 
@@ -263,11 +258,6 @@ class ProfileApply p f | p -> f, f -> p where
 -- | A type you can use to bypass profile calculation. If you don't
 --   pattern-match against 'Sym' quantities, this probably makes sense.
 newtype NoProfiles f = NP () deriving (Show, Eq, Ord)
-
-instance ProfileApply (NoProfiles f) f where
-  prof_fn  _ _ = NP ()
-  prof_val     = NP ()
-  prof_var     = NP ()
 
 
 -- | The class of functions that can be applied to values of type @a@, yielding

@@ -17,10 +17,11 @@
 module Wumber.SymMatch where
 
 
-import Data.Binary  (Binary)
-import Data.Maybe   (fromJust, isJust)
-import Data.Vector  (Vector)
-import GHC.Generics (Generic)
+import Data.Binary   (Binary)
+import Data.Foldable (foldr')
+import Data.Maybe    (fromJust, isJust)
+import Data.Vector   (Vector)
+import GHC.Generics  (Generic)
 
 import qualified Data.Vector as V
 
@@ -62,6 +63,10 @@ match p e = V.toList <$> (V.generate (match_nvars p) undefined V.//) <$> go p e
 
 -- | Returns a profile-matching predicate function from a pattern. The profile
 --   match will usually be much faster than tree-scanning.
+
+-- TODO: what's the strategy here unless we know it's Bits and we know the
+-- layout? Profile doesn't give us enough information to know how to select
+-- specific pieces ... yet.
 pattern_to_profile :: ProfileApply p f => Sym p f (Match a) -> p -> Bool
 pattern_to_profile _ = error "TODO"
 
@@ -80,8 +85,8 @@ pattern_of cons (SymF f xs _) = cons f $ map (pattern_of cons) $ V.toList xs
 
 
 match_nvars :: Sym p f (Match a) -> VarID
-match_nvars = (1 +) . flip foldr (-1) \case Math (As v) -> max v
-                                            Math (Is a) -> id
+match_nvars = (1 +) . flip foldr' (-1) \case Math (As v) -> max v
+                                             Math (Is a) -> id
 
 
 -- | This instance deserves some explanation.

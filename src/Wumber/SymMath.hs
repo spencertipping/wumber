@@ -28,7 +28,9 @@ module Wumber.SymMath (
   SymMath(..),
   val,
   var,
-  val_of
+  val_of,
+  x_, y_, z_, t_,
+  a_, b_, c_, d_,
 ) where
 
 
@@ -59,18 +61,29 @@ data SymMathPhantom
 -- TODO: support real profiles
 type MathProfile f = NoProfiles f
 
+instance ProfileApply (MathProfile MathFn) MathFn where
+  prof_val    = NP ()
+  prof_var    = NP ()
+  prof_fn _ _ = NP ()
 
--- | Promotes a value into a 'SymMath' expression.
-val = Math . sym_val
+instance SymLift a (Sym (MathProfile f) f a) => SymLift a (SymMath f a) where
+  val = Math . val
+  var = Math . var
 
--- | Constructs a 'SymMath' expression that refers to a variable. Variables 0-3
---   are aliased as 'x_', 'y_', 'z_', and 't_' respectively.
-var = Math . sym_var
+x_ :: SymMath f a
+y_ :: SymMath f a
+z_ :: SymMath f a
+t_ :: SymMath f a
 
 x_ = var 0          -- ^ An alias for @var 0@
 y_ = var 1          -- ^ An alias for @var 1@
 z_ = var 2          -- ^ An alias for @var 2@
 t_ = var 3          -- ^ An alias for @var 3@
+
+a_ :: SymMath f (Match a)
+b_ :: SymMath f (Match a)
+c_ :: SymMath f (Match a)
+d_ :: SymMath f (Match a)
 
 a_ = val (Math $ As 0)
 b_ = val (Math $ As 1)
@@ -82,6 +95,13 @@ instance SymVal a b => SymVal (SymMath f a) b where val_of = val_of . unMath
 instance SymVal Double Double where val_of = Just
 instance SymVal Float  Float  where val_of = Just
 
+-- NOTE
+-- This is squirrelly. I'm doing this so we can get floating-point mod, but this
+-- implementation is arguably wrong (see discussion on the 'qr' function in
+-- MathFn).
+instance Integral Double where toInteger = truncate; quotRem = qr
+instance Integral Float  where toInteger = truncate; quotRem = qr
+
 
 -- | A basic 'sym_apply' implementation for math functions.
 math_sym_apply :: (Num a, Fingerprintable a)
@@ -92,8 +112,8 @@ math_sym_apply :: (Num a, Fingerprintable a)
 math_sym_apply Negate [SymF Negate xs _] = xs ! 0
 math_sym_apply Recip  [SymF Recip  xs _] = xs ! 0
 
-math_sym_apply Add [] = sym_val 0
-math_sym_apply Mul [] = sym_val 1
+math_sym_apply Add [] = val 0
+math_sym_apply Mul [] = val 1
 
 math_sym_apply f xs = sym_apply_cons f xs
 
@@ -122,10 +142,6 @@ instance MathFnC a => ValApply MathFn a where
   val_apply mf (x:xs) | Just f <- fn mf = foldl' f x xs
   val_apply mf xs = error $ "can't apply " ++ show mf
                     ++ " to list of arity " ++ show (length xs)
-
-
-instance Integral Double where toInteger = truncate; quotRem = qr
-instance Integral Float  where toInteger = truncate; quotRem = qr
 
 
 instance (MathFnC a, SymVal a a, Fingerprintable a) =>
