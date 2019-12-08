@@ -64,7 +64,7 @@ data MathFn = Add | Negate              -- binary functions
 
 -- | The set of constraints we need for math functions to be able to operate on
 --   concrete values. This is used in 'Wumber.SymMath'.
-type MathFnC a = (Num a, Fractional a, Integral a, Floating a, RealFloat a)
+type MathFnC a = (Show a, Num a, Fractional a, Integral a, Floating a, RealFloat a)
 
 instance Fingerprintable MathFn where fingerprint = binary_fingerprint
 

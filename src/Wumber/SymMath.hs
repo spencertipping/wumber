@@ -38,8 +38,8 @@ import Data.Binary   (Binary)
 import Data.Foldable (foldl')
 import Data.Either   (lefts, rights)
 import Data.Function (on)
-import Data.List     (groupBy, intercalate, partition, sort, sortOn)
-import Data.Maybe    (fromJust, isJust)
+import Data.List     (find, groupBy, intercalate, partition, sort, sortOn)
+import Data.Maybe    (catMaybes, fromJust, fromMaybe, isJust)
 import GHC.Generics  (Generic)
 import Unsafe.Coerce (unsafeCoerce)
 
@@ -49,6 +49,8 @@ import Wumber.Functionable
 import Wumber.MathFn
 import Wumber.SymExpr
 import Wumber.SymMatch
+
+import Debug.Trace
 
 
 -- | Symbolic math expressions. Structurally identical to 'Sym', but typed to
@@ -160,16 +162,16 @@ instance (Eq a, MathFnC a, Fingerprintable a, SymVal a a) =>
     -- so we can reuse factor-handling logic.
     RPow -> \case
       [x, SymF RPow [y, z] _] -> sym_apply RPow [sym_apply Mul [x, y], z]
-      --[x@(SymC _), y@(SymF Mul ys _)]   -> ambs [sym_apply_cons RPow [x, y],
-      --                                           distribute RPow Mul [x] ys]
       [x, y] -> sym_apply_cons RPow [x, y]
       _      -> error "RPow is strictly binary"
 
-    Add -> \case [] -> val 0
-                 xs -> cons_or (val 0) Add $ comm_assoc_fold Add Mul xs
+    Add -> \case []  -> val 0
+                 [x] -> x
+                 xs  -> cons_or (val 0) Add $ comm_assoc_fold Add Mul xs
 
-    Mul -> \case [] -> val 1
-                 xs -> cons_or (val 1) Mul $ comm_assoc_fold Mul RPow xs
+    Mul -> \case []  -> val 1
+                 [x] -> x
+                 xs  -> try_distribute Mul Add $ comm_assoc_fold Mul RPow xs
 
     f -> sym_apply_cons f
 
@@ -184,25 +186,42 @@ associative f = concatMap \case SymF f' xs _ | f' == f -> xs
                                 x                      -> [x]
 
 
+-- | Distributive expansion for specific sub-operators. Operationally, we apply
+--   this transformation:
+--
+--   > (f (g x y z) (g a b) c) -> (g (f x (g a b)) (f x c) (f y (g a b)) ...)
+
+distribute f g xs = catMaybes $ flip map xs \case
+  t@(SymF f' ys _) | f' == g -> Just $ sym_apply g [sym_apply f [x, y] |
+                                                    x <- xs, y <- ys, x /= t]
+  _ -> Nothing
+
+try_distribute f g xs = ambs $ sym_apply_cons f xs : take 1 (distribute f g xs)
+
+
 commute_constants :: (ValApply f a, SymVal a a)
                   => f -> [Sym p f a] -> [Sym p f a]
 commute_constants f xs = SymC (val_apply f $ rights es) : lefts es
   where es = flip map xs \case x | Just v <- val_of x -> Right v
                                x                      -> Left x
 
-expand_subterms f = sortOn fst . map
-  \case SymF f' (SymC v : xs) _ | f' == f -> (xs,  v)
-        x                                 -> ([x], 1)
-
-sum_subterms = filter ((/= 0) . snd)
-               . map (\l@((x, _):_) -> (x, sum $ map snd l))
-               . groupBy ((==) `on` fst)
-
 term_collapse f g = sort
-                    . map (\case ([x], 1) -> x
-                                 (xs, v)  -> sym_apply g (val v : xs))
+                    . catMaybes
+                    . map (\case (_,   0)    -> Nothing
+                                 ([SymC 0], _) -> Nothing
+                                 ([x], 1)    -> Just x
+                                 (xs,  1)    -> Just $ sym_apply g xs
+                                 (xs,  v)    -> Just $ sym_apply g (val v : xs))
                     . sum_subterms
                     . expand_subterms g
+
+  where expand_subterms f = sortOn fst . map
+          \case SymF f' (SymC v : xs) _ | f' == f -> (xs,  v)
+                SymF f' xs            _ | f' == f -> (xs,  1)
+                x                                 -> ([x], 1)
+
+        sum_subterms = map (\l@((x, _):_) -> (x, sum $ map snd l))
+                       . groupBy ((==) `on` fst)
 
 
 -- TODO
