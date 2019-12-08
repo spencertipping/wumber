@@ -1,3 +1,4 @@
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE DeriveAnyClass #-}
@@ -58,6 +59,8 @@ module Wumber.SymExpr (
   tree_size,
   operands,
   profile,
+  Rewritable(..),
+  (//),
 
   SymbolicApply(..),
   sym_apply_foldwith,
@@ -73,11 +76,13 @@ module Wumber.SymExpr (
 
 import Data.Binary   (Binary)
 import Data.Foldable (foldl', toList)
-import Data.Maybe    (fromJust, isJust)
+import Data.IntMap   (IntMap)
+import Data.Maybe    (fromJust, fromMaybe, isJust)
 import GHC.Generics  (Generic)
 
 import Wumber.Fingerprint
 
+import qualified Data.IntMap   as IM
 import qualified Wumber.BitSet as BS
 
 
@@ -102,7 +107,7 @@ data Sym p f a = SymV !VarID
                | SymF { _sym_fn   :: !f,
                         _sym_args :: ![Sym p f a],
                         _sym_meta :: !(SymMeta p) }
-  deriving (Generic)
+  deriving (Generic, Binary)
 
 
 -- | The way 'Sym' quantities refer to variables. For now this is 'Int' so that
@@ -172,6 +177,21 @@ instance SymVal a b => SymVal (Sym p f a) b where
   val_of _        = Nothing
 
 
+-- | The class of things that can be rewritten with other things.
+class Rewritable a where rewrite :: a -> (BS.BitSet, IntMap a) -> a
+instance SymbolicApply p f a => Rewritable (Sym p f a) where
+  rewrite v@(SymV i) (mb, mv) = fromMaybe v $ mv IM.!? i
+  rewrite v@(SymF f xs (SM b _ _ _)) r@(mb, mv)
+    | BS.null (BS.intersect mb b) = v
+    | otherwise                   = sym_apply f $ map (flip rewrite r) xs
+  rewrite x _ = x
+
+
+infixl 4 //
+(//) :: Rewritable a => a -> [(Int, a)] -> a
+v // xs = rewrite v (BS.fromList $ map fst xs, IM.fromList xs)
+
+
 -- | Returns the set of variables referred to by the given tree.
 vars_in :: Sym p f a -> BS.BitSet
 vars_in (SymV i) = BS.singleton i
@@ -186,6 +206,7 @@ amb a b | tree_size a < tree_size b = a
         | otherwise                 = b
 
 ambs = foldl1 amb
+
 
 -- | Returns the total number of elements in the given tree: nodes and
 --   functions. When algebraic rewriting provides multiple representations, we
@@ -222,9 +243,11 @@ class (Fingerprintable a, ProfileApply p f) => SymbolicApply p f a where
 --   use this generality when we introduce algebraic normalization in
 --   'Wumber.AlgebraicSymFn'.
 sym_apply_foldwith cons f xs
-  | all isJust vs = val $ val_apply f $ map fromJust vs
-  | otherwise     = cons f xs
+  | all isJust vs                            = val $ val_apply f $ map fromJust vs
+  | SymF f' xs' _ <- y, f' /= f || xs' /= xs = sym_apply f' xs'
+  | otherwise                                = y
   where vs = map val_of xs
+        y  = cons f xs
 
 -- | Apply a function to symbolic quantities with constant folding.
 sym_apply_fold = sym_apply_foldwith sym_apply_cons
@@ -257,7 +280,7 @@ class ProfileApply p f | p -> f, f -> p where
 
 -- | A type you can use to bypass profile calculation. If you don't
 --   pattern-match against 'Sym' quantities, this probably makes sense.
-newtype NoProfiles f = NP () deriving (Show, Eq, Ord)
+newtype NoProfiles f = NP () deriving (Show, Eq, Ord, Generic, Binary)
 
 
 -- | The class of functions that can be applied to values of type @a@, yielding

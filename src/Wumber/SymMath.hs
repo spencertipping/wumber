@@ -1,3 +1,5 @@
+{-# LANGUAGE StandaloneDeriving #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
@@ -26,6 +28,10 @@
 
 module Wumber.SymMath (
   SymMath(..),
+  SymMathC,
+  SymMathV(..),
+  SymVars(..),
+  v2, v3, v4,
   val,
   var,
   val_of,
@@ -34,13 +40,16 @@ module Wumber.SymMath (
 ) where
 
 
-import Data.Binary   (Binary)
+import Data.Binary   (Binary(..))
 import Data.Foldable (foldl')
 import Data.Either   (lefts, rights)
 import Data.Function (on)
 import Data.List     (find, groupBy, intercalate, partition, sort, sortOn)
 import Data.Maybe    (catMaybes, fromJust, fromMaybe, isJust)
 import GHC.Generics  (Generic)
+import Linear.V2     (V2(..))
+import Linear.V3     (V3(..))
+import Linear.V4     (V4(..))
 import Unsafe.Coerce (unsafeCoerce)
 
 import Wumber.ClosedComparable
@@ -50,7 +59,8 @@ import Wumber.MathFn
 import Wumber.SymExpr
 import Wumber.SymMatch
 
-import Debug.Trace
+import qualified Data.IntMap   as IM
+import qualified Wumber.BitSet as BS
 
 
 -- | Symbolic math expressions. Structurally identical to 'Sym', but typed to
@@ -61,8 +71,25 @@ data SymMathPhantom
 
 type SymMath' f = Sym (MathProfile f) f
 
+type SymMathC f a = (MathFnC a,
+                     SymLift a (SymMath f a),
+                     Rewritable (SymMath f a),
+                     MathApply a (SymMath f a))
+
 -- TODO: support real profiles
 type MathProfile f = NoProfiles f
+
+
+-- | A way to indicate that a symbolic quantity is acting as a vector function.
+--   For example, @SymV V3 MathFn R@ should refer to vars 0, 1, and 2.
+newtype SymMathV (v :: * -> *) f a = SymMathV { unSymMathV :: SymMath f a }
+  deriving (Show, Eq, Generic, Binary)
+
+
+instance Rewritable (SymMath' f a) =>
+         Rewritable (SymMath f a) where
+  rewrite (Math v) (mb, mv) = Math $ rewrite v (mb, IM.map unMath mv)
+
 
 instance ProfileApply (MathProfile MathFn) MathFn where
   prof_val    = NP ()
@@ -82,6 +109,24 @@ a_ = val (Math (As 0)) :: SymMath f (Match a)
 b_ = val (Math (As 1)) :: SymMath f (Match a)
 c_ = val (Math (As 2)) :: SymMath f (Match a)
 d_ = val (Math (As 3)) :: SymMath f (Match a)
+
+
+v2 :: SymMathC f a => V2 (SymMath f a)
+v2 = V2 (var 0) (var 1)
+
+v3 :: SymMathC f a => V3 (SymMath f a)
+v3 = V3 (var 0) (var 1) (var 2)
+
+v4 :: SymMathC f a => V4 (SymMath f a)
+v4 = V4 (var 0) (var 1) (var 2) (var 3)
+
+class SymVars (v :: * -> *) where
+  vars :: SymMathC f a => v (SymMath f a)
+  var_ids :: v VarID
+
+instance SymVars V2 where vars = v2; var_ids = V2 0 1
+instance SymVars V3 where vars = v3; var_ids = V3 0 1 2
+instance SymVars V4 where vars = v4; var_ids = V4 0 1 2 3
 
 
 instance SymVal a b => SymVal (SymMath f a) b where val_of = val_of . unMath

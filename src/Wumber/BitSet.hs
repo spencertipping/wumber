@@ -35,9 +35,9 @@ empty :: BitSet
 empty = BS 0 0
 
 
-is_empty :: BitSet -> Bool
-is_empty (BS 0 0) = True
-is_empty _        = False
+null :: BitSet -> Bool
+null (BS 0 0) = True
+null _        = False
 
 
 singleton :: Int -> BitSet
