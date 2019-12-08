@@ -1,19 +1,18 @@
-{-# LANGUAGE MonoLocalBinds #-}
-{-# LANGUAGE FlexibleInstances #-}
-{-# LANGUAGE IncoherentInstances #-}
-{-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE BlockArguments #-}
-{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
-{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE IncoherentInstances #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields -Wincomplete-patterns #-}
 
--- | Algebraic simplification/rewriting for 'Sym' quantities. The most important
---   operation here is 'isolate', which attempts to isolate a variable within an
---   equation.
+-- | Algebraic simplification/rewriting for 'SymMath' quantities. The most
+--   important operation here is 'isolate', which attempts to isolate a variable
+--   within an equation.
 module Wumber.SymbolicAlgebra (
   isolate,
   Invertible(..)
@@ -25,7 +24,9 @@ import Data.IntSet  (member)
 import Data.List    (partition)
 import GHC.Generics (Generic(..))
 
-import Wumber.Symbolic
+import Wumber.MathFn
+import Wumber.SymExpr
+import Wumber.SymMath
 
 
 -- | Takes both sides of an equation and a variable to isolate, and returns a
@@ -34,7 +35,8 @@ import Wumber.Symbolic
 --   itself, or until we don't know how to invert an expression. Most of this
 --   logic is delegated to 'Invertible'.
 
-isolate :: AlgConstraints f a => Sym f a -> Sym f a -> VarID -> Maybe (Sym f a)
+isolate :: SymMathC f a
+        => SymMath f a -> SymMath f a -> VarID -> Maybe (SymMath f a)
 isolate lhs rhs v | lv && rv  = isolate (lhs - rhs) 0 v
                   | rv        = isolate rhs lhs v
                   | otherwise = invert v lhs >>= \f -> Just (f rhs)

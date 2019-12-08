@@ -58,6 +58,7 @@ module Wumber.SymExpr (
   ambs,
   tree_size,
   operands,
+  descendants,
   profile,
   Rewritable(..),
   (//),
@@ -230,6 +231,13 @@ profile :: ProfileApply p f => Sym p f a -> p
 profile (SymV i)                = prof_var
 profile (SymC x)                = prof_val
 profile (SymF _ _ (SM _ _ p _)) = p
+
+
+-- | Returns this and all descendants.
+descendants :: Sym p f a -> [Sym p f a]
+descendants v@(SymV _)      = [v]
+descendants c@(SymC _)      = [c]
+descendants v@(SymF _ xs _) = v : concatMap descendants xs
 
 
 -- | The class of functions that can be applied to symbolic arguments, yielding

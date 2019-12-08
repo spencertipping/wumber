@@ -31,7 +31,10 @@ import System.Posix.Types     (Fd(..), COff(..))
 
 import qualified Data.ByteString as BS
 
-import Wumber.Symbolic
+import Wumber.Functionable
+import Wumber.MathFn
+import Wumber.SymExpr
+import Wumber.SymMath
 
 
 foreign import ccall unsafe "sys/mman.h mmap"
@@ -81,82 +84,84 @@ codeptr bs = do
   return $ castPtr m
 
 
-instance Functionable SymFn2 (FunPtr (F2 Double)) where
-  fn Quot  = p_quot
-  fn Rem   = p_fmod    -- FIXME: use fmod if we can
-  fn Pow   = p_pow
-  fn Upper = p_fmax
-  fn Lower = p_fmin
-  fn Atan2 = p_atan2
+instance Functionable MathFn (Maybe (FunPtr (F2 Double))) where
+  fn Quot  = Just p_quot
+  fn Rem   = Just p_fmod
+  fn Pow   = Just p_pow
+  fn Upper = Just p_fmax
+  fn Lower = Just p_fmin
+  fn Atan2 = Just p_atan2
 
   -- NOTE: there's no reason to use these; they're just here for completeness.
-  fn Add      = p_add
-  fn Subtract = p_subtract
-  fn Multiply = p_multiply
-  fn Divide   = p_divide
+  fn Add   = Just p_add
+  fn Mul   = Just p_multiply
+  fn _     = Nothing
 
-instance Functionable SymFn2 (FunPtr (F2 Float)) where
-  fn Quot  = p_quotf
-  fn Rem   = p_fmodf    -- FIXME: use fmod if we can
-  fn Pow   = p_powf
-  fn Upper = p_fmaxf
-  fn Lower = p_fminf
-  fn Atan2 = p_atan2f
+instance Functionable MathFn (Maybe (FunPtr (F2 Float))) where
+  fn Quot  = Just p_quotf
+  fn Rem   = Just p_fmodf
+  fn Pow   = Just p_powf
+  fn Upper = Just p_fmaxf
+  fn Lower = Just p_fminf
+  fn Atan2 = Just p_atan2f
 
   -- NOTE: there's no reason to use these; they're just here for completeness.
-  fn Add      = p_addf
-  fn Subtract = p_subtractf
-  fn Multiply = p_multiplyf
-  fn Divide   = p_dividef
+  fn Add   = Just p_addf
+  fn Mul   = Just p_multiplyf
+  fn _     = Nothing
 
 
-instance Functionable SymFn1 (FunPtr (F1 Double)) where
-  fn Abs      = p_fabs
-  fn Signum   = p_signum
-  fn Log      = p_log
-  fn Exp      = p_exp
-  fn Sqrt     = p_sqrt
-  fn Negate   = p_negate
-  fn Sin      = p_sin
-  fn Cos      = p_cos
-  fn Tan      = p_tan
-  fn Asin     = p_asin
-  fn Acos     = p_acos
-  fn Atan     = p_atan
-  fn Sinh     = p_sinh
-  fn Cosh     = p_cosh
-  fn Tanh     = p_tanh
-  fn Asinh    = p_asinh
-  fn Acosh    = p_acosh
-  fn Atanh    = p_atanh
-  fn Ceiling  = p_ceil
-  fn Floor    = p_floor
-  fn Round    = p_round
-  fn Truncate = p_truncate
+instance Functionable MathFn (Maybe (FunPtr (F1 Double))) where
+  fn Abs      = Just p_fabs
+  fn Signum   = Just p_signum
+  fn Log      = Just p_log
+  fn Exp      = Just p_exp
+  fn Sqrt     = Just p_sqrt
+  fn Negate   = Just p_negate
+  fn Recip    = Just p_recip
+  fn Sin      = Just p_sin
+  fn Cos      = Just p_cos
+  fn Tan      = Just p_tan
+  fn Asin     = Just p_asin
+  fn Acos     = Just p_acos
+  fn Atan     = Just p_atan
+  fn Sinh     = Just p_sinh
+  fn Cosh     = Just p_cosh
+  fn Tanh     = Just p_tanh
+  fn Asinh    = Just p_asinh
+  fn Acosh    = Just p_acosh
+  fn Atanh    = Just p_atanh
+  fn Ceiling  = Just p_ceil
+  fn Floor    = Just p_floor
+  fn Round    = Just p_round
+  fn Truncate = Just p_truncate
+  fn _        = Nothing
 
-instance Functionable SymFn1 (FunPtr (F1 Float)) where
-  fn Abs      = p_fabsf
-  fn Signum   = p_signumf
-  fn Log      = p_logf
-  fn Exp      = p_expf
-  fn Sqrt     = p_sqrtf
-  fn Negate   = p_negatef
-  fn Sin      = p_sinf
-  fn Cos      = p_cosf
-  fn Tan      = p_tanf
-  fn Asin     = p_asinf
-  fn Acos     = p_acosf
-  fn Atan     = p_atanf
-  fn Sinh     = p_sinhf
-  fn Cosh     = p_coshf
-  fn Tanh     = p_tanhf
-  fn Asinh    = p_asinhf
-  fn Acosh    = p_acoshf
-  fn Atanh    = p_atanhf
-  fn Ceiling  = p_ceilf
-  fn Floor    = p_floorf
-  fn Round    = p_roundf
-  fn Truncate = p_truncatef
+instance Functionable MathFn (Maybe (FunPtr (F1 Float))) where
+  fn Abs      = Just p_fabsf
+  fn Signum   = Just p_signumf
+  fn Log      = Just p_logf
+  fn Exp      = Just p_expf
+  fn Sqrt     = Just p_sqrtf
+  fn Negate   = Just p_negatef
+  fn Recip    = Just p_recipf
+  fn Sin      = Just p_sinf
+  fn Cos      = Just p_cosf
+  fn Tan      = Just p_tanf
+  fn Asin     = Just p_asinf
+  fn Acos     = Just p_acosf
+  fn Atan     = Just p_atanf
+  fn Sinh     = Just p_sinhf
+  fn Cosh     = Just p_coshf
+  fn Tanh     = Just p_tanhf
+  fn Asinh    = Just p_asinhf
+  fn Acosh    = Just p_acoshf
+  fn Atanh    = Just p_atanhf
+  fn Ceiling  = Just p_ceilf
+  fn Floor    = Just p_floorf
+  fn Round    = Just p_roundf
+  fn Truncate = Just p_truncatef
+  fn _        = Nothing
 
 
 -- Math function pointers available to JIT assemblers. These are
@@ -184,6 +189,7 @@ p_rem      = slow_fn "rem"  $ fn2_dbl_p \x y -> return (x `rem` y)
 p_signum   = slow_fn "sign"  $ fn1_dbl_p (return . signum)
 p_truncate = slow_fn "trunc" $ fn1_dbl_p (return . truncate)
 p_negate   = slow_fn "neg"   $ fn1_dbl_p (return . negate)
+p_recip    = slow_fn "recip" $ fn1_dbl_p (return . recip)
 
 
 foreign import ccall "wrapper" fn1_float_p :: F1 Float -> IO (FunPtr (F1 Float))
@@ -199,6 +205,7 @@ p_remf      = slow_fn "rem"   $ fn2_float_p \x y -> return (x `rem` y)
 p_signumf   = slow_fn "signf"  $ fn1_float_p (return . signum)
 p_truncatef = slow_fn "truncf" $ fn1_float_p (return . truncate)
 p_negatef   = slow_fn "negf"   $ fn1_float_p (return . negate)
+p_recipf    = slow_fn "recipf" $ fn1_float_p (return . recip)
 
 
 foreign import ccall unsafe "math.h &pow"   p_pow   :: FunPtr (F2 Double)

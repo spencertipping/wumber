@@ -60,6 +60,9 @@ data MathFn = Add | Negate              -- binary functions
 
             | IfNN                      -- ternary
 
+            | Upper | Lower             -- unused in math, but useful for JIT
+            | Sqrt
+
   deriving (Show, Eq, Ord, Bounded, Enum, Generic, Binary)
 
 -- | The set of constraints we need for math functions to be able to operate on

@@ -40,8 +40,9 @@ import Wumber.AMD64JIT
 
 import Wumber.JIT
 import Wumber.JITIR
+import Wumber.MathFn
 import Wumber.Numeric
-import Wumber.Symbolic
+import Wumber.SymMath
 
 
 -- | Takes a 'Sym' expression and returns a function that evaluates it at a
