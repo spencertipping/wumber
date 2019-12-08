@@ -9,8 +9,7 @@ module Wumber (
   module Wumber.ModelAffine,
   module Wumber.ModelCSG,
   module Wumber.Numeric,
-  module Wumber.Symbolic
-  -- module Wumber.SymMath,
+  module Wumber.SymMath,
 ) where
 
 import Wumber.BoundingBox
@@ -23,5 +22,4 @@ import Wumber.Model
 import Wumber.ModelAffine
 import Wumber.ModelCSG
 import Wumber.Numeric
-import Wumber.Symbolic
--- import Wumber.SymMath
+import Wumber.SymMath

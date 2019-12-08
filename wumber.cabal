@@ -68,11 +68,10 @@ library
                      , Wumber.ModelAffine
                      , Wumber.ModelCSG
                      , Wumber.Numeric
-                     , Wumber.Symbolic
-                     , Wumber.SymbolicAlgebra
-                     , Wumber.SymbolicDerivative
-                     , Wumber.SymbolicJIT
+                     , Wumber.SymAlgebra
+                     , Wumber.SymDerivative
                      , Wumber.SymExpr
+                     , Wumber.SymJIT
                      , Wumber.SymMatch
                      , Wumber.SymMath
                      , Wumber.VectorConversion

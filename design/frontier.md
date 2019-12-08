@@ -42,19 +42,12 @@
   + Calculate LOD by view prominence
 + Sym compiler/algebra
   + Symbolic derivatives
-  + Tree traversal for new Sym library
-  + Lensing/traversal by profile?
-  + ~~`AlgebraicFunctionable`~~ ... walk this back
-  + Generalized normal form collection
 + Assembler
   + Multi-branch assembly with conditionals
   + Constant vector + indexing
 + JIT
-  + Flexible register allocation (not all threads need extra registers)
   + Reverse-engineer instruction latency/throughput
   + Benchmark reg/reg and reg/memory parallelization
-  + Preload operands into registers while ALUs are busy
-    + Model processor ports at some level
 + Simulation
   + 4D meshing for animation/object-through-time collision detection
     + Collisions happen only at the `t` coordinates of 4D vertices

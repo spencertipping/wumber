@@ -26,7 +26,6 @@ import Wumber.Assembler
 import Wumber.JIT
 import Wumber.JITIR
 import Wumber.Numeric
-import Wumber.Symbolic
 
 
 -- | Strategy-oblivious assembler monad.
@@ -76,7 +75,7 @@ rexw_modrm = flip rex_modrm True
 
 -- | The '%rbp' signed displacement for the specified thread's local memory
 --   address.
-rbp32 :: ThreadID -> Asm' ()
+rbp32 :: IRID -> Asm' ()
 rbp32 t = tell $ B.int32LE (fromIntegral $ (t + 1) * (-8))
 
 
@@ -85,11 +84,11 @@ movsd_rr :: XMMReg -> XMMReg -> Asm' ()
 movsd_rr r1 r2 = rex0_modrm "f3" "0f7e" 3 r2 r1
 
 -- | Loads a thread from memory into the specified XMM register.
-movsd_mr :: ThreadID -> XMMReg -> Asm' ()
+movsd_mr :: IRID -> XMMReg -> Asm' ()
 movsd_mr t x = rex0_modrm "f3" "0f7e" 2 x rbp >> rbp32 t
 
 -- | Spills a register's value into the specified thread memory.
-movsd_rm :: XMMReg -> ThreadID -> Asm' ()
+movsd_rm :: XMMReg -> IRID -> Asm' ()
 movsd_rm x t = rex0_modrm "66" "0fd6" 2 x rbp >> rbp32 t
 
 -- | Loads a 'Var' with the specified index into the given XMM register.

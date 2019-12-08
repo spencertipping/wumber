@@ -24,8 +24,6 @@ import Data.IntSet   (IntSet)
 import Data.List     (partition)
 import Data.Tuple    (swap)
 import GHC.Generics  (Generic)
-import Lens.Micro    ((&))
-import Lens.Micro.TH (makeLenses)
 
 import qualified Data.IntMap          as IM
 import qualified Data.IntSet          as IS
@@ -35,7 +33,13 @@ import qualified Data.Vector.Storable as VS
 import Wumber.Constraint
 import Wumber.ConstraintSimplify
 import Wumber.Numeric
-import Wumber.Symbolic
+import Wumber.SymExpr
+import Wumber.SymMath
+
+
+-- TODO
+-- Fix up broken Symbolic references here (probably after the new
+-- ConstraintSolver is done).
 
 
 -- | A subsystem is a set of mutually dependent constraints that is ready to be
@@ -69,8 +73,6 @@ data Subsystem f = Subsystem { _ss_constraints :: [CVal f],
                                _ss_init        :: VS.Vector R }
   deriving (Show, Generic)
 
-makeLenses ''Subsystem
-
 
 -- | Takes a list of individual subsystem solutions and produces a single vector
 --   in the original variable space.
@@ -81,7 +83,7 @@ merge_solution_vector vs = V.replicate (1 + foldl1 max (map fst c)) 0 V.// c
 
 -- | Separates independent subsystems. This is the first thing we do when
 --   simplifying a set of constraints.
-subsystems :: AlgConstraints f R => V.Vector R -> [CVal f] -> [Subsystem f]
+subsystems :: SymMathC f R => V.Vector R -> [CVal f] -> [Subsystem f]
 subsystems init cs = cs & map normalize
                         & map (\c -> ([c], vars_in c))
                         & group_by_overlap
@@ -91,9 +93,9 @@ subsystems init cs = cs & map normalize
 -- | Reduces a set of constraints to a subsystem with compactly-identified
 --   variables (whose indexes correspond to 'Vector' indexes used by the GSL
 --   minimizer).
-subsystem :: AlgConstraints f R => V.Vector R -> [CVal f] -> Subsystem f
+subsystem :: SymMathC f R => V.Vector R -> [CVal f] -> Subsystem f
 subsystem init cs = Subsystem cs' compact_cs subst solved remap init'
-  where (cs', subst, solved) = csimplify cs
+  where (cs', subst, solved) = error "TODO: simplify"
         (m, remap)           = compact_var_mapping (IS.unions (map vars_in cs'))
         compact_cs           = map (eval val (var . (m IM.!))) cs'
         init'                = VS.generate (V.length remap)
@@ -118,7 +120,7 @@ compact_var_mapping s = (IM.fromList (map swap pairs),
 --
 --   This function produces a list suitable for use by 'merge_solution_vector'.
 
-remap_solution :: FConstraints f R => Subsystem f -> VS.Vector R -> [(VarID, R)]
+remap_solution :: SymMathC f R => Subsystem f -> VS.Vector R -> [(VarID, R)]
 remap_solution ss xs = algebraic ++ subst ++ numerical
   where numerical = V.toList (_ss_remap ss) `zip` VS.toList xs
         algebraic = IM.toList (_ss_solved ss)
