@@ -19,6 +19,8 @@ module Wumber.SymMatch where
 
 import Data.Binary   (Binary)
 import Data.Foldable (foldr')
+import Data.Function (on)
+import Data.List     (groupBy, sortOn)
 import Data.Maybe    (fromJust, isJust)
 import Data.Vector   (Vector)
 import GHC.Generics  (Generic)
@@ -47,18 +49,47 @@ instance SymVal (Match a) (Match a) where
   val_of _               = Nothing
 
 
+-- | The class of functions that can provide overloaded pattern matching. This
+--   is useful when arguments don't need to be matched exactly; e.g. when a
+--   function is commutative, associative, or has arguments that are invertible.
+class FnMatch f t where
+  fn_match :: (Eq a, Fingerprintable a)
+           => f -> f -> [t (Match a)] -> [t a] -> Maybe [(VarID, t a)]
+
+
+-- | A 'fn_match' implementation for functions with no algebraic structure.
+fn_exact_match :: (Eq a, Eq f, Fingerprintable f, Fingerprintable a,
+                   FnMatch f (Sym p f))
+               => f -> f -> [Sym p f (Match a)] -> [Sym p f a]
+               -> Maybe [(VarID, Sym p f a)]
+fn_exact_match f g ps es
+  | f == g && samesize && all isJust vs = Just $ concatMap fromJust vs
+  | otherwise                           = Nothing
+  where vs       = zipWith match' ps es
+        samesize = length ps == length es
+
+
 -- | Matches a pattern against an expression and returns the subexpressions
 --   bound by 'As' terminals.
-match :: (Eq a, Eq f, Fingerprintable f, Fingerprintable a)
+
+-- TODO: faster collision rejection?
+match :: (Eq a, Eq f, Fingerprintable f, Fingerprintable a, FnMatch f (Sym p f))
       => Sym p f (Match a) -> Sym p f a -> Maybe [Sym p f a]
-match p e = V.toList <$> (V.generate (match_nvars p) undefined V.//) <$> go p e
-  where go a b | fingerprint a == fingerprint b = Just []
-        go (SymC (Math (As i))) x               = Just [(i, x)]
-        go (SymF f xs _) (SymF g ys _)
-          | f == g && V.length xs == V.length ys && all isJust ms =
-            Just $ concatMap fromJust ms
-          where ms = zipWith go (V.toList xs) (V.toList ys)
-        go _ _ = Nothing
+match p e = match' p e >>= verify >>= return . unify
+  where unify = V.toList . (V.replicate (match_nvars p) undefined V.//)
+        verify xs | same      = Just xs
+                  | otherwise = Nothing
+          where same = all (\((_, x):xs) -> all ((== x) . snd) xs)
+                       $ groupBy ((==) `on` fst)
+                       $ sortOn fst xs
+
+
+-- | The worker function for 'match'. This function returns @(VarID, Sym)@ pairs
+--   instead of a dense list.
+match' a b | fingerprint a == fingerprint b = Just []
+match' (SymC (Math (As i))) x               = Just [(i, x)]
+match' (SymF f xs _) (SymF g ys _) = fn_match f g xs ys
+match' _ _ = Nothing
 
 
 -- | Returns a profile-matching predicate function from a pattern. The profile
@@ -68,20 +99,7 @@ match p e = V.toList <$> (V.generate (match_nvars p) undefined V.//) <$> go p e
 -- layout? Profile doesn't give us enough information to know how to select
 -- specific pieces ... yet.
 pattern_to_profile :: ProfileApply p f => Sym p f (Match a) -> p -> Bool
-pattern_to_profile _ = error "TODO"
-
-
--- | Takes a 'SymExpr' of variables and turns it into a 'SymExpr' of matches
---   that refers to no variables.
---
---   TODO: specify which variables we want to keep?
-
-pattern_of :: (Fingerprintable f, Fingerprintable a, ProfileApply p f)
-           => (f -> [Sym p f (Match a)] -> Sym p f (Match a))
-           -> Sym p f a -> Sym p f (Match a)
-pattern_of _    (SymC x)      = SymC (Math (Is x))
-pattern_of _    (SymV i)      = SymC (Math (As i))
-pattern_of cons (SymF f xs _) = cons f $ map (pattern_of cons) $ V.toList xs
+pattern_to_profile = error "TODO"
 
 
 match_nvars :: Sym p f (Match a) -> VarID

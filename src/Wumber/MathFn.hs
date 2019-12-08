@@ -47,7 +47,7 @@ data MathFn = Add | Negate              -- binary functions
             | Mul | Recip
             | Rem | Quot
             | Mod | Div
-            | Pow
+            | Pow | RPow                -- NOTE: RPow == flip Pow
             | Atan2
 
             | Abs | Signum              -- unary functions
@@ -79,6 +79,7 @@ instance FnShow MathFn where
     Mod    -> ShowInfix
     Div    -> ShowInfix
     Pow    -> ShowInfix
+    RPow   -> ShowPrefix
     Atan2  -> ShowPrefix
     _      -> ShowPrefix
 
@@ -92,6 +93,7 @@ instance FnShow MathFn where
     Mod    -> "%"
     Div    -> "/"
     Pow    -> "^"
+    RPow   -> "$^$"
     _      -> show f
 
 instance MathFnC a => Functionable MathFn (Maybe (a -> a)) where
@@ -127,6 +129,7 @@ instance MathFnC a => Functionable MathFn (Maybe (a -> a -> a)) where
   fn Mod   = Just mod
   fn Div   = Just div
   fn Pow   = Just (**)
+  fn RPow  = Just $ flip (**)
   fn Atan2 = Just atan2
   fn _     = Nothing
 

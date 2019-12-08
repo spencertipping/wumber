@@ -36,13 +36,13 @@ module Wumber.SymMath (
 
 import Data.Binary   (Binary)
 import Data.Foldable (foldl')
+import Data.Either   (lefts, rights)
 import Data.Function (on)
-import Data.List     (intercalate)
-import Data.Vector   ((!))
+import Data.List     (groupBy, intercalate, sort, sortOn)
+import Data.Maybe    (fromJust, isJust)
 import GHC.Generics  (Generic)
+import Lens.Micro    ((&))
 import Unsafe.Coerce (unsafeCoerce)
-
-import qualified Data.Vector as V
 
 import Wumber.ClosedComparable
 import Wumber.Fingerprint
@@ -55,8 +55,10 @@ import Wumber.SymMatch
 -- | Symbolic math expressions. Structurally identical to 'Sym', but typed to
 --   implement Haskell numeric classes. @f@ should be specified to be
 --   convertible from @MathFn@.
-type SymMath f a = Math (Sym (MathProfile f) f a) SymMathPhantom
+type SymMath f a = Math (SymMath' f a) SymMathPhantom
 data SymMathPhantom
+
+type SymMath' f = Sym (MathProfile f) f
 
 -- TODO: support real profiles
 type MathProfile f = NoProfiles f
@@ -66,29 +68,20 @@ instance ProfileApply (MathProfile MathFn) MathFn where
   prof_var    = NP ()
   prof_fn _ _ = NP ()
 
-instance SymLift a (Sym (MathProfile f) f a) => SymLift a (SymMath f a) where
+instance SymLift a (SymMath' f a) => SymLift a (SymMath f a) where
   val = Math . val
   var = Math . var
 
-x_ :: SymMath f a
-y_ :: SymMath f a
-z_ :: SymMath f a
-t_ :: SymMath f a
+x_ = var 0 :: SymMath f a               -- ^ An alias for @var 0@
+y_ = var 1 :: SymMath f a               -- ^ An alias for @var 1@
+z_ = var 2 :: SymMath f a               -- ^ An alias for @var 2@
+t_ = var 3 :: SymMath f a               -- ^ An alias for @var 3@
 
-x_ = var 0          -- ^ An alias for @var 0@
-y_ = var 1          -- ^ An alias for @var 1@
-z_ = var 2          -- ^ An alias for @var 2@
-t_ = var 3          -- ^ An alias for @var 3@
+a_ = val (Math (As 0)) :: SymMath f (Match a)
+b_ = val (Math (As 1)) :: SymMath f (Match a)
+c_ = val (Math (As 2)) :: SymMath f (Match a)
+d_ = val (Math (As 3)) :: SymMath f (Match a)
 
-a_ :: SymMath f (Match a)
-b_ :: SymMath f (Match a)
-c_ :: SymMath f (Match a)
-d_ :: SymMath f (Match a)
-
-a_ = val (Math $ As 0)
-b_ = val (Math $ As 1)
-c_ = val (Math $ As 2)
-d_ = val (Math $ As 3)
 
 instance SymVal a b => SymVal (SymMath f a) b where val_of = val_of . unMath
 
@@ -103,20 +96,8 @@ instance Integral Double where toInteger = truncate; quotRem = qr
 instance Integral Float  where toInteger = truncate; quotRem = qr
 
 
--- | A basic 'sym_apply' implementation for math functions.
-math_sym_apply :: (Num a, Fingerprintable a)
-               => MathFn
-               -> [Sym (MathProfile MathFn) MathFn a]
-               -> Sym (MathProfile MathFn) MathFn a
-
-math_sym_apply Negate [SymF Negate xs _] = xs ! 0
-math_sym_apply Recip  [SymF Recip  xs _] = xs ! 0
-
-math_sym_apply Add [] = val 0
-math_sym_apply Mul [] = val 1
-
-math_sym_apply f xs = sym_apply_cons f xs
-
+instance FnMatch MathFn (Sym (MathProfile MathFn) MathFn) where
+  fn_match = math_fn_match
 
 instance (Show a, FnShow f) => Show (SymMath f a) where
   show (Math (SymC x)) = show x
@@ -127,22 +108,22 @@ instance (Show a, FnShow f) => Show (SymMath f a) where
                        | otherwise = "v" ++ show i
 
   show (Math (SymF f xs _)) =
-    fshow f $ map (show . (Math :: Sym (MathProfile f) f a -> SymMath f a))
-            $ V.toList xs
+    fshow f $ map (show . (Math :: Sym (MathProfile f) f a -> SymMath f a)) xs
 
-instance (Fingerprintable a,
-          MathFnC a,
-          SymVal a a,
+instance (MathFnC a, SymVal a a, Fingerprintable a,
           ProfileApply (MathProfile MathFn) MathFn) =>
          SymbolicApply (MathProfile MathFn) MathFn a where
   sym_apply = sym_apply_foldwith math_sym_apply
 
 instance MathFnC a => ValApply MathFn a where
-  val_apply mf [x]    | Just f <- fn mf = f x
-  val_apply mf (x:xs) | Just f <- fn mf = foldl' f x xs
+  val_apply Add [] = 0
+  val_apply Mul [] = 1
+
+  val_apply mf [x, y, z] | Just f <- fn mf = f x y z
+  val_apply mf [x]       | Just f <- fn mf = f x
+  val_apply mf (x:xs)    | Just f <- fn mf = foldl' f x xs
   val_apply mf xs = error $ "can't apply " ++ show mf
                     ++ " to list of arity " ++ show (length xs)
-
 
 instance (MathFnC a, SymVal a a, Fingerprintable a) =>
          MathApply a (SymMath MathFn a) where
@@ -150,3 +131,80 @@ instance (MathFnC a, SymVal a a, Fingerprintable a) =>
   fn1 f (Math x)                   = Math $ sym_apply f [x]
   fn2 f (Math x) (Math y)          = Math $ sym_apply f [x, y]
   fn3 f (Math x) (Math y) (Math z) = Math $ sym_apply f [x, y, z]
+
+
+-- | A 'sym_apply' function that reduces certain cases to normal forms so we can
+--   combine and/or cancel terms. The main focus is polynomial stuff, which
+--   means we have two levels of reduction:
+--
+--   1. Additive cancellation of multiplicative terms
+--   2. Multiplicative cancellation of exponential terms
+--
+--   Normalizing terms will sometimes complicate things: we don't always end up
+--   with simpler expressions by distributing multiplication or exponentiation.
+--   Because of this, we use 'amb' to conditionally reject more complex results.
+--
+--   Each layer of normalization relies on the ones below it; that is, we know
+--   up front that each operand is normalized by the time we're 'sym_apply'ing
+--   something on top of it.
+
+math_sym_apply :: (Eq a, MathFnC a, Fingerprintable a, SymVal a a)
+               => MathFn
+               -> [Sym (MathProfile MathFn) MathFn a]
+               -> Sym (MathProfile MathFn) MathFn a
+math_sym_apply f xs = case (f, xs) of
+  (Negate, [x]) -> sym_apply Mul [x, val (-1)]
+  (Recip,  [x]) -> sym_apply Pow [x, val (-1)]
+  (Pow, [x, y]) -> sym_apply RPow [y, x]
+
+  (RPow, [SymC x, SymF RPow [SymC y, z] _]) -> sym_apply RPow [SymC (x*y), z]
+  (RPow, [x@(SymC _), y@(SymF Mul ys _)])   -> try_distribute RPow Mul x ys y
+
+  (Add, []) -> val 0
+  (Mul, []) -> val 1
+  (Add, xs) -> comm_assoc_fold Add Mul xs
+  (Mul, xs) -> comm_assoc_fold Mul RPow xs
+  _         -> sym_apply_cons f xs
+
+
+-- | Commutative, associative normalization with constant folding.
+comm_assoc_fold f g = term_collapse f g . commute_constants f . associative f
+
+associative f = concatMap \case SymF f' xs _ | f' == f -> xs
+                                x                      -> [x]
+
+try_distribute f g x ys y = amb a b
+  where a = sym_apply_cons f [x, y]
+        b = sym_apply g $ map (sym_apply f . (x :) . (: [])) ys
+
+commute_constants :: (ValApply f a, SymVal a a)
+                  => f -> [Sym p f a] -> [Sym p f a]
+commute_constants f xs = SymC (val_apply f $ rights es) : lefts es
+  where es = flip map xs \case x | Just v <- val_of x -> Right v
+                               x                      -> Left x
+
+expand_subterms f = sortOn fst . map
+  \case SymF f' (SymC v : xs) _ | f' == f -> (xs,  v)
+        x                                 -> ([x], 1)
+
+sum_subterms = filter ((/= 0) . snd)
+               . map (\l@((x, _):_) -> (x, sum $ map snd l))
+               . groupBy ((==) `on` fst)
+
+term_collapse f g xs | null ns   = val 0
+                     | otherwise = sym_apply_cons f ns
+  where ns = xs
+             & expand_subterms g
+             & sum_subterms
+             & map (\case ([x], 1) -> x
+                          (xs, v)  -> sym_apply g (val v : xs))
+             & sort
+
+
+-- TODO
+-- Clever stuff to make algebraic inversion work
+math_fn_match :: (Eq a, Fingerprintable a)
+              => MathFn -> MathFn
+              -> [SymMath' MathFn (Match a)] -> [SymMath' MathFn a]
+              -> Maybe [(VarID, SymMath' MathFn a)]
+math_fn_match = fn_exact_match

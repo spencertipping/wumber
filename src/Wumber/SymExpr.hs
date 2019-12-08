@@ -77,7 +77,6 @@ import GHC.Generics  (Generic)
 
 import Wumber.Fingerprint
 
-import qualified Data.Vector   as V
 import qualified Wumber.BitSet as BS
 
 
@@ -100,7 +99,7 @@ import qualified Wumber.BitSet as BS
 data Sym p f a = SymV !VarID
                | SymC !a
                | SymF { _sym_fn   :: !f,
-                        _sym_args :: !(V.Vector (Sym p f a)),
+                        _sym_args :: ![Sym p f a],
                         _sym_meta :: !(SymMeta p) }
   deriving (Generic)
 
@@ -121,8 +120,7 @@ data SymMeta p = SM { _sm_vars :: BS.BitSet,
 instance (Show f, Show a) => Show (Sym p f a) where
   show (SymV i)      = "v" ++ show i
   show (SymC x)      = show x
-  show (SymF f xs _) = "(" ++ show f
-                       ++ concatMap (" " ++) (map show $ V.toList xs) ++ ")"
+  show (SymF f xs _) = "(" ++ show f ++ concatMap (" " ++) (map show xs) ++ ")"
 
 instance Foldable (Sym p f) where
   foldr _ x (SymV _)      = x
@@ -195,11 +193,11 @@ tree_size (SymC _) = 1
 tree_size (SymF _ _ (SM _ _ _ s)) = s
 
 
--- | Returns the operands of the given node, or an empty vector if the node is a
+-- | Returns the operands of the given node, or an empty list if the node is a
 --   terminal.
-operands :: Sym p f a -> V.Vector (Sym p f a)
-operands (SymV _) = V.empty
-operands (SymC _) = V.empty
+operands :: Sym p f a -> [Sym p f a]
+operands (SymV _) = []
+operands (SymC _) = []
 operands (SymF _ v _) = v
 
 
@@ -234,12 +232,11 @@ sym_apply_fold = sym_apply_foldwith sym_apply_cons
 sym_apply_cons :: (Fingerprintable f, Fingerprintable (Sym p f a),
                    ProfileApply p f)
                => f -> [Sym p f a] -> Sym p f a
-sym_apply_cons f xs = SymF f v (SM b id p s)
+sym_apply_cons f xs = SymF f xs (SM b id p s)
   where b  = BS.unions $ map vars_in xs
         id = tree_fingerprint $ fingerprint f : map fingerprint xs
         s  = 1 + sum (map tree_size xs)
         p  = prof_fn f $ map profile xs
-        v  = V.fromList xs
 
 
 -- | A class that allows functions to store profile values onto 'Sym' quantities
