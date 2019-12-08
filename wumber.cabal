@@ -64,6 +64,7 @@ library
                      , Wumber.JIT
                      , Wumber.JITIR
                      , Wumber.Macros
+                     , Wumber.MathFn
                      , Wumber.Model
                      , Wumber.ModelAffine
                      , Wumber.ModelCSG
@@ -73,6 +74,7 @@ library
                      , Wumber.SymbolicDerivative
                      , Wumber.SymbolicJIT
                      , Wumber.SymExpr
+                     , Wumber.SymMatch
                      , Wumber.SymMath
                      , Wumber.VectorConversion
 

@@ -26,7 +26,6 @@
 
 module Wumber.SymMath (
   SymMath(..),
-  SymMathC,
   val,
   var,
   val_of
@@ -46,6 +45,7 @@ import qualified Data.Vector as V
 import Wumber.ClosedComparable
 import Wumber.Fingerprint
 import Wumber.Functionable
+import Wumber.MathFn
 import Wumber.SymExpr
 import Wumber.SymMatch
 
@@ -58,15 +58,6 @@ data SymMathPhantom
 
 -- TODO: support real profiles
 type MathProfile f = NoProfiles f
-
--- | The typeclass context you'll need in order to instantiate 'SymMath'.
-type SymMathC f a = (Fingerprintable a,
-                     Functionable MathFn f,
-                     SymbolicApply (MathProfile f) f a,
-                     ValApply f a,
-                     Num a,
-                     Fractional a,
-                     Floating a)
 
 
 -- | Promotes a value into a 'SymMath' expression.
@@ -81,22 +72,29 @@ y_ = var 1          -- ^ An alias for @var 1@
 z_ = var 2          -- ^ An alias for @var 2@
 t_ = var 3          -- ^ An alias for @var 3@
 
-a_ = val (As 0)     -- ^ An alias for @val (As 0)@
-b_ = val (As 1)     -- ^ An alias for @val (As 1)@
-c_ = val (As 2)     -- ^ An alias for @val (As 2)@
-d_ = val (As 3)     -- ^ An alias for @val (As 3)@
+a_ = val (Math $ As 0)
+b_ = val (Math $ As 1)
+c_ = val (Math $ As 2)
+d_ = val (Math $ As 3)
 
--- | Reduces the symbolic expression to a constant, or 'Nothing' if it has
---   unknown dependencies.
-val_of = sym_val_of . unMath
+instance SymVal a b => SymVal (SymMath f a) b where val_of = val_of . unMath
+
+instance SymVal Double Double where val_of = Just
+instance SymVal Float  Float  where val_of = Just
 
 
 -- | A basic 'sym_apply' implementation for math functions.
+math_sym_apply :: (Num a, Fingerprintable a)
+               => MathFn
+               -> [Sym (MathProfile MathFn) MathFn a]
+               -> Sym (MathProfile MathFn) MathFn a
 
--- TODO
--- Normalizing equations for Add and Mul
 math_sym_apply Negate [SymF Negate xs _] = xs ! 0
 math_sym_apply Recip  [SymF Recip  xs _] = xs ! 0
+
+math_sym_apply Add [] = sym_val 0
+math_sym_apply Mul [] = sym_val 1
+
 math_sym_apply f xs = sym_apply_cons f xs
 
 
@@ -108,10 +106,13 @@ instance (Show a, FnShow f) => Show (SymMath f a) where
                        | i == 3 = "t_"
                        | otherwise = "v" ++ show i
 
-  show (Math (SymF f xs _)) = fshow f $ map show $ V.toList xs
+  show (Math (SymF f xs _)) =
+    fshow f $ map (show . (Math :: Sym (MathProfile f) f a -> SymMath f a))
+            $ V.toList xs
 
 instance (Fingerprintable a,
           MathFnC a,
+          SymVal a a,
           ProfileApply (MathProfile MathFn) MathFn) =>
          SymbolicApply (MathProfile MathFn) MathFn a where
   sym_apply = sym_apply_foldwith math_sym_apply
@@ -127,7 +128,8 @@ instance Integral Double where toInteger = truncate; quotRem = qr
 instance Integral Float  where toInteger = truncate; quotRem = qr
 
 
-instance (MathFnC a, Fingerprintable a) => MathApply a (SymMath MathFn a) where
+instance (MathFnC a, SymVal a a, Fingerprintable a) =>
+         MathApply a (SymMath MathFn a) where
   fn0                              = val
   fn1 f (Math x)                   = Math $ sym_apply f [x]
   fn2 f (Math x) (Math y)          = Math $ sym_apply f [x, y]

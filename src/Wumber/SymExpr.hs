@@ -1,5 +1,3 @@
-{-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE DeriveAnyClass #-}
@@ -7,10 +5,12 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
+{-# LANGUAGE IncoherentInstances #-}
+{-# LANGUAGE KindSignatures #-}
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
-{-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields -Wincomplete-patterns #-}
 
@@ -50,9 +50,9 @@ module Wumber.SymExpr (
   Sym(..),
   SymMeta,
   VarID,
+  SymVal(..),
   sym_val,
   sym_var,
-  sym_val_of,
   vars_in,
   amb,
   tree_size,
@@ -68,12 +68,12 @@ module Wumber.SymExpr (
   NoProfiles,
 
   ValApply(..),
-  sym_eval,
 ) where
 
 
 import Data.Binary   (Binary)
 import Data.Foldable (foldl', toList)
+import Data.Maybe    (fromJust, isJust)
 import GHC.Generics  (Generic)
 
 import Wumber.Fingerprint
@@ -165,24 +165,12 @@ sym_var :: VarID -> Sym p f a
 sym_var = SymV
 
 
--- | If the symbolic expression can be reduced to a constant value, returns
---   'Just' that value. Otherwise returns 'Nothing'.
---
---   Symbolic expressions have constant values exactly when they refer to no
---   variables.
-
-sym_val_of :: ValApply f a => Sym p f a -> Maybe a
-sym_val_of s | BS.is_empty (vars_in s) = Just $ sym_eval s
-             | otherwise               = Nothing
-
-
--- | Reduces constant 'Sym' expressions to their terminal values. This function
---   is used by 'sym_apply_fold'. Throws an error if the 'Sym' depends on
---   unknown quantities (i.e. variables).
-sym_eval :: ValApply f a => Sym p f a -> a
-sym_eval (SymV i) = error $ "unexpected variable in constexpr " ++ show i
-sym_eval (SymC x) = x
-sym_eval (SymF f xs _) = val_apply f (map sym_eval $ V.toList xs)
+-- | The class of symbolic things that can sometimes be reduced to non-symbolic
+--   values.
+class SymVal s a where val_of :: s -> Maybe a
+instance SymVal a b => SymVal (Sym p f a) b where
+  val_of (SymC x) = val_of x
+  val_of _        = Nothing
 
 
 -- | Returns the set of variables referred to by the given tree.
@@ -232,13 +220,15 @@ class (Fingerprintable a, ProfileApply p f) => SymbolicApply p f a where
 -- | A generalized way to add constant folding to a tree-consing function. We
 --   use this generality when we introduce algebraic normalization in
 --   'Wumber.AlgebraicSymFn'.
-sym_apply_foldwith :: (Fingerprintable f, Fingerprintable (Sym p f a),
-                       ProfileApply p f, ValApply f a)
-                   => (f -> [Sym p f a] -> Sym p f a)
-                   -> f -> [Sym p f a] -> Sym p f a
+sym_apply_foldwith :: (Fingerprintable f, Fingerprintable (Sym p f b),
+                       SymVal (Sym p f a) b,
+                       ProfileApply p f, ValApply f b)
+                   => (f -> [Sym p f a] -> Sym p f b)
+                   -> f -> [Sym p f a] -> Sym p f b
 sym_apply_foldwith cons f xs
-  | all (BS.is_empty . vars_in) xs = sym_val $ val_apply f $ map sym_eval xs
-  | otherwise                      = cons f xs
+  | all isJust vs = sym_val $ val_apply f $ map fromJust vs
+  | otherwise     = cons f xs
+  where vs = map val_of xs
 
 -- | Apply a function to symbolic quantities with constant folding.
 sym_apply_fold = sym_apply_foldwith sym_apply_cons
