@@ -10,6 +10,7 @@
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields -Wincomplete-patterns #-}
 
@@ -97,10 +98,11 @@ import qualified Wumber.BitSet as BS
 -- the work? It seems like all we get for this is inline _sym_meta, but that
 -- seems better handled by a new type of collection.
 
-data Sym (f :: * -> *) p a = SymV !VarID
-                           | SymC !a
-                           | SymF { _sym_fn   :: !(f (Sym f p a)),
-                                    _sym_meta :: !(SymMeta p) }
+data Sym p f a = SymV !VarID
+               | SymC !a
+               | SymF { _sym_fn   :: !f,
+                        _sym_args :: !(V.Vector (Sym p f a)),
+                        _sym_meta :: !(SymMeta p) }
   deriving (Generic)
 
 
@@ -117,23 +119,24 @@ data SymMeta p = SM { _sm_vars :: BS.BitSet,
   deriving (Show, Eq, Ord, Generic, Binary)
 
 
-instance (Show (f (Sym f p a)), Show a) => Show (Sym f p a) where
-  show (SymV i)   = "v" ++ show i
-  show (SymC x)   = show x
-  show (SymF f _) = show f
+instance (Show f, Show a) => Show (Sym p f a) where
+  show (SymV i)      = "v" ++ show i
+  show (SymC x)      = show x
+  show (SymF f xs _) = "(" ++ show f
+                       ++ concatMap (" " ++) (map show $ V.toList xs) ++ ")"
 
-instance Foldable (Sym f p) where
+instance Foldable (Sym p f) where
   foldr _ x (SymV _)      = x
   foldr f x (SymC y)      = f y x
   foldr f x (SymF _ xs _) = foldr (flip $ foldr f) x xs
 
-instance (Fingerprintable (f (Sym f p a)), Fingerprintable a) =>
-         Fingerprintable (Sym f p a) where
+instance (Fingerprintable f, Fingerprintable a) =>
+         Fingerprintable (Sym p f a) where
   fingerprint (SymV v) = binary_fingerprint (False, binary_fingerprint v)
   fingerprint (SymC c) = binary_fingerprint (True,  fingerprint c)
   fingerprint (SymF _ _ (SM _ i _ _)) = i
 
-instance (Eq (f (Sym f p a)), Eq a) => Eq (Sym f p a) where
+instance (Eq f, Eq a) => Eq (Sym p f a) where
   SymV i                == SymV j                = i == j
   SymC a                == SymC b                = a == b
   SymF _ _ (SM _ i _ _) == SymF _ _ (SM _ j _ _) = i == j
@@ -261,10 +264,6 @@ sym_apply_cons f xs = SymF f v (SM b id p s)
 --
 --   Implementing profiles is optional; you can use @NoProfiles f@ if you don't
 --   want to go to the trouble.
-
--- TODO
--- These fundeps make it impossible to combine function types with Either. That
--- seems wrong. Maybe just have profiles be Word64 and call it a day?
 
 class ProfileApply p f | p -> f, f -> p where
   prof_fn  :: f -> [p] -> p

@@ -43,7 +43,6 @@ import Unsafe.Coerce (unsafeCoerce)
 
 import qualified Data.Vector as V
 
-import Wumber.AlgebraicSymFn
 import Wumber.ClosedComparable
 import Wumber.Fingerprint
 import Wumber.Functionable
@@ -54,14 +53,27 @@ import Wumber.SymMatch
 -- | Symbolic math expressions. Structurally identical to 'Sym', but typed to
 --   implement Haskell numeric classes. @f@ should be specified to be
 --   convertible from @MathFn@.
-newtype SymMath f a = SM { unSM :: Sym (NoProfiles f) f a }
+newtype SymMath f a = SM { unSM :: Sym (MathProfile f) f a }
+
+type MathProfile f = NoProfiles f
 
 -- | The typeclass context you'll need in order to instantiate 'SymMath'.
 type SymMathC f a = (Fingerprintable a,
                      Functionable MathFn f,
-                     SymbolicApply (NoProfiles f) f a,
+                     SymbolicApply (MathProfile f) f a,
                      ValApply f a,
-                     MathFnC a)
+                     Num a,
+                     Fractional a,
+                     Floating a)
+
+-- | A marker type to indicate that a value can be subject to 'ValApply' within
+--   a math context. Most values are, but pattern-matching terms aren't.
+
+-- TODO
+-- This is wrong. We really do need a runtime partial-function thing to figure
+-- out whether to val_apply stuff.
+newtype Val a = V { unV :: a }
+  deriving (Eq, Ord, Generic, Binary)
 
 
 -- | Promotes a value into a 'SymMath' expression.
@@ -71,34 +83,28 @@ val = SM . sym_val
 --   are aliased as 'x_', 'y_', 'z_', and 't_' respectively.
 var = SM . sym_var
 
-x_ = var 0  -- ^ An alias for @var 0@
-y_ = var 1  -- ^ An alias for @var 1@
-z_ = var 2  -- ^ An alias for @var 2@
-t_ = var 3  -- ^ An alias for @var 3@
+x_ = var 0          -- ^ An alias for @var 0@
+y_ = var 1          -- ^ An alias for @var 1@
+z_ = var 2          -- ^ An alias for @var 2@
+t_ = var 3          -- ^ An alias for @var 3@
+
+a_ = val (As 0)     -- ^ An alias for @val (As 0)@
+b_ = val (As 1)     -- ^ An alias for @val (As 1)@
+c_ = val (As 2)     -- ^ An alias for @val (As 2)@
+d_ = val (As 3)     -- ^ An alias for @val (As 3)@
 
 -- | Reduces the symbolic expression to a constant, or 'Nothing' if it has
 --   unknown dependencies.
 val_of = sym_val_of . unSM
 
 
-instance (Eq a, Ord a, Num a) => AlgebraicSymFn (NoProfiles MathFn) MathFn a where
-  left_identity Add = Just (== SymC 0)
-  left_identity Mul = Just (== SymC 1)
-  left_identity Pow = Just (== SymC 1)
-  left_identity _   = Nothing
+-- | A basic 'sym_apply' implementation for math functions.
 
-  right_identity Add = Just (== SymC 0)
-  right_identity Mul = Just (== SymC 1)
-  right_identity Pow = Just (== SymC 1)
-  right_identity _   = Nothing
-
-  commutativity Add = Just compare
-  commutativity Mul = Just compare
-  commutativity _   = Nothing
-
-  associativity Add = Just $ fn_is Add
-  associativity Mul = Just $ fn_is Mul
-  associativity _   = Nothing
+-- TODO
+-- Normalizing equations for Add and Mul
+math_sym_apply Negate [SymF Negate xs _] = xs ! 0
+math_sym_apply Recip  [SymF Recip  xs _] = xs ! 0
+math_sym_apply f xs = sym_apply_cons f xs
 
 
 instance (Show a, FnShow f) => Show (SymMath f a) where
@@ -111,14 +117,16 @@ instance (Show a, FnShow f) => Show (SymMath f a) where
 
   show (SM (SymF f xs _)) = fshow f $ map (show . SM) $ V.toList xs
 
-instance (Fingerprintable a,
-          MathFnC a,
-          ProfileApply (NoProfiles MathFn) MathFn) =>
-         SymbolicApply (NoProfiles MathFn) MathFn a where
-  sym_apply Negate [SymF Negate xs _] = xs ! 0
-  sym_apply Recip  [SymF Recip  xs _] = xs ! 0
+instance (Fingerprintable (Constant a),
+          MathFnC (Constant a),
+          ProfileApply (MathProfile MathFn) MathFn) =>
+         SymbolicApply (MathProfile MathFn) MathFn (Constant a) where
+  sym_apply = sym_apply_foldwith math_sym_apply
 
-  sym_apply f xs = sym_apply_foldwith (normalize_with sym_apply_cons) f xs
+instance (Fingerprintable a,
+          ProfileApply (MathProfile MathFn) MathFn) =>
+         SymbolicApply (MathProfile MathFn) MathFn (Match a) where
+  sym_apply = math_sym_apply
 
 instance MathFnC a => ValApply MathFn a where
   val_apply mf [x]    | Just f <- fn mf = f x

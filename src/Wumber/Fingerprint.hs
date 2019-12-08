@@ -1,5 +1,7 @@
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE TemplateHaskell #-}
+{-# LANGUAGE TypeSynonymInstances #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
@@ -67,6 +69,7 @@ tree_fingerprint = decode . fromStrict . finalize . foldl' each init
 $(forM [''(), ''Bool, ''Char, ''Double, ''Float,
         ''Int, ''Int8, ''Int16, ''Int32, ''Int64, ''Integer,
         ''Ordering,
+        ''String,
         ''Word, ''Word8, ''Word16, ''Word32, ''Word64]
    \n -> reinstantiate (ConT n) <$>
          [d| instance Fingerprintable where fingerprint = binary_fingerprint |])

@@ -23,6 +23,10 @@
 -- Add support for distributivity. This is complicated by the fact that we'll
 -- amb-reduce potentially many levels above where we do the expansion.
 
+-- TODO
+-- This implementation is a garbage fire. Most of this stuff should be done with
+-- the natural ordering offered by profiles, not this way.
+
 module Wumber.AlgebraicSymFn where
 
 
