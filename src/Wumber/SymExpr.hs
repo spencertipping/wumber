@@ -34,18 +34,7 @@
 --   Constants sort first, then variables, then function applications.
 --
 --   Don't @import@ this module directly unless you're writing Wumber-internal
---   code. Instead, import @Wumber@ to get relevant @Show@ instances and other
---   helpful interfacing.
-
--- TODO
--- Fully defer to the function type for operand storage. The only requirement
--- should be that we have a way to linearize the results.
-
--- TODO
--- Functions should opt into term reduction when they observe
--- associative/commutative collapse. Let's keep profiles and use them to store
--- things like polynomial term members, e.g. "[x², x, y³]". Then we'll know
--- whether we need to expand distributively.
+--   code. Instead, use 'Wumber.SymMath' to get a more useful interface.
 
 module Wumber.SymExpr (
   Sym(..),
@@ -54,9 +43,11 @@ module Wumber.SymExpr (
   SymVal(..),
   SymLift(..),
   vars_in,
+  has_var,
   amb,
   ambs,
   tree_size,
+  arity,
   operands,
   descendants,
   profile,
@@ -95,15 +86,13 @@ import qualified Wumber.BitSet as BS
 --   below).
 --
 --   Don't construct 'Sym' instances by hand; instead, use 'var', 'val', and
---   'SymbolicApply'. This will build consistent 'SymMeta' objects for you.
+--   'sym_apply_cons'. This will build consistent 'SymMeta' objects for you. (In
+--   fact, the 'SymMeta' constructor is hidden specifically for this reason.)
 --
 --   'Sym's compare first using the profile value, then using the fingerprint
---   within that. This creates properties we can use in 'Wumber.AlgebraicSymFn'.
-
--- TODO
--- What's the point of this abstraction when we could have the functions do all
--- the work? It seems like all we get for this is inline _sym_meta, but that
--- seems better handled by a new type of collection.
+--   within that. Profile-first comparisons make it possible to sort operands in
+--   a way that's useful for algebraic operations, if your functions are
+--   commutative.
 
 data Sym p f a = SymV !VarID
                | SymC !a
@@ -182,7 +171,7 @@ instance SymVal a b => SymVal (Sym p f a) b where
   val_of _        = Nothing
 
 
--- | The class of things that can be rewritten with other things.
+-- | The class of things that can be rewritten by substituting variables.
 class Rewritable a where rewrite :: a -> (BS.BitSet, IntMap a) -> a
 instance SymbolicApply p f a => Rewritable (Sym p f a) where
   rewrite v@(SymV i) (mb, mv) = fromMaybe v $ mv IM.!? i
@@ -202,6 +191,11 @@ vars_in :: Sym p f a -> BS.BitSet
 vars_in (SymV i) = BS.singleton i
 vars_in (SymC _) = BS.empty
 vars_in (SymF _ _ (SM b _ _ _ _)) = b
+
+
+-- | Returns 'True' if the expression refers to the given variable.
+has_var :: VarID -> Sym p f a -> Bool
+has_var v = BS.member v . vars_in
 
 
 -- | Chooses the simpler of two equivalent representations of the same logical

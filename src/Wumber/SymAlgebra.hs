@@ -1,3 +1,4 @@
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
@@ -36,73 +37,63 @@ import qualified Wumber.BitSet as BS
 --   itself, or until we don't know how to invert an expression. Most of this
 --   logic is delegated to 'Invertible'.
 
-isolate :: (Invertible (SymMath f a) (SymMath f a), SymMathC f a)
+isolate :: (Invertible (SymMath f a), SymMathC f a)
         => SymMath f a -> SymMath f a -> VarID -> Maybe (SymMath f a)
 isolate lhs rhs v | lv && rv  = isolate (lhs - rhs) 0 v
                   | rv        = isolate rhs lhs v
-                  | otherwise = invert v lhs >>= \f -> Just (f rhs)
+                  | otherwise = invert v lhs rhs
   where lv = BS.member v (vars_in $ unMath lhs)
         rv = BS.member v (vars_in $ unMath rhs)
 
 
--- | Things that can provide inversions against 'Sym' quantities.
-class Invertible a b where invert :: VarID -> a -> Maybe (b -> b)
-
-(^.) :: Maybe (b -> c) -> Maybe (a -> b) -> Maybe (a -> c)
-Just f ^. Just g = Just (f . g)
-_      ^. _      = Nothing
+-- | Things that can provide inversions against values.
+class Invertible a where invert :: VarID -> a -> a -> Maybe a
 
 
-{-
-instance SymConstraints f a => Invertible (Sym f a) (Sym f a) where
-  -- TODO
-  -- Implement Cantor-Zassenhaus to try to factor polynomials when we see the
-  -- variable mentioned in multiple terms.
-  --
-  -- https://kluedo.ub.uni-kl.de/frontdoor/deliver/index/docId/3555/file/Doktorarbeit_Martin_Lee.pdf
-  invert v (ts :+ n) | length i == 1 = invert v (head i) ^. Just (+ (- (o :+ n)))
-                     | otherwise     = Nothing
-    where (i, o) = partition (member v . vars_in) ts
+-- TODO
+-- If we see a variable shared across multiple subterms, we may still be able to
+-- invert by aggressively distributing operations and collapsing terms.
 
-instance SymConstraints f a => Invertible (SymTerm f a) (Sym f a) where
-  invert v (a :* es) | length i == 1 = invert v (head i) ^. Just (/ (sym (a :* o)))
-                     | otherwise     = Nothing
-    where (i, o) = partition (member v . vars_in) es
+instance (SymVal a a, SymMathC MathFn a) =>
+         Invertible (SymMath MathFn a) where
+  invert v (Math (SymV i)) b | i == v = Just b
+  invert v (Math (SymF f xs _)) b | [x] <- cs = goforit (Math x)
+                                  | otherwise = Nothing
+    where (cs, ncs) = partition (has_var v) xs
+          goforit x = case f of
+            Add -> invert v x $ b - apply' Add ncs
+            Mul -> invert v x $ b / apply' Mul ncs
+            Pow -> invert v (apply' RPow $ reverse xs) b
+            RPow -> case xs of
+              [p, x] | has_var v x -> invert v (Math x) $ b ** (1 / Math p)
+              [p, x] | has_var v p -> invert v (Math p) $ log b / log (Math x)
+              _                    -> Nothing
 
-instance SymConstraints f a => Invertible (SymExp f a) (Sym f a) where
-  invert v (x :** n) = invert v x ^. Just (** (val (1 / n)))
+            _ | [] <- ncs, Just g <- invert v f f ->
+                invert v x $ Math (sym_apply g [unMath b])
+            _ -> Nothing
 
-instance SymConstraints f a => Invertible (SymVar f a) (Sym f a) where
-  invert v (Poly (OS x))    = invert v x
-  invert v (Var i) | i == v = Just id
-  invert v (Var _)          = Nothing
-  invert v (Fn1 f _ (OS x)) = invert v x ^. invert v f
-  invert v (FnN _ _ _)      = Nothing
+  invert _ _ _ = Nothing
 
-  -- Most binary functions can't be inverted easily, but Pow can if either the
-  -- exponent or base is constant.
-  invert v (Fn2 Pow _ (OS x) (OS y))
-    | not (member v (vars_in y)) = invert v x ^. Just (** (1 / y))
-    | not (member v (vars_in x)) = invert v y ^. Just (\y -> log y / log x)
 
-  invert v (Fn2 _ _ _ _) = Nothing
-
-instance SymConstraints f a => Invertible SymFn1 (Sym f a) where
-  invert _ Log    = Just exp
-  invert _ Exp    = Just log
-  invert _ Sin    = Just asin
-  invert _ Cos    = Just acos
-  invert _ Tan    = Just atan
-  invert _ Asin   = Just sin
-  invert _ Acos   = Just cos
-  invert _ Atan   = Just tan
-  invert _ Sinh   = Just asinh
-  invert _ Cosh   = Just acosh
-  invert _ Tanh   = Just atanh
-  invert _ Asinh  = Just sinh
-  invert _ Acosh  = Just cosh
-  invert _ Atanh  = Just tanh
-  invert _ Negate = Just negate
-  invert _ Sqrt   = Just (** 2)
-  invert _ _      = Nothing
--}
+-- | Some math functions can be directly inverted by other math functions. A
+--   'Nothing' reply doesn't mean the function is uninvertible, but rather that
+--   its inversion can't be expressed by applying a unary function.
+instance Invertible MathFn where
+  invert _ Log _    = Just Exp
+  invert _ Exp _    = Just Log
+  invert _ Sin _    = Just Asin
+  invert _ Cos _    = Just Acos
+  invert _ Tan _    = Just Atan
+  invert _ Asin _   = Just Sin
+  invert _ Acos _   = Just Cos
+  invert _ Atan _   = Just Tan
+  invert _ Sinh _   = Just Asinh
+  invert _ Cosh _   = Just Acosh
+  invert _ Tanh _   = Just Atanh
+  invert _ Asinh _  = Just Sinh
+  invert _ Acosh _  = Just Cosh
+  invert _ Atanh _  = Just Tanh
+  invert _ Negate _ = Just Negate
+  invert _ Recip _  = Just Recip
+  invert _ _ _      = Nothing

@@ -11,16 +11,16 @@
 --   during pattern matching. If we think about the memory layout:
 --
 --   @
---                          zero pointers away
---                          |
---                          V
---   [sym !f !xs ![meta _ _ p _]]
+--                        zero pointers away
+--                        |
+--                        V
+--   [Sym !f !xs ![SM _ _ p _]]
 --            |
 --            Cons h t --> Cons h t --> Nil
 --                 |            |
---                 |            [sym !f !xs ...]  <- three pointers away
+--                 |            [Sym !f !xs ...]  <- three pointers away
 --                 |
---                 [sym !f !xs ..]                <- two pointers away
+--                 [Sym !f !xs ..]                <- two pointers away
 --   @
 --
 --   An ideal profile, then, describes a set of @!f@ values whose expected
@@ -34,6 +34,11 @@
 --   to query a node and something about its children; for instance, if you
 --   wanted to find multiply nodes whose operands were additions without
 --   visiting those operands.
+--
+--   There are two fairly compelling cases for profiles:
+--
+--   1. High-arity functions whose operands are sometimes of interest
+--   2. Highly nested applications of low-arity functions
 --
 --   TODO
 

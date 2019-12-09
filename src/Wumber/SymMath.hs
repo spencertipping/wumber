@@ -27,6 +27,7 @@
 
 module Wumber.SymMath (
   SymMath(..),
+  SymMath',
   SymMathC,
   SymMathV(..),
   SymVars(..),
@@ -34,6 +35,8 @@ module Wumber.SymMath (
   val,
   var,
   val_of,
+  apply,
+  apply',
   x_, y_, z_, t_,
   a_, b_, c_, d_,
 ) where
@@ -77,6 +80,14 @@ type SymMathC f a = (MathFnC a,
 
 -- TODO: support real profiles
 type MathProfile f = NoProfiles f
+
+
+-- | A wrapper around 'sym_apply' that works for 'SymMath' quantities.
+apply :: SymMathC f a => f -> [SymMath f a] -> SymMath f a
+apply f = apply' f . map unMath
+
+apply' :: SymMathC f a => f -> [SymMath' f a] -> SymMath f a
+apply' f = Math . sym_apply f
 
 
 instance Rewritable (SymMath' f a) =>
