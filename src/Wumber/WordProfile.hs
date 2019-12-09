@@ -6,7 +6,37 @@
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
--- | Profiles for 'Wumber.SymExpr' that encode down to 'Word64' values.
+-- | Profiles for 'Wumber.SymExpr' that encode down to 'Word64' values. The
+--   primary purpose of an inline profile is to reduce pointer dereferences
+--   during pattern matching. If we think about the memory layout:
+--
+--   @
+--                          zero pointers away
+--                          |
+--                          V
+--   [sym !f !xs ![meta _ _ p _]]
+--            |
+--            Cons h t --> Cons h t --> Nil
+--                 |            |
+--                 |            [sym !f !xs ...]  <- three pointers away
+--                 |
+--                 [sym !f !xs ..]                <- two pointers away
+--   @
+--
+--   An ideal profile, then, describes a set of @!f@ values whose expected
+--   pointer distance is uniformly distributed within that profile. This is
+--   nontrivial because not all functions have the same arity. In general,
+--   though, we can assume the arity distribution is log-normal or similar.
+--
+--   We also need to think about who's going to be using these profiles.
+--   Single-layer destructuring isn't a use case because the @!f@ function field
+--   will tell you everything you need to know. Profiles come in when you need
+--   to query a node and something about its children; for instance, if you
+--   wanted to find multiply nodes whose operands were additions without
+--   visiting those operands.
+--
+--   TODO
+
 module Wumber.WordProfile where
 
 

@@ -77,11 +77,13 @@ module Wumber.SymExpr (
 
 import Data.Binary   (Binary)
 import Data.Foldable (foldl', toList)
+import Data.Int      (Int32)
 import Data.IntMap   (IntMap)
 import Data.Maybe    (fromJust, fromMaybe, isJust)
 import GHC.Generics  (Generic)
 
 import Wumber.Fingerprint
+import Wumber.Numeric
 
 import qualified Data.IntMap   as IM
 import qualified Wumber.BitSet as BS
@@ -117,10 +119,11 @@ type VarID = Int
 
 -- | Metadata stored on each branching 'Sym' node for optimization purposes.
 --   'SymMeta' values are opaque outside of this module.
-data SymMeta p = SM { _sm_vars :: BS.BitSet,
-                      _sm_id   :: Fingerprint,
-                      _sm_prof :: !p,
-                      _sm_size :: !Int }
+data SymMeta p = SM { _sm_vars  :: BS.BitSet,
+                      _sm_id    :: Fingerprint,
+                      _sm_prof  :: !p,
+                      _sm_size  :: !Int32,
+                      _sm_arity :: !Int32 }
   deriving (Show, Eq, Ord, Generic, Binary)
 
 
@@ -138,13 +141,13 @@ instance (Fingerprintable f, Fingerprintable a) =>
          Fingerprintable (Sym p f a) where
   fingerprint (SymV v) = binary_fingerprint (False, binary_fingerprint v)
   fingerprint (SymC c) = binary_fingerprint (True,  fingerprint c)
-  fingerprint (SymF _ _ (SM _ i _ _)) = i
+  fingerprint (SymF _ _ (SM _ i _ _ _)) = i
 
 instance (Eq f, Eq a) => Eq (Sym p f a) where
-  SymV i                == SymV j                = i == j
-  SymC a                == SymC b                = a == b
-  SymF _ _ (SM _ i _ _) == SymF _ _ (SM _ j _ _) = i == j
-  _                     == _                     = False
+  SymV i                  == SymV j                  = i == j
+  SymC a                  == SymC b                  = a == b
+  SymF _ _ (SM _ i _ _ _) == SymF _ _ (SM _ j _ _ _) = i == j
+  _                       == _                       = False
 
 instance (Ord f, Ord a, Ord p, ProfileApply p f) => Ord (Sym p f a) where
   a@(SymC av) `compare` b@(SymC bv) = compare (profile a, av) (profile b, bv)
@@ -155,9 +158,10 @@ instance (Ord f, Ord a, Ord p, ProfileApply p f) => Ord (Sym p f a) where
   a@(SymV ai) `compare` b@(SymV bi) = compare (profile a, ai) (profile b, bi)
   SymV _      `compare` SymF _ _ _  = LT
 
-  SymF _ _ _            `compare` SymC _                = GT
-  SymF _ _ _            `compare` SymV _                = GT
-  SymF _ _ (SM _ i p _) `compare` SymF _ _ (SM _ j q _) = compare (p, i) (q, j)
+  SymF _ _ _              `compare` SymC _                  = GT
+  SymF _ _ _              `compare` SymV _                  = GT
+  SymF _ _ (SM _ i p _ _) `compare` SymF _ _ (SM _ j q _ _) =
+    compare (p, i) (q, j)
 
 
 -- | Promotes a constant or variable into a symbolic value.
@@ -182,7 +186,7 @@ instance SymVal a b => SymVal (Sym p f a) b where
 class Rewritable a where rewrite :: a -> (BS.BitSet, IntMap a) -> a
 instance SymbolicApply p f a => Rewritable (Sym p f a) where
   rewrite v@(SymV i) (mb, mv) = fromMaybe v $ mv IM.!? i
-  rewrite v@(SymF f xs (SM b _ _ _)) r@(mb, mv)
+  rewrite v@(SymF f xs (SM b _ _ _ _)) r@(mb, mv)
     | BS.null (BS.intersect mb b) = v
     | otherwise                   = sym_apply f $ map (flip rewrite r) xs
   rewrite x _ = x
@@ -197,7 +201,7 @@ v // xs = rewrite v (BS.fromList $ map fst xs, IM.fromList xs)
 vars_in :: Sym p f a -> BS.BitSet
 vars_in (SymV i) = BS.singleton i
 vars_in (SymC _) = BS.empty
-vars_in (SymF _ _ (SM b _ _ _)) = b
+vars_in (SymF _ _ (SM b _ _ _ _)) = b
 
 
 -- | Chooses the simpler of two equivalent representations of the same logical
@@ -212,10 +216,23 @@ ambs = foldl1 amb
 -- | Returns the total number of elements in the given tree: nodes and
 --   functions. When algebraic rewriting provides multiple representations, we
 --   usually choose the one with the smallest 'tree_size'.
+--
+--   prop> tree_size x == length (descendants x)
+
 tree_size :: Sym p f a -> Int
 tree_size (SymV _) = 1
 tree_size (SymC _) = 1
-tree_size (SymF _ _ (SM _ _ _ s)) = s
+tree_size (SymF _ _ (SM _ _ _ s _)) = fi s
+
+
+-- | Returns the number of children of the current node.
+--
+--   prop> arity x == length (operands x)
+
+arity :: Sym p f a -> Int
+arity (SymV _) = 0
+arity (SymC _) = 0
+arity (SymF _ _ (SM _ _ _ _ a)) = fi a
 
 
 -- | Returns the operands of the given node, or an empty list if the node is a
@@ -228,9 +245,9 @@ operands (SymF _ v _) = v
 
 -- | Returns the profile of the given node.
 profile :: ProfileApply p f => Sym p f a -> p
-profile (SymV i)                = prof_var
-profile (SymC x)                = prof_val
-profile (SymF _ _ (SM _ _ p _)) = p
+profile (SymV i)                  = prof_var
+profile (SymC x)                  = prof_val
+profile (SymF _ _ (SM _ _ p _ _)) = p
 
 
 -- | Returns this and all descendants.
@@ -266,7 +283,7 @@ sym_apply_fold = sym_apply_foldwith sym_apply_cons
 sym_apply_cons :: (Fingerprintable f, Fingerprintable (Sym p f a),
                    ProfileApply p f)
                => f -> [Sym p f a] -> Sym p f a
-sym_apply_cons f xs = SymF f xs (SM b id p s)
+sym_apply_cons f xs = SymF f xs (SM b id p (fi s) (fi $ length xs))
   where b  = BS.unions $ map vars_in xs
         id = tree_fingerprint $ fingerprint f : map fingerprint xs
         s  = 1 + sum (map tree_size xs)

@@ -210,6 +210,14 @@ instance (Eq a, MathFnC a, Fingerprintable a, SymVal a a) =>
       [x, y] -> sym_apply_cons RPow [x, y]
       _      -> error "RPow is strictly binary"
 
+    -- TODO
+    -- This logic is a mess. We have several places where additive and
+    -- multiplicative identities are provided. It wouldn't be wrong to use a
+    -- typeclass to manage that stuff.
+
+    -- TODO
+    -- Move algebraic structure into SymAlgebra.
+
     Add -> \case []  -> val 0
                  [x] -> x
                  xs  -> cons_or (val 0) Add $ comm_assoc_fold Add Mul xs
