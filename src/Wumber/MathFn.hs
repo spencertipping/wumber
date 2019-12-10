@@ -61,7 +61,7 @@ data MathFn = Add | Negate              -- binary functions
             | IfNN                      -- ternary
 
             | Upper | Lower             -- unused in math, but useful for JIT
-            | Sqrt
+            | Sqrt | Sqr
 
   deriving (Show, Eq, Ord, Bounded, Enum, Generic, Binary)
 
@@ -122,6 +122,8 @@ instance MathFnC a => Functionable MathFn (Maybe (a -> a)) where
   fn Round    = Just round
   fn Ceiling  = Just ceiling
   fn Floor    = Just floor
+  fn Sqrt     = Just sqrt
+  fn Sqr      = Just \x -> x*x
   fn _        = Nothing
 
 instance MathFnC a => Functionable MathFn (Maybe (a -> a -> a)) where

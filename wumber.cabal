@@ -57,6 +57,7 @@ library
                      , Wumber.Cursor
                      , Wumber.DualContour
                      , Wumber.Element
+                     , Wumber.EquationSystem
                      , Wumber.Fingerprint
                      , Wumber.Functionable
                      , Wumber.GeometricConstraints

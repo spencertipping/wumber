@@ -1,4 +1,3 @@
-{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
@@ -6,6 +5,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE IncoherentInstances #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE UndecidableInstances #-}
 
@@ -96,4 +96,6 @@ instance Invertible MathFn where
   invert _ Atanh _  = Just Tanh
   invert _ Negate _ = Just Negate
   invert _ Recip _  = Just Recip
+  invert _ Sqrt _   = Just Sqr
+  invert _ Sqr _    = Just Sqrt
   invert _ _ _      = Nothing

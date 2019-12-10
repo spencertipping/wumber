@@ -15,6 +15,11 @@
 --   then we take each of those and isolate/substitute variables, and finally we
 --   JIT a cost function with whichever variables remain and pass that to the
 --   GSL minimizer.
+--
+--   Constraint systems are used both for parametric modeling and for some
+--   finite element simulations. The main priority is to be able to scale out to
+--   hundreds or thousands of variables.
+
 module Wumber.Constraint where
 
 
@@ -22,7 +27,6 @@ import Control.Monad.RWS (RWS, evalRWS, get, modify', tell)
 import Data.Binary       (Binary)
 import Data.Either       (lefts, rights)
 import Data.Foldable     (toList)
-import Data.Maybe        (isJust)
 import GHC.Generics      (Generic(..))
 
 import qualified Data.Binary as B
@@ -30,6 +34,7 @@ import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 
 import Wumber.ClosedComparable
+import Wumber.EquationSystem
 import Wumber.Fingerprint
 import Wumber.Numeric
 import Wumber.SymAlgebra
@@ -49,7 +54,7 @@ type CVal f = SymMath f R
 --
 --   'Constrained' monad instances are both serializable and 'Fingerprintable'.
 --   This means you can build a @Computed (Constrained f a) _@ and Wumber will
---   memoize it.
+--   memoize the constraint solution.
 
 -- TODO
 -- Rewrite constraint variables as we discover equivalence. This means we need
@@ -88,7 +93,7 @@ set_equal a b = do let v = a - b
                    tell [Right v]
                    return v
 
--- | Sets one constrained quantity to be less than the other.
+-- | Sets one constrained quantity to be bounded above by another.
 set_below :: SymMathC f R => CVal f -> CVal f -> Constrained f (CVal f)
 set_below a b = do let v = (b - a) `upper` 0
                    tell [Right v]
@@ -99,15 +104,15 @@ set_below a b = do let v = (b - a) `upper` 0
 --   down to one or more scalar values that describe its out-of-whackness. The
 --   solver attempts to set these values to zero.
 class SymMathC f R => CEq f a | a -> f where
-  infix 4 =-=; (=-=) :: a -> a -> Constrained f (CVal f)
-  infix 4 <-=; (<-=) :: a -> a -> Constrained f (CVal f)
-  infix 4 >-=; (>-=) :: a -> a -> Constrained f (CVal f)
+  infix 4 =-=; (=-=) :: a -> a -> Constrained f ()
+  infix 4 <-=; (<-=) :: a -> a -> Constrained f ()
+  infix 4 >-=; (>-=) :: a -> a -> Constrained f ()
   (>-=) = flip (<-=)
 
 instance {-# OVERLAPPABLE #-} SymMathC f R => CEq f (CVal f) where
-  (=-=) = set_equal
-  (<-=) = set_below
+  (=-=) = set_equal >> return ()
+  (<-=) = set_below >> return ()
 
 instance {-# OVERLAPPABLE #-} (Foldable f, CEq t a) => CEq t (f a) where
-  a =-= b = sum <$> sequence (zipWith (=-=) (toList a) (toList b))
-  a <-= b = sum <$> sequence (zipWith (<-=) (toList a) (toList b))
+  a =-= b = sequence_ $ zipWith (=-=) (toList a) (toList b)
+  a <-= b = sequence_ $ zipWith (<-=) (toList a) (toList b)

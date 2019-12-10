@@ -50,6 +50,10 @@ member b (BS h _) | b < 64 = testBit h b
 member b (BS _ t)          = testBit t (b - 64)
 
 
+size :: BitSet -> Int
+size (BS h t) = popCount h + popCount t
+
+
 union :: BitSet -> BitSet -> BitSet
 union (BS h1 t1) (BS h2 t2) = BS (h1 .|. h2) (t1 .|. t2)
 

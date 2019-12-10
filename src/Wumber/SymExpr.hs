@@ -53,6 +53,7 @@ module Wumber.SymExpr (
   profile,
   Rewritable(..),
   (//),
+  (//:),
 
   SymbolicApply(..),
   sym_apply_foldwith,
@@ -182,8 +183,13 @@ instance SymbolicApply p f a => Rewritable (Sym p f a) where
 
 
 infixl 4 //
-(//) :: Rewritable a => a -> [(Int, a)] -> a
-v // xs = rewrite v (BS.fromList $ map fst xs, IM.fromList xs)
+infixl 4 //:
+
+(//)  :: Rewritable a => a -> [(Int, a)] -> a
+(//:) :: Rewritable a => a -> IntMap a   -> a
+
+v //  xs = rewrite v (BS.fromList $ map fst xs, IM.fromList xs)
+v //: xs = v // IM.toList xs
 
 
 -- | Returns the set of variables referred to by the given tree.
