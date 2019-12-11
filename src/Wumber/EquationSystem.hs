@@ -55,6 +55,11 @@ data EquationSystem f a = ES { _es_subst        :: !(IntMap (SymMath f a)),
   deriving (Show, Eq, Generic, Binary)
 
 
+-- | An empty equation system.
+init_es :: EquationSystem f a
+init_es = ES IM.empty BS.empty (SCF []) [] [] BS.empty
+
+
 -- | A cost function partitioned across multiple independent subsets of a
 --   variable space. We represent it this way so that we can invoke the
 --   numerical solver on subsystems with minimal dimension.
@@ -82,9 +87,7 @@ data Equation f a = EQN { _eq_q        :: !(SymMath f a),
 --   - 'EqMinimize': the equation has variables, but none of them can be
 --     isolated; its only purpose is to act as a numerical cost function.
 --   - 'EqUnivariate': the equation will specify the value of a single variable
---     once solved (either algebraically or numerically).
---   - 'EqUniMultivariate': the equation refers to multiple variables, but only
---     one of them can be isolated.
+--     once solved.
 --   - 'EqMultivariate': the equation relates multiple quantities; solving for
 --     any one of them won't yield a constant.
 --
@@ -93,17 +96,35 @@ data Equation f a = EQN { _eq_q        :: !(SymMath f a),
 --   system's substitutions to the equation 'SymMath' before characterizing it,
 --   entangling the system into the equation up front.
 
+-- TODO
+-- 'EqUnivariate' isn't the whole story; some univariate equations can be solved
+-- numerically even though the variable can't be isolated.
+
 data EquationType = EqConsistent
                   | EqInconsistent
                   | EqMinimize
                   | EqUnivariate
-                  | EqUniMultivariate
                   | EqMultivariate
   deriving (Show, Eq, Ord, Bounded, Enum, Generic, Binary)
 
 
 makeLenses ''EquationSystem
 makeLenses ''Equation
+
+
+-- | Adds a constraint to an equation system, where the constraint is a value to
+--   be set to zero. Mechanically, our goal is to use the new constraint to
+--   build new variable substitutions. Failing that, we try to add it to the
+--   list of quantities to minimize.
+constrain :: (Invertible (SymMath f a), SymMathC f a, Delta a)
+          => SymMath f a -> EquationSystem f a -> EquationSystem f a
+constrain c es@(ES s ss f i a d) = case _eq_type e of
+  EqConsistent   -> es
+  EqInconsistent -> ES s ss f (c:i) a d
+  EqMinimize     -> ES s ss (add_costfn (_eq_q e) f) i a d
+  EqMultivariate -> add_multivariate e es
+  _              -> add_univariate e es
+  where e = equation (c //: s)
 
 
 -- | Constructs an 'Equation' from the given 'SymMath' quantity by attempting to
@@ -118,9 +139,8 @@ equation m = EQN m t (BS.fromList $ map fst isos) (IM.fromList isos)
         v         = val_of m
         t         = if | Just v' <- v, abs v' <= δ 1 -> EqConsistent
                        | Just _ <- v                 -> EqInconsistent
-                       | length vs == 1              -> EqUnivariate
                        | null isos                   -> EqMinimize
-                       | length isos == 1            -> EqUniMultivariate
+                       | length isos == 1            -> EqUnivariate
                        | otherwise                   -> EqMultivariate
 
 
@@ -144,40 +164,38 @@ subst_costfn b m (SCF fs) = foldr add_costfn (SCF o) i'
         i'     = map ((//: m) . snd) i
 
 
--- | Adds a constraint to an equation system, where the constraint is a value to
---   be set to zero. Mechanically, our goal is to use the new constraint to
---   build new variable substitutions. Failing that, we try to add it to the
---   list of quantities to minimize.
-constrain :: (Invertible (SymMath f a), SymMathC f a, Delta a)
-          => SymMath f a -> EquationSystem f a -> EquationSystem f a
-constrain c es@(ES s ss f i a d) = case _eq_type e of
-  EqConsistent   -> es
-  EqInconsistent -> ES s ss f (c:i) a d
-  EqMinimize     -> ES s ss (add_costfn (_eq_q e) f) i a d
-  EqMultivariate -> add_multivariate e es
-  _              -> add_univariate e es
-  where e = equation (c //: s)
-
-
--- | Adds a multivariate equation to an 'EquationSystem'.
-add_multivariate :: SymMathC f a
+-- | Adds a multivariate equation to an 'EquationSystem'. If the equation
+--   provides a substitution for any existing degree of freedom, we choose one
+--   arbitrarily. Otherwise we enqueue the equation onto the '_es_amb' list.
+add_multivariate :: (Invertible (SymMath f a), SymMathC f a, Delta a)
                  => Equation f a -> EquationSystem f a -> EquationSystem f a
-add_multivariate e es = error "TODO"
+add_multivariate e es@(ES s ss f i a d)
+  | v:_ <- vs = add_subst v (_eq_subst e IM.! v) es
+  | otherwise = ES s ss f i (e:a) (BS.union d $ _eq_substset e)
+  where vs = BS.toList $ BS.intersect d (_eq_substset e)
 
 
--- | Adds a univariate equation to an 'EquationSystem'.
-add_univariate :: SymMathC f a
+-- | Adds a univariate equation to an 'EquationSystem'. We do this by solving
+--   the equation, either numerically or algebraically, and adding a
+--   substitution.
+add_univariate :: (Invertible (SymMath f a), SymMathC f a, Delta a)
                => Equation f a -> EquationSystem f a -> EquationSystem f a
-add_univariate e es = error "TODO"
+add_univariate e = add_subst v q where [(v, q)] = IM.toList (_eq_subst e)
 
 
 -- | Applies a new substitution to an 'EquationSystem'. If the 'EquationSystem'
 --   has ambivalent equations, then this may trigger a cascade of substitutions.
+--
+--   If you try to substitute the same variable multiple times, we'll derive a
+--   new equation by setting the substitutions equal to each other.
+
 add_subst :: (Invertible (SymMath f a), SymMathC f a, Delta a)
           => VarID -> SymMath f a -> EquationSystem f a -> EquationSystem f a
-add_subst v m (ES s ss f i a d) = foldr constrain es0 (map _eq_q ai)
+add_subst v q es@(ES s ss f i a d)
+  | Just q' <- IM.lookup v s = constrain (q - q') es
+  | otherwise                = foldr constrain es0 (map _eq_q ai)
   where es0      = ES s' ss' f' i ao (BS.unions $ map (vars_in . _eq_q) ao)
-        s'       = IM.insert v m s
+        s'       = IM.insert v q $ IM.map (// [(v, q)]) s
         ss'      = BS.union ss (BS.singleton v)
         f'       = subst_costfn ss' s' f
         (ai, ao) = partition (BS.member v . _eq_substset) a
