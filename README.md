@@ -73,7 +73,7 @@ Some places to start:
   + [`Wumber.SymMath`](src/Wumber/SymMath.hs): symbolic math expressions
   + [`Wumber.SymJIT`][jit]: JIT compilation for symbolic expressions
   + [`Wumber.Constraint`][const]: constraint specification DSL
-  + [`Wumber.EquationSolver`][esolv]: algebraic + numerical solver
+  + [`Wumber.EquationSolve`][esolv]: algebraic + numerical solver
 + [`WumberShell`](shell/WumberShell.hs): display and interactive reloading
   + [`Wumber.Element`](src/Wumber/Element.hs): graphics we render (yes, they're
     in the wrong namespace)
@@ -94,7 +94,7 @@ Some places to start:
 [amdre]: src/Wumber/AMD64RE.hs
 [amdjit]: src/Wumber/AMD64JIT.hs
 [const]: src/Wumber/Constraint.hs
-[esolv]: src/Wumber/EquationSolver.hs
+[esolv]: src/Wumber/EquationSolve.hs
 
 
 ## System libraries
