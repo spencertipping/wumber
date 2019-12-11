@@ -166,7 +166,7 @@ instance SymLift a (Sym p f a) where
 
 -- | The class of symbolic things that can sometimes be reduced to non-symbolic
 --   values.
-class SymVal s a where val_of :: s -> Maybe a
+class SymVal s a | s -> a where val_of :: s -> Maybe a
 instance SymVal a b => SymVal (Sym p f a) b where
   val_of (SymC x) = val_of x
   val_of _        = Nothing

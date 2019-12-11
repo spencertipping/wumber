@@ -31,19 +31,11 @@ import Wumber.SymMath
 import qualified Wumber.BitSet as BS
 
 
--- | Takes both sides of an equation and a variable to isolate, and returns a
---   mathematically sound substitution for the variable if possible. Internally,
---   all we're doing is applying function inverses until the variable ends up by
---   itself, or until we don't know how to invert an expression. Most of this
---   logic is delegated to 'Invertible'.
-
+-- | @isolate v s@ attempts to solve the implicit equation @s = 0@ for the
+--   variable @v@.
 isolate :: (Invertible (SymMath f a), SymMathC f a)
-        => SymMath f a -> SymMath f a -> VarID -> Maybe (SymMath f a)
-isolate lhs rhs v | lv && rv  = isolate (lhs - rhs) 0 v
-                  | rv        = isolate rhs lhs v
-                  | otherwise = invert v lhs rhs
-  where lv = BS.member v (vars_in $ unMath lhs)
-        rv = BS.member v (vars_in $ unMath rhs)
+        => VarID -> SymMath f a -> Maybe (SymMath f a)
+isolate v e = invert v e 0
 
 
 -- | Things that can provide inversions against values.
