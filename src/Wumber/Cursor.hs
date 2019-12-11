@@ -7,7 +7,6 @@ module Wumber.Cursor where
 import Control.Monad.Identity
 import Control.Monad.RWS.Strict
 import GHC.Float
-import Graphics.Gloss.Data.Color
 import Lens.Micro
 import Linear.Matrix hiding (trace, translation)
 import Linear.Projection

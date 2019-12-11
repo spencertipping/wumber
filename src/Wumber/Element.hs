@@ -7,7 +7,6 @@
 module Wumber.Element where
 
 import Data.Foldable (foldl')
-import Graphics.Gloss
 import Lens.Micro
 import Lens.Micro.TH
 import Linear.Matrix

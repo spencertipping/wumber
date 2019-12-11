@@ -43,7 +43,7 @@ type_is :: Typeable a => a
 type_is = HI.as
 
 
-compiler_loop :: (Typeable a, Computed a (Sketch (V3 R)))
+compiler_loop :: (Show a, Typeable a, Computed a (Sketch (V3 R)))
               => MVar (Maybe [Element]) -> FilePath -> String -> a -> IO ()
 compiler_loop model f expr type_marker = do
   i <- initINotify
@@ -58,10 +58,6 @@ module_name p = map dotify $ take (length p - 3) p
         dotify  c  =  c
 
 
-worker :: MVar ThreadId
-worker = unsafePerformIO newEmptyMVar
-
-
 nanos :: IO Integer
 nanos = toNanoSecs <$> getTime Realtime
 
@@ -69,7 +65,7 @@ nanos_since :: Integer -> IO Integer
 nanos_since t = flip (-) t <$> nanos
 
 
-recompile :: (Typeable a, Computed a (Sketch (V3 R)))
+recompile :: (Show a, Typeable a, Computed a (Sketch (V3 R)))
           => MVar (Maybe [Element]) -> FilePath -> String -> a -> IO ()
 recompile model f expr type_marker = do
   eprintf "\027[2J\027[1;1Hcompiling...\n"
@@ -94,16 +90,13 @@ recompile model f expr type_marker = do
       eprintf "%s\n" (show e)
 
     Right p -> do
-      w <- tryTakeMVar worker
-      case w of Just t -> killThread t
-                _      -> return ()
-
-      forkOS (update_model model p) >>= putMVar worker
+      eprintf "  got object: %s\n" (show p)
+      update_model model p
       eprintf "\027[2J\027[1;1H%s OK\n" f
       eprintf "  compile time: %dms\n" (compile_nanos `quot` 1_000_000)
 
 
-update_model :: Computed a (Sketch (V3 R))
+update_model :: (Show a, Computed a (Sketch (V3 R)))
              => MVar (Maybe [Element]) -> a -> IO ()
 update_model model v = do
   start_time <- nanos

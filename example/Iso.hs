@@ -3,8 +3,6 @@
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE TupleSections #-}
 
-{-# OPTIONS -fobject-code #-}
-
 module Iso (example) where
 
 import Data.Foldable
@@ -18,7 +16,7 @@ import Wumber
 
 
 example :: FRep V3 MathFn
-example = FRep (SymMathV $ model $ screw 0 v3) (BB (-2 :: V3 R) 2)
+example = FRep (SymMathV $! model $! screw 0 v3) (BB (-2 :: V3 R) 2)
 
 
 for  = flip map

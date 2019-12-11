@@ -28,7 +28,7 @@ import WumberShell.Render
 import WumberShell.View
 
 
-wumber_live :: (Typeable a, Computed a (Sketch (V3 R)))
+wumber_live :: (Show a, Typeable a, Computed a (Sketch (V3 R)))
             => FilePath -> FilePath -> String -> a -> IO ()
 wumber_live base_path file expr type_marker = do
   changeWorkingDirectory base_path
@@ -37,7 +37,7 @@ wumber_live base_path file expr type_marker = do
   wumber_window ("Wumber " ++ file) model
 
 
-wumber_main :: Computed a (Sketch (V3 R)) => a -> IO ()
+wumber_main :: (Show a, Computed a (Sketch (V3 R))) => a -> IO ()
 wumber_main m = do
   model <- newMVar Nothing
   update_model model m
