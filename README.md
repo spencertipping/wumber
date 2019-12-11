@@ -56,18 +56,15 @@ have features that don't immediately relate to the project I'm working on.
 ## Code spelunking guide
 Things under active construction:
 
-+ [`SymMath`][sym]: bugfixes and much better performance
 + [`JITIR`][jitir]: faster compilation and better superscalar codegen
 + [`AMD64RE`][amdre]: on-the-fly processor profiling
 + [`AMD64JIT`][amdjit]: AMD64 JIT backend
 
 Code that's going away or will be unrecognizably refactored:
 
-+ [`ConstraintSimplify`](src/Wumber/ConstraintSimplify.hs)
 + [`Cursor`](src/Wumber/Cursor.hs)
 + [`Element`](src/Wumber/Element.hs)
 + [`GeometricConstraints`](src/Wumber/GeometricConstraints.hs)
-+ [`SymDerivative`](src/Wumber/SymbolicDerivative.hs)
 
 Some places to start:
 
@@ -76,8 +73,8 @@ Some places to start:
   + [`Wumber.SymMath`](src/Wumber/SymMath.hs): symbolic math expressions
   + [`Wumber.SymJIT`][jit]: JIT compilation for symbolic expressions
   + [`Wumber.Constraint`][const]: constraint specification DSL
-  + [`Wumber.ConstraintSolver`][csolv]: algebraic + numerical solver
-+ [`WumberShell`](src/WumberShell.hs): display and interactive reloading
+  + [`Wumber.EquationSolver`][esolv]: algebraic + numerical solver
++ [`WumberShell`](shell/WumberShell.hs): display and interactive reloading
   + [`Wumber.Element`](src/Wumber/Element.hs): graphics we render (yes, they're
     in the wrong namespace)
 
@@ -97,7 +94,7 @@ Some places to start:
 [amdre]: src/Wumber/AMD64RE.hs
 [amdjit]: src/Wumber/AMD64JIT.hs
 [const]: src/Wumber/Constraint.hs
-[csolv]: src/Wumber/ConstraintSolver.hs
+[esolv]: src/Wumber/EquationSolver.hs
 
 
 ## System libraries
