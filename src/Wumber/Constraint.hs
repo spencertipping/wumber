@@ -85,8 +85,9 @@ cvars = mapM cvar
 --   solved values.
 csolve :: (Eq a, SymLift R a, SymMathC f R, Rewritable a)
        => Constrained f a -> a
-csolve m = r // [(v, val x) | (v, x) <- IM.toList $ solve (IM.fromList ivs) es]
+csolve m = r // [(v, val x) | (v, x) <- IM.toList solution]
   where (r, (_, es), ivs) = runRWS m () (0, init_es)
+        solution          = solve default_settings (IM.fromList ivs) es
 
 
 -- | Sets two constrained quantities equal to each other.

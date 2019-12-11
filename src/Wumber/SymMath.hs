@@ -38,7 +38,6 @@ module Wumber.SymMath (
   apply,
   apply',
   x_, y_, z_, t_,
-  a_, b_, c_, d_,
 ) where
 
 
@@ -59,7 +58,6 @@ import Wumber.Fingerprint
 import Wumber.Functionable
 import Wumber.MathFn
 import Wumber.SymExpr
-import Wumber.SymMatch
 
 import qualified Data.IntMap   as IM
 import qualified Wumber.BitSet as BS
@@ -75,6 +73,9 @@ type SymMath' f = Sym (MathProfile f) f
 
 -- | Class constraints that make most 'SymMath' things work.
 type SymMathC f a = (MathFnC a,
+                     Fingerprintable f,
+                     Eq a,
+                     Eq f,
                      SymVal a a,
                      SymbolicApply (MathProfile f) f a,
                      MathApply a (SymMath f a),
@@ -111,11 +112,6 @@ x_ = var 0 :: SymMath f a               -- ^ An alias for @var 0@
 y_ = var 1 :: SymMath f a               -- ^ An alias for @var 1@
 z_ = var 2 :: SymMath f a               -- ^ An alias for @var 2@
 t_ = var 3 :: SymMath f a               -- ^ An alias for @var 3@
-
-a_ = val (Math (As 0)) :: SymMath f (Match a)
-b_ = val (Math (As 1)) :: SymMath f (Match a)
-c_ = val (Math (As 2)) :: SymMath f (Match a)
-d_ = val (Math (As 3)) :: SymMath f (Match a)
 
 
 -- | A way to indicate that a symbolic quantity is acting as a vector function.
@@ -161,9 +157,6 @@ instance Integral Double where toInteger = truncate; quotRem = qr
 instance Integral Float  where toInteger = truncate; quotRem = qr
 
 
-instance FnMatch MathFn (Sym (MathProfile MathFn) MathFn) where
-  fn_match = math_fn_match
-
 instance (Show a, FnShow f) => Show (SymMath f a) where
   show (Math (SymC x)) = show x
   show (Math (SymV i)) | i == 0 = "x_"
@@ -175,7 +168,7 @@ instance (Show a, FnShow f) => Show (SymMath f a) where
   show (Math (SymF f xs _)) =
     fshow f $ map (show . (Math :: Sym (MathProfile f) f a -> SymMath f a)) xs
 
-instance (MathFnC a, SymVal a a, Fingerprintable a,
+instance (Eq a, Ord a, MathFnC a, SymVal a a, Fingerprintable a,
           ProfileApply (MathProfile MathFn) MathFn) =>
          SymbolicApply (MathProfile MathFn) MathFn a where
   sym_apply = sym_apply_foldwith fn
@@ -184,13 +177,13 @@ instance MathFnC a => ValApply MathFn a where
   val_apply Add [] = 0
   val_apply Mul [] = 1
 
-  val_apply mf [x, y, z] | Just f <- fn mf = f x y z
+  -- val_apply mf [x, y, z] | Just f <- fn mf = f x y z
   val_apply mf [x]       | Just f <- fn mf = f x
   val_apply mf (x:xs)    | Just f <- fn mf = foldl' f x xs
   val_apply mf xs = error $ "can't apply " ++ show mf
                     ++ " to list of arity " ++ show (length xs)
 
-instance (MathFnC a, SymVal a a, Fingerprintable a) =>
+instance (Eq a, Ord a, MathFnC a, SymVal a a, Fingerprintable a) =>
          MathApply a (SymMath MathFn a) where
   fn0                              = val
   fn1 f (Math x)                   = Math $ sym_apply f [x]
@@ -213,7 +206,7 @@ instance (MathFnC a, SymVal a a, Fingerprintable a) =>
 --   up front that each operand is normalized by the time we're 'sym_apply'ing
 --   something on top of it.
 
-instance (Eq a, MathFnC a, Fingerprintable a, SymVal a a) =>
+instance (Eq a, Ord a, MathFnC a, Fingerprintable a, SymVal a a) =>
          Functionable MathFn ([SymMath' MathFn a] -> SymMath' MathFn a) where
   fn = \case
     Negate -> \[x]    -> sym_apply Mul  [x, val (-1)]
@@ -294,12 +287,3 @@ term_collapse f g = sort
 
         sum_subterms = map (\l@((x, _):_) -> (x, sum $ map snd l))
                        . groupBy ((==) `on` fst)
-
-
--- TODO
--- Clever stuff to make algebraic inversion work
-math_fn_match :: (Eq a, Fingerprintable a)
-              => MathFn -> MathFn
-              -> [SymMath' MathFn (Match a)] -> [SymMath' MathFn a]
-              -> Maybe [(VarID, SymMath' MathFn a)]
-math_fn_match = fn_exact_match

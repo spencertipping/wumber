@@ -71,7 +71,6 @@ library
                      , Wumber.SymDerivative
                      , Wumber.SymExpr
                      , Wumber.SymJIT
-                     , Wumber.SymMatch
                      , Wumber.SymMath
                      , Wumber.VectorConversion
                      , Wumber.WordProfile

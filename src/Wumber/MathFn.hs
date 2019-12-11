@@ -1,5 +1,6 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE CPP #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -14,6 +15,13 @@
 
 -- | 'Functionable' translation for Haskell math.
 module Wumber.MathFn where
+
+
+-- NOTE
+-- Our 'Math' wrapper falsely implements 'Ord', which means that any failures
+-- happen at runtime. If you activate this flag, we will temporarily no longer
+-- implement Ord so you get a (hopefully more useful) type error.
+#define DEBUG_ORD_LEAKAGE 0
 
 
 import Data.Binary   (Binary)
@@ -67,7 +75,13 @@ data MathFn = Add | Negate              -- binary functions
 
 -- | The set of constraints we need for math functions to be able to operate on
 --   concrete values. This is used in 'Wumber.SymMath'.
-type MathFnC a = (Show a, Num a, Fractional a, Integral a, Floating a, RealFloat a)
+#if !DEBUG_ORD_LEAKAGE
+type MathFnC a = (Eq a, Show a, Num a, Fractional a, Integral a,
+                  Floating a, RealFloat a)
+#else
+type MathFnC a = (Eq a, Show a, Num a, Fractional a, Floating a)
+#endif
+
 
 instance Fingerprintable MathFn where fingerprint = binary_fingerprint
 
@@ -118,43 +132,41 @@ instance MathFnC a => Functionable MathFn (Maybe (a -> a)) where
   fn Asinh    = Just asinh
   fn Acosh    = Just acosh
   fn Atanh    = Just atanh
+  fn Sqrt     = Just sqrt
+  fn Sqr      = Just \x -> x*x
+#if !DEBUG_ORD_LEAKAGE
   fn Truncate = Just truncate
   fn Round    = Just round
   fn Ceiling  = Just ceiling
   fn Floor    = Just floor
-  fn Sqrt     = Just sqrt
-  fn Sqr      = Just \x -> x*x
+#endif
   fn _        = Nothing
 
 instance MathFnC a => Functionable MathFn (Maybe (a -> a -> a)) where
   fn Add   = Just (+)
   fn Mul   = Just (*)
+  fn Pow   = Just (**)
+  fn RPow  = Just $ flip (**)
+#if !DEBUG_ORD_LEAKAGE
   fn Rem   = Just rem
   fn Quot  = Just quot
   fn Mod   = Just mod
   fn Div   = Just div
-  fn Pow   = Just (**)
-  fn RPow  = Just $ flip (**)
   fn Atan2 = Just atan2
+#endif
   fn _     = Nothing
-
-instance MathFnC a => Functionable MathFn (Maybe (a -> a -> a -> a)) where
-  fn IfNN = Just \x a b -> if x >= 0 then a else b
-  fn _    = Nothing
 
 
 -- | Semi-automatic Haskell math derivation for stuff. Implementing all of the
 --   instance functions by hand is a lot of work, so let's factor it all into a
 --   @newtype@ instead.
-newtype Math a b = Math { unMath :: a } deriving (Generic, Binary)
+newtype Math a b = Math { unMath :: a } deriving (Eq, Generic, Binary)
 
-instance Eq (Math a b) where
-  _ == _ = error $ "Math instances are not comparable; use IfNN "
-           ++ "(or, for structural comparison, unwrap with unMath)"
-
-instance Ord (Math a b) where
-  compare _ _ = error $ "Math instances are not comparable; use IfNN "
+#if !DEBUG_ORD_LEAKAGE
+instance Eq a => Ord (Math a b) where
+  compare _ _ = error $ "Math instances are not Ord-comparable; use IfNN "
                 ++ "(or, for structural comparison, unwrap with unMath)"
+#endif
 
 
 class MathApply a m | m -> a where
@@ -205,13 +217,15 @@ instance (MathApply n (Math a b), MathFnC n) => Enum (Math a b) where
   pred x     = x - 1
   succ x     = x + 1
 
-instance (MathApply n (Math a b), MathFnC n) => Real (Math a b) where
+#if !DEBUG_ORD_LEAKAGE
+instance (Eq a, MathApply n (Math a b), MathFnC n) => Real (Math a b) where
   toRational _ = error "can't collapse Math to Rational via toRational"
 
-instance (MathApply n (Math a b), MathFnC n) => Integral (Math a b) where
+instance (Eq a, MathApply n (Math a b), MathFnC n) => Integral (Math a b) where
   toInteger _ = error "can't collapse Math to Integer; use Truncate"
   quotRem a b = (fn2 Quot a b, fn2 Rem a b)
   divMod a b  = (fn2 Div a b,  fn2 Mod a b)
+#endif
 
 
 -- | A quotient/remainder function we reuse in several places.
@@ -225,14 +239,15 @@ instance (MathApply n (Math a b), MathFnC n) => Integral (Math a b) where
 
 qr a b = (q, r) where q = truncate (a / b); r = a - q*b
 
-instance (MathApply n (Math a b), MathFnC n) => RealFrac (Math a b) where
+#if !DEBUG_ORD_LEAKAGE
+instance (Eq a, MathApply n (Math a b), MathFnC n) => RealFrac (Math a b) where
   properFraction a = (unsafeCoerce q, r) where (q, r) = qr a 1
   truncate         = unsafeCoerce . fn1 Truncate
   round            = unsafeCoerce . fn1 Round
   ceiling          = unsafeCoerce . fn1 Ceiling
   floor            = unsafeCoerce . fn1 Floor
 
-instance (MathApply n (Math a b), MathFnC n) => RealFloat (Math a b) where
+instance (Eq a, MathApply n (Math a b), MathFnC n) => RealFloat (Math a b) where
   floatRadix _     = error "floatRadix is undefined for Math"
   floatDigits _    = error "floatDigits is undefined for Math"
   floatRange _     = error "floatRange is undefined for Math"
@@ -244,3 +259,4 @@ instance (MathApply n (Math a b), MathFnC n) => RealFloat (Math a b) where
   isNaN _          = error "isNaN is undefined for Math"
   isInfinite _     = error "isInfinite is undefined for Math"
   atan2            = fn2 Atan2
+#endif

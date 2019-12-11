@@ -100,6 +100,11 @@ data Equation f a = EQN { _eq_q        :: !(SymMath f a),
 -- 'EqUnivariate' isn't the whole story; some univariate equations can be solved
 -- numerically even though the variable can't be isolated.
 
+-- TODO
+-- Sometimes we'll have a self-contained subsystem that is entangled with a
+-- larger subsystem. It makes sense to partition by solving the smaller one
+-- first, then propagating constants into the larger one.
+
 data EquationType = EqConsistent
                   | EqInconsistent
                   | EqMinimize
