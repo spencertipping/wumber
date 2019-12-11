@@ -83,9 +83,9 @@ cvars = mapM cvar
 
 -- | Evaluates a set of constraints and returns the solution, rewritten with the
 --   solved values.
-csolve :: (Eq a, SymLift R a, SymMathC f R, Rewritable a)
-       => Constrained f a -> a
-csolve m = r // [(v, val x) | (v, x) <- IM.toList solution]
+csolve :: (Eq a, SymLift R a, SymMathC f R, Rewritable a, Functor g)
+       => Constrained f (g a) -> (g a)
+csolve m = (// [(v, val x) | (v, x) <- IM.toList solution]) <$> r
   where (r, (_, es), ivs) = runRWS m () (0, init_es)
         solution          = solve default_settings (IM.fromList ivs) es
 

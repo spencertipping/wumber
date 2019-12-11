@@ -7,6 +7,7 @@ import System.Environment (getArgs, getProgName)
 import Wumber
 import WumberShell (wumber_main, wumber_live, type_is)
 
+import qualified Data.ByteString.Lazy as BL
 import qualified Iso as Iso
 
 
@@ -23,7 +24,7 @@ examples = [("iso",      iso_example),
             ("say-hi",   putStrLn "hi!")]
 
   where iso_example = wumber_main Iso.example
-        iso_live    = wumber_live "example" "Iso.hs" "example"
+        iso_live    = wumber_live "example" "Iso.hs" "runWumber example"
                                   (type_is :: FRep V3 MathFn)
 
 

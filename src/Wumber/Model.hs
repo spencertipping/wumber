@@ -91,12 +91,15 @@ class (Fingerprintable a, Binary b) => Computed a b where compute :: a -> b
 
 instance {-# OVERLAPPABLE #-}
          (SymMathC f R,
+          Binary f,
+          Binary (g a),
           SymLift R a,
           Rewritable a,
           Eq a,
           Fingerprintable (Constrained f a),
-          Binary a) =>
-         Computed (Constrained f a) a where
+          Binary a,
+          Functor g) =>
+         Computed (Constrained f (g a)) (g a) where
   compute = csolve
 
 
