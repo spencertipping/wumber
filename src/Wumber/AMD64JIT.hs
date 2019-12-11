@@ -68,10 +68,13 @@ empty_regset = RS 0
 
 -- | A model of the thread graph and processor that represents the current
 --   instruction graph and a mapping from resident threads to XMM registers
---   ('ps_tr').
+--   ('as_tr').
 data AsmState = AS { _as_g  :: IR MathFn Double,
                      _as_tr :: IntMap XMMReg }
   deriving (Show, Eq, Generic)
+
+
+assemble_ir = error "TODO"
 
 
 -- TODO

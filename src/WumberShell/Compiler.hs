@@ -30,7 +30,7 @@ import qualified Language.Haskell.Interpreter as HI
 
 import Wumber
 import Wumber.DualContour
-import Wumber.SymbolicJIT
+import Wumber.SymJIT
 
 import WumberShell.ComputedCache
 

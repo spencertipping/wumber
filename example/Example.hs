@@ -24,7 +24,7 @@ examples = [("iso",      iso_example),
 
   where iso_example = wumber_main Iso.example
         iso_live    = wumber_live "example" "Iso.hs" "example"
-                                  (type_is :: FRep V3 ())
+                                  (type_is :: FRep V3 MathFn)
 
 
 usage :: IO ()

@@ -143,6 +143,11 @@ instance SymVars V3 where vars = v3; var_ids = V3 0 1 2
 instance SymVars V4 where vars = v4; var_ids = V4 0 1 2 3
 
 
+instance Bounded a => Bounded (SymMath f a) where
+  minBound = val minBound
+  maxBound = val maxBound
+
+
 instance SymVal a b => SymVal (SymMath f a) b where val_of = val_of . unMath
 
 instance SymVal Double Double where val_of = Just

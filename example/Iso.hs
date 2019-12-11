@@ -1,7 +1,7 @@
-{-# LANGUAGE TupleSections #-}
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE TupleSections #-}
 
 {-# OPTIONS -fobject-code #-}
 
@@ -17,15 +17,15 @@ import Linear.Vector
 import Wumber
 
 
-example :: FRep V3 ()
-example = FRep (SymV $ model $ screw 0 v3) (BB (-2 :: V3 R) 2)
+example :: FRep V3 MathFn
+example = FRep (SymMathV $ model $ screw 0 v3) (BB (-2 :: V3 R) 2)
 
 
 for  = flip map
 cfor = flip concatMap
 
 
-screw :: Sym () R -> V3 (Sym () R) -> V3 (Sym () R)
+screw :: SymMath MathFn R -> V3 (SymMath MathFn R) -> V3 (SymMath MathFn R)
 screw dθ v@(V3 x y z) = v *! rotate_z_m (dθ * z)
 
 

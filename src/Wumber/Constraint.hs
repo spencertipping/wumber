@@ -23,17 +23,19 @@
 module Wumber.Constraint where
 
 
-import Control.Monad.RWS (RWS, evalRWS, get, modify', tell)
+import Control.Monad.RWS (RWS, runRWS, gets, modify', tell)
 import Data.Binary       (Binary)
 import Data.Either       (lefts, rights)
 import Data.Foldable     (toList)
 import GHC.Generics      (Generic(..))
+import Lens.Micro        (_1, _2, (%~))
 
 import qualified Data.Binary as B
 import qualified Data.IntMap as IM
 import qualified Data.IntSet as IS
 
 import Wumber.ClosedComparable
+import Wumber.EquationSolve
 import Wumber.EquationSystem
 import Wumber.Fingerprint
 import Wumber.Numeric
@@ -56,19 +58,12 @@ type CVal f = SymMath f R
 --   This means you can build a @Computed (Constrained f a) _@ and Wumber will
 --   memoize the constraint solution.
 
--- TODO
--- Rewrite constraint variables as we discover equivalence. This means we need
--- to replace [] with something that does more active management.
---
--- I think we can replace ConstraintSimplify with an incremental approach,
--- probably just Monoid.
-
-type Constrained f = RWS () [Either (VarID, R) (CVal f)] VarID
+type Constrained f = RWS () [(VarID, R)] (VarID, EquationSystem f R)
 
 instance (Binary a, Binary f) => Binary (Constrained f a) where
-  put m = B.put $ evalRWS m () 0
-  get = do (a, cs) <- B.get
-           return $ tell cs >> return a
+  put m = B.put $ runRWS m () (0, init_es)
+  get = do (a, s, i) <- B.get
+           return $ tell i >> modify' (const s) >> return a
 
 instance (Binary a, Binary f) => Fingerprintable (Constrained f a) where
   fingerprint = binary_fingerprint
@@ -76,9 +71,9 @@ instance (Binary a, Binary f) => Fingerprintable (Constrained f a) where
 
 -- | Create a new constrained variable initialized to the specified value.
 cvar :: R -> Constrained f (CVal f)
-cvar init = do id <- get
-               modify' (+ 1)
-               tell [Left (id, init)]
+cvar init = do id <- gets fst
+               modify' $ _1 %~ (+ 1)
+               tell [(id, init)]
                return $ var id
 
 -- | A multidimensional variant of 'cvar'.
@@ -86,17 +81,26 @@ cvars :: (SymMathC f R, Traversable t) => t R -> Constrained f (t (CVal f))
 cvars = mapM cvar
 
 
--- | Sets two constrained quantities equal to each other. When the two
---   quantities yield isolatable terms, adds entries to the substitution map.
-set_equal :: SymMathC f R => CVal f -> CVal f -> Constrained f (CVal f)
+-- | Evaluates a set of constraints and returns the solution, rewritten with the
+--   solved values.
+csolve :: (Eq a, SymLift R a, SymMathC f R, Rewritable a)
+       => Constrained f a -> a
+csolve m = r // [(v, val x) | (v, x) <- IM.toList $ solve (IM.fromList ivs) es]
+  where (r, (_, es), ivs) = runRWS m () (0, init_es)
+
+
+-- | Sets two constrained quantities equal to each other.
+set_equal :: (Invertible (SymMath f R), SymMathC f R)
+          => CVal f -> CVal f -> Constrained f (CVal f)
 set_equal a b = do let v = a - b
-                   tell [Right v]
+                   modify' $ _2 %~ constrain v
                    return v
 
 -- | Sets one constrained quantity to be bounded above by another.
-set_below :: SymMathC f R => CVal f -> CVal f -> Constrained f (CVal f)
+set_below :: (Invertible (SymMath f R), SymMathC f R)
+          => CVal f -> CVal f -> Constrained f (CVal f)
 set_below a b = do let v = (b - a) `upper` 0
-                   tell [Right v]
+                   modify' $ _2 %~ constrain v
                    return v
 
 
@@ -109,9 +113,10 @@ class SymMathC f R => CEq f a | a -> f where
   infix 4 >-=; (>-=) :: a -> a -> Constrained f ()
   (>-=) = flip (<-=)
 
-instance {-# OVERLAPPABLE #-} SymMathC f R => CEq f (CVal f) where
-  (=-=) = set_equal >> return ()
-  (<-=) = set_below >> return ()
+instance {-# OVERLAPPABLE #-} (Invertible (SymMath f R), SymMathC f R) =>
+                              CEq f (CVal f) where
+  a =-= b = set_equal a b >> return ()
+  a <-= b = set_below a b >> return ()
 
 instance {-# OVERLAPPABLE #-} (Foldable f, CEq t a) => CEq t (f a) where
   a =-= b = sequence_ $ zipWith (=-=) (toList a) (toList b)

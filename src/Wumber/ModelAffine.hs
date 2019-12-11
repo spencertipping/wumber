@@ -33,7 +33,8 @@ import Wumber.BoundingBox
 import Wumber.ClosedComparable
 import Wumber.Model
 import Wumber.Numeric
-import Wumber.Symbolic
+import Wumber.SymExpr
+import Wumber.SymMath
 
 
 -- | The class of objects that can be transformed using an affine matrix of type
@@ -65,7 +66,7 @@ instance (Traversable v, MonadZip v, Affine (v a) m v a, Bounded (v a),
          Affine (BoundingBox (v a)) m v a where
   transform m b = of_points $ map (transform m) (corners b)
 
-instance AlgConstraints f R => Affine (FRep V3 f) AffineM3 V3 R where
+instance SymMathC f R => Affine (FRep V3 f) AffineM3 V3 R where
   transform m (FRep f b) = FRep (transform (fmap val m) f) (transform m b)
 
 
@@ -78,13 +79,15 @@ instance AlgConstraints f R => Affine (FRep V3 f) AffineM3 V3 R where
 -- a way for us to pass enough type information down to the 'vars' invocation
 -- since it's being consumed by 'fromList'.
 
-instance AlgConstraints f a => Affine (SymV V2 f a) AffineM2 V2 (Sym f a) where
-  transform m (SymV v) = SymV $ rewrite_vars v' v
-    where v' = fromList $ zip [0..] $ toList $ transform (minvert m) v2
+instance SymMathC f a =>
+         Affine (SymMathV V2 f a) AffineM2 V2 (SymMath f a) where
+  transform m (SymMathV v) = SymMathV $ v // v'
+    where v' = zip [0..] $ toList $ transform (minvert m) v2
 
-instance AlgConstraints f a => Affine (SymV V3 f a) AffineM3 V3 (Sym f a) where
-  transform m (SymV v) = SymV $ rewrite_vars v' v
-    where v' = fromList $ zip [0..] $ toList $ transform (minvert m) v3
+instance SymMathC f a =>
+         Affine (SymMathV V3 f a) AffineM3 V3 (SymMath f a) where
+  transform m (SymMathV v) = SymMathV $ v // v'
+    where v' = zip [0..] $ toList $ transform (minvert m) v3
 
 
 -- | The class of matrices that offer affine constructors. We need this to

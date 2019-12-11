@@ -43,8 +43,8 @@ data IROperand f a = IRC !a
 type IRID = Int
 
 
-compile :: (Fingerprintable f, Fingerprintable a) => Sym p f a -> IR f a
-compile v = IR ret BS.empty ops
+compile_ir :: (Fingerprintable f, Fingerprintable a) => Sym p f a -> IR f a
+compile_ir v = IR ret BS.empty ops
   where table = M.fromList [(fingerprint x, x) | x <- descendants v]
         index = M.fromList $ zip (M.keys table) [0..]
         ret   = index M.! fingerprint v

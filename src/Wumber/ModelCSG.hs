@@ -7,6 +7,7 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
@@ -22,7 +23,7 @@ import Wumber.ClosedComparable
 import Wumber.Fingerprint
 import Wumber.Model
 import Wumber.Numeric
-import Wumber.Symbolic
+import Wumber.SymMath
 
 
 -- | A CSG operation over some type of value. Typically 'a' will be an 'FRep'
@@ -44,19 +45,19 @@ instance Binary a => Fingerprintable (CSG a) where
 -- FReps for those, since the CSG can be lifted into the result domain.
 
 
-instance (FConstraints f R, Applicative v, ClosedComparable (v R), Ord (v R)) =>
+instance (SymMathC f R, Applicative v, ClosedComparable (v R), Ord (v R)) =>
          FReppable (CSG (FRep v f)) v f where
 
   frep (CSGJust x) = x
 
-  frep (CSGIntersect x y) = FRep (SymV $ upper xf yf) (intersect xb yb)
-    where FRep (SymV xf) xb = frep x
-          FRep (SymV yf) yb = frep y
+  frep (CSGIntersect x y) = FRep (SymMathV $ upper xf yf) (intersect xb yb)
+    where FRep (SymMathV xf) xb = frep x
+          FRep (SymMathV yf) yb = frep y
 
-  frep (CSGUnion x y) = FRep (SymV $ lower xf yf) (union xb yb)
-    where FRep (SymV xf) xb = frep x
-          FRep (SymV yf) yb = frep y
+  frep (CSGUnion x y) = FRep (SymMathV $ lower xf yf) (union xb yb)
+    where FRep (SymMathV xf) xb = frep x
+          FRep (SymMathV yf) yb = frep y
 
-  frep (CSGSubtract x y) = FRep (SymV $ upper xf (negate yf)) xb
-    where FRep (SymV xf) xb = frep x
-          FRep (SymV yf) _  = frep y
+  frep (CSGSubtract x y) = FRep (SymMathV $ upper xf (negate yf)) xb
+    where FRep (SymMathV xf) xb = frep x
+          FRep (SymMathV yf) _  = frep y

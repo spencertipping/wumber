@@ -1,5 +1,6 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 
 -- | TODO

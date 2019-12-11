@@ -1,6 +1,7 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE CPP #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE MonoLocalBinds #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
@@ -28,20 +29,30 @@ import qualified Data.ByteString      as BS
 import qualified Data.Vector.Storable as VS
 
 
+#define WUMBER_UNKNOWN 0
+#define WUMBER_AMD64 1
+
+
 #if __amd64__ || __amd64 || __x86_64__ || __x86_64
-#  define WUMBER_ARCH amd64
+-- #  define WUMBER_ARCH WUMBER_AMD64
+#  define WUMBER_ARCH WUMBER_UNKNOWN
 #else
-#  define WUMBER_ARCH unknown
+#  define WUMBER_ARCH WUMBER_UNKNOWN
 #endif
 
-#if WUMBER_ARCH == amd64
+#if WUMBER_ARCH == WUMBER_AMD64
 import Wumber.AMD64JIT
 #endif
 
+#if WUMBER_ARCH != WUMBER_UNKNOWN
 import Wumber.JIT
 import Wumber.JITIR
+#endif
+
+import Wumber.Fingerprint
 import Wumber.MathFn
 import Wumber.Numeric
+import Wumber.SymExpr
 import Wumber.SymMath
 
 
@@ -49,13 +60,14 @@ import Wumber.SymMath
 --   given 'Arg' state vector. In general, 'jit sym v == eval (v !) sym', but
 --   'jit' will usually be faster if JIT is supported for your platform. You can
 --   use 'is_jit_supported' to determine this.
-jit :: (SymMathC f R, VectorConversion v (VS.Vector R))
+jit :: (SymMathC f R, Fingerprintable f, VectorConversion v (VS.Vector R))
     => SymMath f R -> v -> R
 
 
 -- | Compiles a 'Sym' expression to machine code, but doesn't coerce that code
 --   to a function pointer.
-jit_as_machinecode :: SymMathC f R => SymMath f R -> BS.ByteString
+jit_as_machinecode :: (SymMathC f R, Fingerprintable f)
+                   => SymMath f R -> BS.ByteString
 
 
 -- | Returns 'True' if we support JIT on the platform being compiled. You can
@@ -64,11 +76,11 @@ jit_as_machinecode :: SymMathC f R => SymMath f R -> BS.ByteString
 is_jit_supported :: Bool
 
 
-#if WUMBER_ARCH == amd64
+#if WUMBER_ARCH == WUMBER_AMD64
 
 is_jit_supported = True
 
-jit_as_machinecode = assemble_ir . compile . unMath
+jit_as_machinecode = assemble_ir . compile_ir . unMath
 
 jit sym = unsafePerformIO do
   f <- compile_machinecode dblfn (jit_as_machinecode sym)

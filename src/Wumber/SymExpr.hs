@@ -53,6 +53,7 @@ module Wumber.SymExpr (
   Rewritable(..),
   (//),
   (//:),
+  eval,
 
   SymbolicApply(..),
   sym_apply_foldwith,
@@ -183,14 +184,18 @@ instance SymbolicApply p f a => Rewritable (Sym p f a) where
   rewrite x _ = x
 
 
-infixl 4 //
 infixl 4 //:
+infixl 4 //
 
-(//)  :: Rewritable a => a -> [(Int, a)] -> a
-(//:) :: Rewritable a => a -> IntMap a   -> a
+(//:) :: (SymLift a s, Rewritable s, Eq s) => s -> IntMap s   -> s
+(//)  :: (SymLift a s, Rewritable s, Eq s) => s -> [(Int, s)] -> s
 
-v //  xs = rewrite v (BS.fromList $ map fst xs, IM.fromList xs)
 v //: xs = v // IM.toList xs
+v //  xs = rewrite v (BS.fromList $ map fst xs', IM.fromList xs')
+  where xs' = filter (\(a, b) -> b /= var a) xs
+
+eval :: (SymLift a s, SymVal s a, Rewritable s, Eq s) => (VarID -> a) -> s -> a
+eval f s = fromJust $ val_of $ s // [(v, val (f v)) | v <- BS.toList (vars_in s)]
 
 
 -- | Returns the set of variables referred to by the given tree.

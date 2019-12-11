@@ -1,6 +1,7 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MultiWayIf #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
@@ -57,14 +58,13 @@ data EquationSystem f a = ES { _es_subst        :: !(IntMap (SymMath f a)),
 
 -- | An empty equation system.
 init_es :: EquationSystem f a
-init_es = ES IM.empty BS.empty (SCF []) [] [] BS.empty
+init_es = ES IM.empty BS.empty [] [] [] BS.empty
 
 
 -- | A cost function partitioned across multiple independent subsets of a
 --   variable space. We represent it this way so that we can invoke the
 --   numerical solver on subsystems with minimal dimension.
-newtype SplitCostFn f a = SCF [(BS.BitSet, SymMath f a)]
-  deriving (Show, Eq, Generic, Binary)
+type SplitCostFn f a = [SymMath f a]
 
 
 -- | A single equation that knows which variables can be isolated.
@@ -148,20 +148,18 @@ equation m = EQN m t (BS.fromList $ map fst isos) (IM.fromList isos)
 --   subsystems if necessary. The constraint is squared before summing it into a
 --   combined cost function.
 add_costfn :: SymMathC f a => SymMath f a -> SplitCostFn f a -> SplitCostFn f a
-add_costfn c (SCF fs) = SCF (i' : o)
-  where vs                      = vars_in c
-        (i, o)                  = partition (BS.intersects vs . fst) fs
-        i'                      = foldl merge (vs, c**2) i
-        merge (b1, c1) (b2, c2) = (b1 `BS.union` b2, c1 + c2)
+add_costfn c fs = i' : o
+  where vs     = vars_in c
+        (i, o) = partition (BS.intersects vs . vars_in) fs
+        i'     = c**2 + sum i
 
 
 -- | Applies a substitution map to a 'SplitCostFn' efficiently.
 subst_costfn :: SymMathC f a
              => BS.BitSet -> IntMap (SymMath f a)
              -> SplitCostFn f a -> SplitCostFn f a
-subst_costfn b m (SCF fs) = foldr add_costfn (SCF o) i'
-  where (i, o) = partition (BS.intersects b . fst) fs
-        i'     = map ((//: m) . snd) i
+subst_costfn b m fs = foldr add_costfn o $ map (//: m) i
+  where (i, o) = partition (BS.intersects b . vars_in) fs
 
 
 -- | Adds a multivariate equation to an 'EquationSystem'. If the equation

@@ -43,13 +43,14 @@ import qualified Data.Vector.Storable as VS
 
 import Wumber.BoundingBox
 import Wumber.Constraint
-import Wumber.ConstraintSolver
 import Wumber.DualContour
 import Wumber.Fingerprint
+import Wumber.Functionable
 import Wumber.Numeric
-import Wumber.Symbolic
-import Wumber.SymbolicDerivative
-import Wumber.SymbolicJIT
+import Wumber.SymDerivative
+import Wumber.SymExpr
+import Wumber.SymMath
+import Wumber.SymJIT
 import Wumber.VectorConversion
 
 
@@ -62,11 +63,11 @@ import Wumber.VectorConversion
 --   derive most other interfaces.
 class FReppable a v f | a -> f, a -> v where frep :: a -> FRep v f
 
-data FRep v f = FRep { _frep_fn :: SymV v f R,
+data FRep v f = FRep { _frep_fn :: SymMathV v f R,
                        _frep_bb :: BoundingBox (v R) }
   deriving (Generic)
 
-deriving instance (Show   f,   Show (v R)) => Show   (FRep v f)
+deriving instance (FnShow f,   Show (v R)) => Show   (FRep v f)
 deriving instance (Eq     f,     Eq (v R)) => Eq     (FRep v f)
 deriving instance (Binary f, Binary (v R)) => Binary (FRep v f)
 
@@ -89,12 +90,14 @@ instance BoundedObject (FRep v f) (v R) where bounding_box = _frep_bb
 class (Fingerprintable a, Binary b) => Computed a b where compute :: a -> b
 
 instance {-# OVERLAPPABLE #-}
-         (AlgConstraints f R,
+         (SymMathC f R,
+          SymLift R a,
+          Rewritable a,
+          Eq a,
           Fingerprintable (Constrained f a),
-          DeterministicEval R R a b,
-          Binary b) =>
-         Computed (Constrained f a) b where
-  compute = fst . solve 1e-6 10000
+          Binary a) =>
+         Computed (Constrained f a) a where
+  compute = csolve
 
 
 -- | An object sketched using a given type of point. This is used for live
@@ -106,9 +109,10 @@ newtype Sketch v = Sketch { unSketch :: [(v, v)] }
 -- TODO
 -- Add level-of-detail based on view
 
-type ComputedContext f v = (AlgConstraints f R,
+type ComputedContext f v = (SymMathC f R,
                             Binary (v R),
                             Binary f,
+                            Fingerprintable f,
                             DCVector v,
                             SymVars v,
                             Applicative v,
@@ -116,5 +120,6 @@ type ComputedContext f v = (AlgConstraints f R,
 
 instance {-# OVERLAPPABLE #-} ComputedContext f v =>
          Computed (FRep v f) (Sketch (v R)) where
-  compute (FRep (SymV f) bb) = Sketch $ toList $ iso_contour (jit f) f' bb 6 18 0.1
-    where f' v = fmap jit (vector_derivative (SymV f)) <*> pure v
+  compute (FRep (SymMathV f) bb) =
+    Sketch $ toList $ iso_contour (jit f) f' bb 6 12 0.1
+    where f' v = fmap jit (vector_derivative (SymMathV f)) <*> pure v
