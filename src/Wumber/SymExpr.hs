@@ -42,7 +42,6 @@ module Wumber.SymExpr (
   VarID,
   SymVal(..),
   SymLift(..),
-  vars_in,
   has_var,
   amb,
   ambs,
@@ -156,12 +155,14 @@ instance (Ord f, Ord a, Ord p, ProfileApply p f) => Ord (Sym p f a) where
 
 -- | Promotes a constant or variable into a symbolic value.
 class SymLift a s | s -> a where
-  val :: a -> s
-  var :: VarID -> s
+  val     :: a -> s
+  var     :: VarID -> s
+  vars_in :: s -> BS.BitSet
 
 instance SymLift a (Sym p f a) where
-  val = SymC
-  var = SymV
+  val     = SymC
+  var     = SymV
+  vars_in = sym_vars_in
 
 
 -- | The class of symbolic things that can sometimes be reduced to non-symbolic
@@ -193,14 +194,14 @@ v //: xs = v // IM.toList xs
 
 
 -- | Returns the set of variables referred to by the given tree.
-vars_in :: Sym p f a -> BS.BitSet
-vars_in (SymV i) = BS.singleton i
-vars_in (SymC _) = BS.empty
-vars_in (SymF _ _ (SM b _ _ _ _)) = b
+sym_vars_in :: Sym p f a -> BS.BitSet
+sym_vars_in (SymV i) = BS.singleton i
+sym_vars_in (SymC _) = BS.empty
+sym_vars_in (SymF _ _ (SM b _ _ _ _)) = b
 
 
 -- | Returns 'True' if the expression refers to the given variable.
-has_var :: VarID -> Sym p f a -> Bool
+has_var :: SymLift a s => VarID -> s -> Bool
 has_var v = BS.member v . vars_in
 
 

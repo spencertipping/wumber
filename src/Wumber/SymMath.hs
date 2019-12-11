@@ -75,8 +75,10 @@ type SymMath' f = Sym (MathProfile f) f
 
 -- | Class constraints that make most 'SymMath' things work.
 type SymMathC f a = (MathFnC a,
+                     SymVal a a,
                      SymbolicApply (MathProfile f) f a,
-                     MathApply a (SymMath f a))
+                     MathApply a (SymMath f a),
+                     SymLift a (SymMath f a))
 
 -- TODO: support real profiles
 type MathProfile f = NoProfiles f
@@ -101,8 +103,9 @@ instance ProfileApply (MathProfile MathFn) MathFn where
   prof_fn _ _ = NP ()
 
 instance SymLift a (SymMath' f a) => SymLift a (SymMath f a) where
-  val = Math . val
-  var = Math . var
+  val     = Math . val
+  var     = Math . var
+  vars_in = vars_in . unMath
 
 x_ = var 0 :: SymMath f a               -- ^ An alias for @var 0@
 y_ = var 1 :: SymMath f a               -- ^ An alias for @var 1@

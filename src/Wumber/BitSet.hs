@@ -22,6 +22,8 @@ import Data.Foldable (foldl')
 import Data.Word     (Word64)
 import GHC.Generics  (Generic)
 
+import Prelude hiding (null)
+
 
 -- | A BitSet the first 64 of whose bits are stored in an immediate unboxed
 --   word. This should result in fewer cache misses to access those elements,
@@ -64,8 +66,11 @@ unions = foldl' union empty
 intersect :: BitSet -> BitSet -> BitSet
 intersect (BS h1 t1) (BS h2 t2) = BS (h1 .&. h2) (t1 .&. t2)
 
-intersects :: Foldable f => f BitSet -> BitSet
-intersects = foldl' intersect empty
+intersects :: BitSet -> BitSet -> Bool
+intersects a b = not $ null (a `intersect` b)
+
+intersections :: Foldable f => f BitSet -> BitSet
+intersections = foldl' intersect empty
 
 
 highestBit :: BitSet -> Int
