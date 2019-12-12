@@ -1,0 +1,47 @@
+#!/usr/bin/env perl
+use strict;
+use warnings;
+use v5.14;
+
+use Cwd qw/cwd abs_path/;
+use File::Find;
+
+our $problems = 0;
+our @markdowns;
+our %targets;
+
+sub scan_links
+{
+  return 1 unless /\.md$/i;
+
+  my $md = $_;
+  open my $fh, "<", $_ or die "failed to open markdown $_: $!";
+  push @markdowns, abs_path $_ unless /^readme\./i;
+
+  while (<$fh>)
+  {
+    next if /^\`\`\`/.../^\`\`\`/;
+
+    for (/\]\(([^)]+)\)/g)
+    {
+      next if /^#/ or /^\w+:\/\//;
+      if (-e)
+      {
+        ++$targets{abs_path $_};
+      }
+      else
+      {
+        ++$problems;
+        printf "%s:%d: invalid link to %s\n", "$File::Find::dir/$md", $., $_;
+      }
+    }
+  }
+}
+
+find \&scan_links, $_ for @ARGV ? @ARGV : ".";
+
+my $cwd = cwd;
+++$problems, printf "%s is orphaned\n", s/^$cwd/./r
+  for grep !$targets{$_}, @markdowns;
+
+exit !!$problems;

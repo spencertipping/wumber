@@ -77,7 +77,6 @@ recompile model f expr type_marker = do
   r <- HI.runInterpreter do
     HI.loadModules [f]
     HI.setTopLevelModules [module_name f]
-    -- HI.setImports ["Data.ByteString"]
     HI.interpret expr (HI.as :: B.ByteString)
 
   compile_nanos <- nanos_since start_time
