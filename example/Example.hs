@@ -8,9 +8,6 @@ import Wumber.MathFn
 import Wumber.Model
 import WumberShell (wumber_main, wumber_live, type_is)
 
-import qualified Data.ByteString.Lazy as BL
-import qualified Iso as Iso
-
 
 main :: IO ()
 main = do
@@ -20,13 +17,11 @@ main = do
 
 
 examples :: [(String, IO ())]
-examples = [("iso",      iso_example),
-            ("iso-live", iso_live),
+examples = [("iso-live", iso_live),
             ("say-hi",   putStrLn "hi!")]
 
-  where iso_example = wumber_main Iso.example
-        iso_live    = wumber_live "example" "Iso.hs" "example"
-                                  (type_is :: FRep V3 MathFn)
+  where iso_live = wumber_live "examples" "Iso.hs" "example"
+                   (type_is :: FRep V3 MathFn)
 
 
 usage :: IO ()

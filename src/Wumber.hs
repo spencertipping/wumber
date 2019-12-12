@@ -10,6 +10,7 @@ module Wumber (
   module Wumber.ModelAffine,
   module Wumber.ModelCSG,
   module Wumber.Numeric,
+  module Wumber.SymExpr,
   module Wumber.SymMath,
 ) where
 
@@ -24,4 +25,5 @@ import Wumber.Model
 import Wumber.ModelAffine
 import Wumber.ModelCSG
 import Wumber.Numeric
+import Wumber.SymExpr
 import Wumber.SymMath

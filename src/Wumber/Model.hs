@@ -124,5 +124,5 @@ type ComputedContext f v = (SymMathC f R,
 instance {-# OVERLAPPABLE #-} ComputedContext f v =>
          Computed (FRep v f) (Sketch (v R)) where
   compute (FRep (SymMathV f) bb) =
-    Sketch $ toList $ iso_contour (jit f) f' bb 6 12 0.1
+    Sketch $ toList $ iso_contour (jit f) f' bb 6 6 0.1
     where f' v = fmap jit (vector_derivative (SymMathV f)) <*> pure v

@@ -39,6 +39,7 @@ wumber_live base_path file expr type_marker = do
 
 wumber_main :: (Show a, Computed a (Sketch (V3 R))) => a -> IO ()
 wumber_main m = do
+  putStrLn "computing model..."
   model <- newMVar Nothing
   update_model model m
   wumber_window "Wumber" model

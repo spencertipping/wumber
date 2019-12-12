@@ -52,6 +52,9 @@
 
 
 ## Backend
++ Distributed compute daemons
+  + Complicated because we need to move code
+  + Can we pre-reduce everything to `SymMath` or similar?
 + LOD-variant feature hinting
   + Calculate LOD by view prominence
   + How do we cache this if it's dynamic?
