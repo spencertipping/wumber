@@ -31,9 +31,12 @@ import qualified Data.ByteString.UTF8         as B8
 import qualified Data.ByteString.Lazy         as BL
 import qualified Language.Haskell.Interpreter as HI
 
-import Wumber
 import Wumber.DualContour
-import Wumber.SymJIT
+import Wumber.Element
+import Wumber.Fingerprint
+import Wumber.MathFn
+import Wumber.Model
+import Wumber.Numeric
 
 import WumberShell.ComputedCache
 
@@ -77,7 +80,7 @@ recompile model f expr type_marker = do
   r <- HI.runInterpreter do
     HI.loadModules [f]
     HI.setTopLevelModules [module_name f]
-    HI.interpret expr (HI.as :: B.ByteString)
+    HI.interpret expr type_marker
 
   compile_nanos <- nanos_since start_time
 
@@ -93,10 +96,8 @@ recompile model f expr type_marker = do
       eprintf "%s\n" (show e)
 
     Right p -> do
-      eprintf "  got bytestring of length %d\n" (B.length p)
-      let p' = decode (BL.fromStrict p) :: FRep V3 MathFn
-      eprintf "  got object: %s\n" (show p')
-      update_model model p'
+      eprintf "  got object: %s\n" (show p)
+      update_model model p
       eprintf "\027[2J\027[1;1H%s OK\n" f
       eprintf "  compile time: %dms\n" (compile_nanos `quot` 1_000_000)
 

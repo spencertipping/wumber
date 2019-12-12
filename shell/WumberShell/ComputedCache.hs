@@ -23,7 +23,6 @@ module WumberShell.ComputedCache where
 import Codec.Compression.GZip (compress, decompress)
 import Control.Concurrent     (forkIO)
 import Data.Binary            (Binary(..), encode, decode)
-import GHC.Fingerprint        (Fingerprint)
 import GHC.Generics           (Generic)
 import System.Directory       (createDirectoryIfMissing, doesPathExist,
                                getXdgDirectory, XdgDirectory(..))

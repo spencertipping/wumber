@@ -1,4 +1,25 @@
 # Development frontier
+## Priority queue
++ Live code iteration that doesn't segfault
++ EDA simulation + visualization
++ Structural FEA + visualization
++ Vector+gradient JIT
++ Symbolic differentiation
+
+
+## Simulation
++ FEA prototype, incl auto-meshing
+  + Anisotropic material properties specified by vector fields
+  + Material property vectors for F-rep solid modeling
+  + Fast approximation > slow detail; use this for structural optimization
++ EDA
+  + Circuits as constraint systems to be minimized (proof of concept)
+  + Trace capacitance/impedance: integrate layout and design
+  + Live-test hardware driver for unknown circuits
+  + LXI scope data collection?
+  + Fast approximation > slow detail; we can always export to SPICE
+
+
 ## Frontend
 + Dual contour
   + Deduplicate function evaluations
@@ -47,16 +68,3 @@
   + 4D meshing for animation/object-through-time collision detection
 + Meshing
   + Progressive solid meshing for FEA, driven by error gradient
-
-
-## Simulation
-+ FEA prototype, incl auto-meshing
-  + Anisotropic material properties specified by vector fields
-  + Material property vectors for F-rep solid modeling
-  + Fast approximation > slow detail; use this for structural optimization
-+ EDA
-  + Circuits as constraint systems to be minimized (proof of concept)
-  + Trace capacitance/impedance: integrate layout and design
-  + Live-test hardware driver for unknown circuits
-  + LXI scope data collection?
-  + Fast approximation > slow detail; we can always export to SPICE

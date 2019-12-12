@@ -4,7 +4,8 @@ import Control.Monad      (forM_)
 import Linear.V3          (V3)
 import System.Environment (getArgs, getProgName)
 
-import Wumber
+import Wumber.MathFn
+import Wumber.Model
 import WumberShell (wumber_main, wumber_live, type_is)
 
 import qualified Data.ByteString.Lazy as BL
@@ -24,7 +25,7 @@ examples = [("iso",      iso_example),
             ("say-hi",   putStrLn "hi!")]
 
   where iso_example = wumber_main Iso.example
-        iso_live    = wumber_live "example" "Iso.hs" "runWumber example"
+        iso_live    = wumber_live "example" "Iso.hs" "example"
                                   (type_is :: FRep V3 MathFn)
 
 

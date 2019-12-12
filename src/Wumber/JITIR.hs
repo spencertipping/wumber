@@ -1,4 +1,6 @@
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields -Wincomplete-patterns #-}
 
@@ -8,14 +10,17 @@
 --
 --   The premise for this module is pretty straightforward. Most of the
 --   scheduling logic is in the JIT backend, so our job is to reduce 'Sym' trees
---   down to a deduplicated, topsorted graph that can be executed incrementally.
+--   down to a deduplicated graph that can be executed incrementally.
 
 module Wumber.JITIR where
 
 
+import Data.Binary     (Binary)
+import Data.Foldable   (toList)
 import Data.IntMap     (IntMap)
 import Data.List       (groupBy, sort)
 import Data.Map.Strict (Map)
+import GHC.Generics    (Generic)
 
 import Wumber.Fingerprint
 import Wumber.MathFn
@@ -27,28 +32,44 @@ import qualified Data.Map      as M
 import qualified Wumber.BitSet as BS
 
 
--- TODO
--- Have a way to track which values are ready to be used?
-
-data IR f a = IR { _ir_ret  :: IRID,
+-- | A backend-agnostic SSA-style graph that can be consumed by a JIT backend.
+--   Any control flow behavior is delegated to the function type @f@, and we
+--   don't do much with it.
+--
+--   IR represents a function that can return more than one value. Typically
+--   this is done by destructively writing entries into a vector designated as
+--   return-value storage. This pattern works well for derivative/gradient
+--   functions, for example.
+data IR f a = IR { _ir_ret  :: [IRID],
                    _ir_done :: BS.BitSet,
                    _ir_ops  :: IntMap (IROperand f a) }
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic, Binary)
 
 data IROperand f a = IRC !a
                    | IRV !VarID
                    | IRF f [IRID]
-  deriving (Show, Eq, Ord)
+  deriving (Show, Eq, Ord, Generic, Binary)
 
 type IRID = Int
 
 
-compile_ir :: (Fingerprintable f, Fingerprintable a) => Sym p f a -> IR f a
-compile_ir v = IR ret BS.empty ops
-  where table = M.fromList [(fingerprint x, x) | x <- descendants v]
+-- TODO
+-- Let's provide a few functions to help with register allocation and/or
+-- next-step scheduling.
+
+
+-- | Compiles one or more symbolic quantities to a shared IR graph. In general,
+--   if you have /n/ different functions to compute, you should compile them
+--   together rather than separately because the IR deduplicates subexpressions.
+compile_ir :: (Foldable t, Fingerprintable f, Fingerprintable a)
+           => t (Sym p f a) -> IR f a
+compile_ir v = IR rets BS.empty ops
+  where syms  = toList v
+        table = M.fromList [(fingerprint x, x) | s <- syms, x <- descendants s]
         index = M.fromList $ zip (M.keys table) [0..]
-        ret   = index M.! fingerprint v
-        ops   = IM.fromList [(index M.! fingerprint v, op v) | v <- M.elems table]
+        rets  = [index M.! fingerprint s | s <- syms]
+        ops   = IM.fromList
+                [(index M.! fingerprint v, op v) | v <- M.elems table]
 
         op (SymC x)      = IRC x
         op (SymV i)      = IRV i

@@ -11,9 +11,6 @@ module Wumber (
   module Wumber.ModelCSG,
   module Wumber.Numeric,
   module Wumber.SymMath,
-
-  B.ByteString,
-  runWumber
 ) where
 
 import Wumber.BoundingBox
@@ -28,11 +25,3 @@ import Wumber.ModelAffine
 import Wumber.ModelCSG
 import Wumber.Numeric
 import Wumber.SymMath
-
-import Data.Binary (Binary, encode)
-import qualified Data.ByteString      as B
-import qualified Data.ByteString.Lazy as BL
-
-
-runWumber :: Binary a => a -> B.ByteString
-runWumber = BL.toStrict . encode
