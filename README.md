@@ -56,7 +56,6 @@ have features that don't immediately relate to the project I'm working on.
 ## Code spelunking guide
 Things under active construction:
 
-+ [`JITIR`][jitir]: faster compilation and better superscalar codegen
 + [`AMD64RE`][amdre]: on-the-fly processor profiling
 + [`AMD64JIT`][amdjit]: AMD64 JIT backend
 
@@ -89,7 +88,7 @@ Some places to start:
 [sym]: src/Wumber/SymMath.hs
 [der]: src/Wumber/SymDerivative.hs
 [jit]: src/Wumber/SymJIT.hs
-[disk]: src/WumberShell/ComputedCache.hs
+[disk]: src/Wumber/ComputedCache.hs
 [jitir]: src/Wumber/JITIR.hs
 [amdre]: src/Wumber/AMD64RE.hs
 [amdjit]: src/Wumber/AMD64JIT.hs
