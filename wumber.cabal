@@ -74,12 +74,6 @@ library
                      , Wumber.SymMath
                      , Wumber.VectorConversion
                      , Wumber.WordProfile
-                     , WumberShell
-                     , WumberShell.Compiler
-                     , WumberShell.ComputedCache
-                     , WumberShell.Event
-                     , WumberShell.Render
-                     , WumberShell.View
 
 
 test-suite wumber-tests
