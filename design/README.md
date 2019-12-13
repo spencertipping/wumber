@@ -8,6 +8,7 @@
 + [Dual contouring for simulation](dc-for-simulation.md)
 + [Dual contour hinting](dc-hinting.md)
 + [Model/shell integration](model-shell.md)
++ [Progressive dual contouring](progressive-dc.md)
 + [Visual/CLI shell](shell.md)
 
 
