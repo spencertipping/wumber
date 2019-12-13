@@ -3,7 +3,7 @@
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE TupleSections #-}
 
-module Iso (example) where
+module Iso (model) where
 
 import Data.Foldable
 import Linear.Matrix ((*!))
@@ -15,8 +15,8 @@ import Linear.Vector
 import Wumber
 
 
-example :: FRep V3 MathFn
-example = FRep (SymMathV $! model $! screw 0 v3) (BB (-2 :: V3 R) 2)
+model :: FRep V3 MathFn
+model = FRep (SymMathV $! model_fn $! screw 0 v3) (BB (-2 :: V3 R) 2)
 
 
 for  = flip map
@@ -70,7 +70,7 @@ inegate    f v   = negate (f v)
 moved_by t f v = f (v - t)
 
 
-model = moved_by (V3 0.3 1.3 (-0.4)) (bolt 0.5 0.4) `iunion` scs
+model_fn = moved_by (V3 0.3 1.3 (-0.4)) (bolt 0.5 0.4) `iunion` scs
 
 spheres = sphere 0 `iunion` sphere 0.9 `iunion` sphere (V3 (-0.4) (-0.4) 1)
 scs     = spheres `iunion` cube (BB (-1.5) (-0.5))
