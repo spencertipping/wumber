@@ -4,7 +4,6 @@
 + EDA simulation + visualization
 + Structural FEA + visualization
 + Vector+gradient JIT
-+ Symbolic differentiation
 
 
 ## Simulation
@@ -58,13 +57,10 @@
 + LOD-variant feature hinting
   + Calculate LOD by view prominence
   + How do we cache this if it's dynamic?
-+ Sym compiler/algebra
-  + Symbolic derivatives
 + Assembler
   + Multi-branch assembly with conditionals
   + Constant vector + indexing
 + JIT
-  + Vector output with parallel subterm reduction
   + Reverse-engineer instruction latency/throughput
   + Benchmark reg/reg and reg/memory parallelization
 + Simulation
