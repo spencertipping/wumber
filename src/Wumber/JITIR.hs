@@ -1,6 +1,7 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE TemplateHaskell #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields -Wincomplete-patterns #-}
 
@@ -21,6 +22,8 @@ import Data.IntMap     (IntMap)
 import Data.List       (groupBy, sort)
 import Data.Map.Strict (Map)
 import GHC.Generics    (Generic)
+import Lens.Micro      ((%~))
+import Lens.Micro.TH   (makeLenses)
 
 import Wumber.Fingerprint
 import Wumber.MathFn
@@ -48,7 +51,8 @@ import qualified Wumber.BitSet as BS
 --   multiple branches, each with a different 'IR' state, before merging them
 --   later on.
 
-data IR f a = IR { _ir_ret  :: [IRID],
+data IR f a = IR { _ir_ret  :: IRID,
+                   _ir_rv   :: [IRID],
                    _ir_req  :: BS.BitSet,
                    _ir_done :: BS.BitSet,
                    _ir_ops  :: IntMap (IROperand f a) }
@@ -61,17 +65,19 @@ data IROperand f a = IRC !a
 
 type IRID = Int
 
+makeLenses ''IR
+
 
 -- | Compiles one or more symbolic quantities to a shared IR graph. In general,
 --   if you have /n/ different functions to compute, you should compile them
 --   together rather than separately because the IR deduplicates subexpressions.
 compile_ir :: (Foldable t, Fingerprintable f, Fingerprintable a)
            => t (Sym p f a) -> IR f a
-compile_ir v = IR rets (BS.fromList rets) BS.empty ops
+compile_ir v = IR r rs (BS.fromList (r:rs)) BS.empty ops
   where syms  = toList v
         table = M.fromList [(fingerprint x, x) | s <- syms, x <- descendants s]
         index = M.fromList $ zip (M.keys table) [0..]
-        rets  = [index M.! fingerprint s | s <- syms]
+        r:rs  = [index M.! fingerprint s | s <- syms]
         ops   = IM.fromList
                 [(index M.! fingerprint v, op v) | v <- M.elems table]
 
@@ -81,11 +87,19 @@ compile_ir v = IR rets (BS.fromList rets) BS.empty ops
 
 
 -- | Returns a lazy list of ops whose operands are ready to be run, and whose
---   results have not already been produced.
+--   results have not already been produced. Only requested values will be
+--   returned; you'll need to call 'ir_request' to make them schedulable.
 ir_runnable :: IR f a -> [IRID]
-ir_runnable (IR _ r d o) = [k | (k, v) <- IM.toList o,
-                                BS.member k r,
-                                all (flip BS.member d) (op_deps v)]
+ir_runnable (IR _ _ r d o) = [k | (k, v) <- IM.toList o,
+                                  BS.member k r,
+                                  all (flip BS.member d) (op_deps v)]
+
+
+-- | Requests that a set of values be calculated. Operands of the values are
+--   /not/ automatically requested because the IR layer doesn't know which ones
+--   are necessary to evaluate the function.
+ir_request :: [IRID] -> IR f a -> IR f a
+ir_request b = ir_req %~ BS.union (BS.fromList b)
 
 
 -- | Dependencies for the specified operand.

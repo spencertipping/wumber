@@ -122,6 +122,11 @@ type DCVector v = (Metric v, Traversable v, Applicative v, Fractional (v R),
 --
 --   TODO: let 'sf' specify which split it wants, then bisect down to that axis.
 
+-- TODO
+-- Completely redo this. There's no reason to build the tree up front and then
+-- scan it as a separate step; we'll do better if we make scanning a single
+-- reentrant process.
+
 build :: DCVector v
       => IsoFn (v R) -> IsoGradient (v R) -> BoundingBox (v R) -> SplitFn (v R)
       -> R -> Tree (v R)

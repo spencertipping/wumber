@@ -1,9 +1,11 @@
 # Development frontier
 ## Priority queue
++ Composite visualization in general
++ 3D object view
 + Live code iteration that doesn't segfault
 + EDA simulation + visualization
 + Structural FEA + visualization
-+ Vector+gradient JIT
++ New AMD64 JIT backend
 
 
 ## Simulation
@@ -21,27 +23,20 @@
 
 ## Frontend
 + Dual contour
-  + Deduplicate function evaluations
-  + Prioritize bisections by expected error
-  + Accept/generate surface hints, e.g. by extrapolating from tangent planes
-  + Detect errors by verifying surface normal against function gradient
-  + More accurate edge rendering, particularly for nonaligned corners
-  + Incremental/progressive scanning (reuse already-computed data)
-  + Mesh to quads/prisms, not just lines
+  + Rewrite around re-entrant, progressive scanning
+  + Use observed gradients and f-values to infer isosurface/face collisions
+  + FEA mesh emitter: generalize to arbitrary-dimensional scanning?
+  + Second derivatives to guide split points?
 + Shell
   + New architecture that prevents `hint` from segfaulting
-  + LOD based on view matrix: incorporate "visually perceptible error" into DC
   + Augment/rewrite Gloss so we can use real fonts/etc
 + Shell CLI
-  + Select variable(s) to be rendered
   + Build views programmatically, integrated with constraints
-  + Export bulk constraint solutions
 
 
 ## Modeling
 + 2D
   + Render 2D within a 3D context, given a plane + UV coordinates
-  + Support for text/labels?
   + Diagrams/lines/graphs/etc?
 + Parts
   + Iso-libraries for screws, beams, etc
