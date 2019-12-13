@@ -240,7 +240,9 @@ instance (Eq a, Ord a, MathFnC a, Fingerprintable a, SymVal a a) =>
 
     Mul -> \case []  -> val 1
                  [x] -> x
-                 xs  -> try_distribute Mul Add $ comm_assoc_fold Mul RPow xs
+                 xs | any (== val 0) ts -> val 0
+                    | otherwise         -> try_distribute Mul Add ts
+                    where ts = comm_assoc_fold Mul RPow xs
 
     f -> sym_apply_cons f
 
@@ -276,11 +278,10 @@ commute_constants f xs = SymC (val_apply f $ rights es) : lefts es
 
 term_collapse f g = sort
                     . catMaybes
-                    . map (\case (_,   0)    -> Nothing
-                                 ([SymC 0], _) -> Nothing
-                                 ([x], 1)    -> Just x
-                                 (xs,  1)    -> Just $ sym_apply g xs
-                                 (xs,  v)    -> Just $ sym_apply g (val v : xs))
+                    . map (\case (_,   0) -> Nothing
+                                 ([x], 1) -> Just x
+                                 (xs,  1) -> Just $ sym_apply g xs
+                                 (xs,  v) -> Just $ sym_apply g (val v : xs))
                     . sum_subterms
                     . expand_subterms g
 
