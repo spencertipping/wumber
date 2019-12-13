@@ -31,6 +31,7 @@ module Wumber.SymMath (
   SymMathC,
   SymMathV(..),
   SymVars(..),
+  math,
   v2, v3, v4,
   val,
   var,
@@ -68,6 +69,9 @@ import qualified Wumber.BitSet as BS
 --   convertible from @MathFn@.
 type SymMath f a = Math (SymMath' f a) SymMathPhantom
 data SymMathPhantom
+
+math :: SymMath' f a -> SymMath f a
+math = Math
 
 type SymMath' f = Sym (MathProfile f) f
 

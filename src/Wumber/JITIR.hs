@@ -40,8 +40,16 @@ import qualified Wumber.BitSet as BS
 --   this is done by destructively writing entries into a vector designated as
 --   return-value storage. This pattern works well for derivative/gradient
 --   functions, for example.
+--
+--   Functions like 'IfNN' make it so that not every operand is always required.
+--   Although the exact details of which values are needed is beyond the scope
+--   of this code, we nonetheless can control which values we want to compute by
+--   setting bits in '_ir_req' ("requested values"). JIT backends can assemble
+--   multiple branches, each with a different 'IR' state, before merging them
+--   later on.
 
 data IR f a = IR { _ir_ret  :: [IRID],
+                   _ir_req  :: BS.BitSet,
                    _ir_done :: BS.BitSet,
                    _ir_ops  :: IntMap (IROperand f a) }
   deriving (Show, Eq, Ord, Generic, Binary)
@@ -59,7 +67,7 @@ type IRID = Int
 --   together rather than separately because the IR deduplicates subexpressions.
 compile_ir :: (Foldable t, Fingerprintable f, Fingerprintable a)
            => t (Sym p f a) -> IR f a
-compile_ir v = IR rets BS.empty ops
+compile_ir v = IR rets (BS.fromList rets) BS.empty ops
   where syms  = toList v
         table = M.fromList [(fingerprint x, x) | s <- syms, x <- descendants s]
         index = M.fromList $ zip (M.keys table) [0..]
@@ -75,9 +83,9 @@ compile_ir v = IR rets BS.empty ops
 -- | Returns a lazy list of ops whose operands are ready to be run, and whose
 --   results have not already been produced.
 ir_runnable :: IR f a -> [IRID]
-ir_runnable (IR _ d o) = [k | (k, v) <- IM.toList o,
-                              not (BS.member k d),
-                              all (flip BS.member d) (op_deps v)]
+ir_runnable (IR _ r d o) = [k | (k, v) <- IM.toList o,
+                                BS.member k r,
+                                all (flip BS.member d) (op_deps v)]
 
 
 -- | Dependencies for the specified operand.
