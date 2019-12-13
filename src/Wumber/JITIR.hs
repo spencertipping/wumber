@@ -40,6 +40,7 @@ import qualified Wumber.BitSet as BS
 --   this is done by destructively writing entries into a vector designated as
 --   return-value storage. This pattern works well for derivative/gradient
 --   functions, for example.
+
 data IR f a = IR { _ir_ret  :: [IRID],
                    _ir_done :: BS.BitSet,
                    _ir_ops  :: IntMap (IROperand f a) }
@@ -51,11 +52,6 @@ data IROperand f a = IRC !a
   deriving (Show, Eq, Ord, Generic, Binary)
 
 type IRID = Int
-
-
--- TODO
--- Let's provide a few functions to help with register allocation and/or
--- next-step scheduling.
 
 
 -- | Compiles one or more symbolic quantities to a shared IR graph. In general,
@@ -74,3 +70,17 @@ compile_ir v = IR rets BS.empty ops
         op (SymC x)      = IRC x
         op (SymV i)      = IRV i
         op (SymF f xs _) = IRF f [index M.! fingerprint x | x <- xs]
+
+
+-- | Returns a lazy list of ops whose operands are ready to be run, and whose
+--   results have not already been produced.
+ir_runnable :: IR f a -> [IRID]
+ir_runnable (IR _ d o) = [k | (k, v) <- IM.toList o,
+                              not (BS.member k d),
+                              all (flip BS.member d) (op_deps v)]
+
+
+-- | Dependencies for the specified operand.
+op_deps :: IROperand f a -> [IRID]
+op_deps (IRF _ xs) = xs
+op_deps _          = []

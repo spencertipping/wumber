@@ -50,6 +50,7 @@ library
                      , Wumber.BitSet
                      , Wumber.BoundingBox
                      , Wumber.ClosedComparable
+                     , Wumber.ComputedCache
                      , Wumber.Constraint
                      , Wumber.DualContour
                      , Wumber.EquationSolve
