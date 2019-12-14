@@ -40,6 +40,7 @@ import Wumber.EquationSystem
 import Wumber.Fingerprint
 import Wumber.Numeric
 import Wumber.SymAlgebra
+import Wumber.SymDerivative
 import Wumber.SymExpr
 import Wumber.SymMath
 
@@ -83,7 +84,7 @@ cvars = mapM cvar
 
 -- | Evaluates a set of constraints and returns the solution, rewritten with the
 --   solved values.
-csolve :: (Eq a, SymLift R a, SymMathC f R, Rewritable a, Functor g)
+csolve :: (Eq a, SymLift R a, SymDifferentiable f R, Rewritable a, Functor g)
        => Constrained f (g a) -> (g a)
 csolve m = (// [(v, val x) | (v, x) <- IM.toList solution]) <$> r
   where (r, (_, es), ivs) = runRWS m () (0, init_es)

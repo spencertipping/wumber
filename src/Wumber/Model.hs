@@ -90,7 +90,7 @@ instance BoundedObject (FRep v f) (v R) where bounding_box = _frep_bb
 class (Fingerprintable a, Binary b) => Computed a b where compute :: a -> b
 
 instance {-# OVERLAPPABLE #-}
-         (SymMathC f R,
+         (SymDifferentiable f R,
           Binary f,
           Binary (g a),
           SymLift R a,
@@ -112,7 +112,7 @@ newtype Sketch v = Sketch { unSketch :: [(v, v)] }
 -- TODO
 -- Add level-of-detail based on view
 
-type ComputedContext f v = (SymMathC f R,
+type ComputedContext f v = (SymDifferentiable f R,
                             Binary (v R),
                             Binary f,
                             Fingerprintable f,

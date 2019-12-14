@@ -37,6 +37,7 @@ data BFGSSettings = BFGSS { _bfgs_precision  :: Double,
   deriving (Show, Eq, Generic, Binary)
 
 
+-- | Not a lot of thought went into these settings.
 default_settings :: BFGSSettings
 default_settings = BFGSS (δ 1) 1048576 1 0.1
 
@@ -44,7 +45,7 @@ default_settings = BFGSS (δ 1) 1048576 1 0.1
 -- | Reduces a system of equations to concrete values using a mixture of
 --   algebraic and numerical methods. If your equation system is underspecified,
 --   then you'll get an incomplete solution.
-solve :: SymMathC f R
+solve :: SymDifferentiable f R
       => BFGSSettings -> IntMap R -> EquationSystem f R -> IntMap R
 solve ss ivs (ES s _ m _ a _) = IM.union mins s'
   where mins = IM.unions $ map (minimize ss ivs) m
@@ -53,7 +54,7 @@ solve ss ivs (ES s _ m _ a _) = IM.union mins s'
 
 -- | Minimizes the solution error for the specified cost function by delegating
 --   to the GSL BFGS minimizer.
-minimize :: SymMathC f R
+minimize :: SymDifferentiable f R
          => BFGSSettings -> IntMap R -> SymMath f R -> IntMap R
 minimize (BFGSS prec iter fs tol) ivs m = IM.map (s VS.!) cs
   where cs   = IM.fromList $ zip (BS.toList (vars_in m)) [0..]
@@ -61,7 +62,7 @@ minimize (BFGSS prec iter fs tol) ivs m = IM.map (s VS.!) cs
         m'   = m //: IM.map var cs
         ivs' = VS.generate (BS.size (vars_in m)) ((ivs IM.!) . (csi IM.!))
 
-        ds     = map (jit . derivative m') $ IM.keys csi
+        ds     = map (jit . flip derivative m') $ IM.keys csi
         (s, _) = minimizeVD VectorBFGS2 prec iter fs tol
                  (jit m')
                  (\v -> VS.fromListN (length ds) $ map ($! v) ds)
