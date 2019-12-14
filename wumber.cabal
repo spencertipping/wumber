@@ -71,6 +71,7 @@ library
                      , Wumber.SymJIT
                      , Wumber.SymMath
                      , Wumber.VectorConversion
+                     , Wumber.View
                      , Wumber.WordProfile
 
 

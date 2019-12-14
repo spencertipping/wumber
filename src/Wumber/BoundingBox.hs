@@ -1,10 +1,14 @@
-{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFunctor #-}
-{-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE TemplateHaskell #-}
+
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
+-- | Axis-aligned bounding volumes in /n/-dimensional space.
 module Wumber.BoundingBox where
 
 
@@ -19,6 +23,19 @@ import Linear.V2           (V2(..))
 import Linear.V3           (V3(..))
 
 import Wumber.ClosedComparable
+import Wumber.Numeric
+
+
+-- | Type constraints that make bounding boxes Just Work (TM) for most cases.
+--   Note that we don't require 'Ord' here because we don't want to presume that
+--   @a@ is a concrete type -- e.g. it may be symbolic and therefore not
+--   directly comparable. That means intersection-testing won't be covered by
+--   this constraint.
+type BoundingBoxC v a = (Applicative v,
+                         Bounded a,
+                         Bounded (v a),
+                         ClosedComparable a,
+                         MonadZip v)
 
 
 -- | An axis-aligned bounding box specified by two vectors. Each coordinate of
@@ -39,15 +56,24 @@ instance Bounded Double where
   minBound = -1/0
   maxBound =  1/0
 
+instance Bounded Float where
+  minBound = -1/0
+  maxBound =  1/0
 
-type BB2D = BoundingBox (V2 Double)
-type BB3D = BoundingBox (V3 Double)
+
+type BB2D = BoundingBox (V2 R)
+type BB3D = BoundingBox (V3 R)
 
 
 -- | A bounding box that contains nothing as it is completely inverted. 'exists'
 --   will return 'False' for this box, as it contains no points.
 empty :: (Applicative f, Bounded a) => BoundingBox (f a)
 empty = BB (pure maxBound) (pure minBound)
+
+
+-- | A bounding box that contains every point.
+everything :: (Applicative f, Bounded a) => BoundingBox (f a)
+everything = BB (pure minBound) (pure maxBound)
 
 
 -- | A bounding box that contains a single point. 'exists' will return 'True'
@@ -119,6 +145,10 @@ inside (BB a b) x = and lower && and upper where lower = liftA2 (<=) a x
 union :: ClosedComparable a => BoundingBox a -> BoundingBox a -> BoundingBox a
 union (BB a b) (BB c d) = BB (lower a c) (upper b d)
 
+unions = foldl' union empty
+
 
 intersect :: ClosedComparable a => BoundingBox a -> BoundingBox a -> BoundingBox a
 intersect (BB a b) (BB c d) = BB (upper a c) (lower b d)
+
+intersections = foldl' intersect everything

@@ -27,6 +27,8 @@
 --   This module is only the most basic layer of interfacing. As Wumber gets
 --   support for other domains, we'll have things like 'Wumber.ModelStructural'
 --   and 'Wumber.ModelElectrical' that define more specific interfaces.
+--
+--   Presentation is managed by 'Wumber.View'.
 
 module Wumber.Model where
 
@@ -54,10 +56,6 @@ import Wumber.SymJIT
 import Wumber.VectorConversion
 
 
--- TODO
--- Use a Reader monad with configuration lenses?
-
-
 -- | Objects whose volume can be reduced to an N-dimensional isofunction. Most
 --   objects should implement this because it makes it possible for Wumber to
 --   derive most other interfaces.
@@ -81,48 +79,3 @@ makeLenses ''FRep
 class BoundedObject a v where bounding_box :: a -> BoundingBox v
 
 instance BoundedObject (FRep v f) (v R) where bounding_box = _frep_bb
-
-
--- | Objects that undergo a compilation or solving step before they can be
---   modeled. You don't have to use this typeclass, but you should if you can
---   because Wumber will use a disk cache to store outputs that are slow to
---   compute.
-class (Fingerprintable a, Binary b) => Computed a b where compute :: a -> b
-
-instance {-# OVERLAPPABLE #-}
-         (SymDifferentiable f R,
-          Binary f,
-          Binary (g a),
-          SymLift R a,
-          Rewritable a,
-          Eq a,
-          Fingerprintable (Constrained f a),
-          Binary a,
-          Functor g) =>
-         Computed (Constrained f (g a)) (g a) where
-  compute = csolve
-
-
--- | An object sketched using a given type of point. This is used for live
---   previews.
-newtype Sketch v = Sketch { unSketch :: [(v, v)] }
-  deriving (Show, Eq, Generic, Binary)
-
-
--- TODO
--- Add level-of-detail based on view
-
-type ComputedContext f v = (SymDifferentiable f R,
-                            Binary (v R),
-                            Binary f,
-                            Fingerprintable f,
-                            DCVector v,
-                            SymVars v,
-                            Applicative v,
-                            VectorConversion (v R) (VS.Vector R))
-
-instance {-# OVERLAPPABLE #-} ComputedContext f v =>
-         Computed (FRep v f) (Sketch (v R)) where
-  compute (FRep (SymMathV f) bb) =
-    Sketch $ toList $ iso_contour (jit f) f' bb 6 6 0.1
-    where f' v = fmap jit (vector_derivative (SymMathV f)) <*> pure v
