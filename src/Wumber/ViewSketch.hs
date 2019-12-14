@@ -2,6 +2,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleInstances #-}
+{-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
@@ -9,7 +10,7 @@
 -- | Human-visible representations of things in 'Wumber.Model'. And by that I
 --   mean, /descriptions/ of human-visible representations -- since Wumber
 --   doesn't directly manage rendering.
-module Wumber.View where
+module Wumber.ViewSketch where
 
 
 import Data.Binary  (Binary)
@@ -20,8 +21,11 @@ import Linear.V4    (V4)
 
 import Wumber.BoundingBox
 import Wumber.ClosedComparable
-import Wumber.Model
 import Wumber.Numeric
+
+
+-- | The class of objects that can be presented with a sketch.
+class Sketchable a v | a -> v where sketch :: a -> Sketch v
 
 
 -- | A sketch of basic line elements. Most objects can be presented this way.
@@ -37,7 +41,8 @@ instance BoundingBoxC v a => BoundedObject (Sketch (v a)) (v a) where
 data SketchElement v = SketchLine !v !v !Color
   deriving (Show, Eq, Ord, Generic, Binary)
 
-instance (Bounded v, ClosedComparable v) => BoundedObject (SketchElement v) v where
+instance (Bounded v, ClosedComparable v) =>
+         BoundedObject (SketchElement v) v where
   bounding_box (SketchLine a b _) = of_points [a, b]
 
 

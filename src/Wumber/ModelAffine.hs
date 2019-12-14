@@ -31,7 +31,6 @@ import Text.Printf       (printf)
 
 import Wumber.BoundingBox
 import Wumber.ClosedComparable
-import Wumber.Model
 import Wumber.Numeric
 import Wumber.SymExpr
 import Wumber.SymMath
@@ -66,9 +65,6 @@ instance (Traversable v, MonadZip v, Affine (v a) m v a, Bounded (v a),
          Affine (BoundingBox (v a)) m v a where
   transform m b = of_points $ map (transform m) (corners b)
 
-instance SymMathC f R => Affine (FRep V3 f) AffineM3 V3 R where
-  transform m (FRep f b) = FRep (transform (fmap val m) f) (transform m b)
-
 
 -- NOTE
 -- We can transform symbolic quantities that are acting as vector functions. To
@@ -77,7 +73,7 @@ instance SymMathC f R => Affine (FRep V3 f) AffineM3 V3 R where
 --
 -- Sadly, we can't generalize over vector dimension and use 'vars'; there isn't
 -- a way for us to pass enough type information down to the 'vars' invocation
--- since it's being consumed by 'fromList'.
+-- since it's being consumed by 'toList'.
 
 instance SymMathC f a =>
          Affine (SymMathV V2 f a) AffineM2 V2 (SymMath f a) where

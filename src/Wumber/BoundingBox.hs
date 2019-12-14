@@ -3,6 +3,7 @@
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveFunctor #-}
 {-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
 {-# LANGUAGE TemplateHaskell #-}
 
@@ -36,6 +37,10 @@ type BoundingBoxC v a = (Applicative v,
                          Bounded (v a),
                          ClosedComparable a,
                          MonadZip v)
+
+
+-- | Objects whose extents are known.
+class BoundedObject a v where bounding_box :: a -> BoundingBox v
 
 
 -- | An axis-aligned bounding box specified by two vectors. Each coordinate of

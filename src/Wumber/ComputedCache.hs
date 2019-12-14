@@ -32,7 +32,6 @@ import System.IO.Unsafe       (unsafePerformIO)
 import qualified Data.ByteString.Lazy as BL
 
 import Wumber.Fingerprint
-import Wumber.Model
 
 
 -- | Computes using the cache.
