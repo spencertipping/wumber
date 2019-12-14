@@ -9,12 +9,13 @@
 {-# LANGUAGE MonoLocalBinds #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
--- | Models that support affine transformations.
-module Wumber.ModelAffine where
+-- | Affine transformations for things in general.
+module Wumber.Affine where
 
 
 import Control.Monad.Zip (MonadZip)
@@ -36,11 +37,28 @@ import Wumber.SymExpr
 import Wumber.SymMath
 
 
--- | The class of objects that can be transformed using an affine matrix of type
---   'm'. Typically 'm' will be @M44 R@ or @M44 (Sym f R)@ to operate on 3D
---   vectors.
+-- | The class of values that have mappings to homogeneous coordinates.
+class HomogeneousVector (v :: * -> *) where
+  type Hom v :: * -> *
+  hom   :: Num a        => v a -> Hom v a
+  unhom :: Fractional a => Hom v a -> v a
 
-class AffineMatrix m v n => Affine a m v n | a -> m, a -> n where
+instance HomogeneousVector V2 where
+  type Hom V2 = V3
+  hom   (V2 x y)   = V3 x y 1
+  unhom (V3 x y h) = V2 (x/h) (y/h)
+
+instance HomogeneousVector V3 where
+  type Hom V3 = V4
+  hom   (V3 x y z)   = V4 x y z 1
+  unhom (V4 x y z h) = V3 (x/h) (y/h) (z/h)
+
+
+-- | The class of objects that can be transformed using an affine matrix of type
+--   'm'. For example, 'm' will be @M44@ (wrapped as @AffineM3@) to operate on
+--   3D vectors.
+class (HomogeneousVector v, AffineMatrix m v n) =>
+      Affine a m v n | a -> m, a -> n where
   transform   :: m n -> a -> a
 
   untransform :: m n -> a -> a
@@ -55,10 +73,10 @@ class AffineMatrix m v n => Affine a m v n | a -> m, a -> n where
 
 
 instance Floating a => Affine (V3 a) AffineM3 V3 a where
-  transform (AM3 m) (V3 x y z) = (V4 x y z 1 *! m) ^. _xyz
+  transform (AM3 m) v = (hom v *! m) ^. _xyz
 
 instance Floating a => Affine (V2 a) AffineM2 V2 a where
-  transform (AM2 m) (V2 x y) = (V3 x y 1 *! m) ^. _xy
+  transform (AM2 m) v = (hom v *! m) ^. _xy
 
 instance (Traversable v, MonadZip v, Affine (v a) m v a, Bounded (v a),
           ClosedComparable a) =>
@@ -120,11 +138,10 @@ instance Show a => Show (AffineM2 a) where
                                (show x) (show y) (show z)
 
 
+instance Num a => Monoid    (AffineM2 a) where mempty         = AM2 identity
+instance Num a => Monoid    (AffineM3 a) where mempty         = AM3 identity
 instance Num a => Semigroup (AffineM2 a) where AM2 x <> AM2 y = AM2 (x !*! y)
 instance Num a => Semigroup (AffineM3 a) where AM3 x <> AM3 y = AM3 (x !*! y)
-
-instance Num a => Monoid (AffineM2 a) where mempty = AM2 identity
-instance Num a => Monoid (AffineM3 a) where mempty = AM3 identity
 
 
 instance Floating a => AffineMatrix AffineM2 V2 a where

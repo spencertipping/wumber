@@ -46,6 +46,7 @@ library
                      , Wumber.AMD64Asm
                      , Wumber.AMD64JIT
                      , Wumber.AMD64RE
+                     , Wumber.Affine
                      , Wumber.Assembler
                      , Wumber.BitSet
                      , Wumber.BoundingBox
@@ -61,7 +62,6 @@ library
                      , Wumber.JITIR
                      , Wumber.Macros
                      , Wumber.MathFn
-                     , Wumber.ModelAffine
                      , Wumber.ModelCSG
                      , Wumber.ModelFRep
                      , Wumber.Numeric
@@ -71,6 +71,7 @@ library
                      , Wumber.SymJIT
                      , Wumber.SymMath
                      , Wumber.VectorConversion
+                     , Wumber.View
                      , Wumber.ViewSketch
                      , Wumber.WordProfile
 

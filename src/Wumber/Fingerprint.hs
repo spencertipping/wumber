@@ -33,6 +33,9 @@ import Data.Int             (Int8, Int16, Int32, Int64)
 import Data.Word            (Word, Word8, Word16, Word32, Word64)
 import GHC.Fingerprint      (Fingerprint(..))
 import Language.Haskell.TH  (Type(ConT))
+import Linear.V2            (V2)
+import Linear.V3            (V3)
+import Linear.V4            (V4)
 
 import Prelude hiding (init)
 
@@ -73,3 +76,12 @@ $(forM [''(), ''Bool, ''Char, ''Double, ''Float,
         ''Word, ''Word8, ''Word16, ''Word32, ''Word64]
    \n -> reinstantiate (ConT n) <$>
          [d| instance Fingerprintable where fingerprint = binary_fingerprint |])
+
+instance Fingerprintable t => Fingerprintable (V2 t) where
+  fingerprint = tree_fingerprint . fmap fingerprint
+
+instance Fingerprintable t => Fingerprintable (V3 t) where
+  fingerprint = tree_fingerprint . fmap fingerprint
+
+instance Fingerprintable t => Fingerprintable (V4 t) where
+  fingerprint = tree_fingerprint . fmap fingerprint

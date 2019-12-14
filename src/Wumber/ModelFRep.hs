@@ -41,11 +41,11 @@ import GHC.Generics  (Generic, Generic1)
 
 import qualified Data.Set as S
 
+import Wumber.Affine
 import Wumber.BoundingBox
 import Wumber.ClosedComparable
 import Wumber.Fingerprint
 import Wumber.Functionable
-import Wumber.ModelAffine
 import Wumber.ModelCSG
 import Wumber.Numeric
 import Wumber.SymExpr

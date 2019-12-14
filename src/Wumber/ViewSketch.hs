@@ -22,10 +22,12 @@ import Linear.V4    (V4)
 import Wumber.BoundingBox
 import Wumber.ClosedComparable
 import Wumber.Numeric
+import Wumber.View
 
 
--- | The class of objects that can be presented with a sketch.
-class Sketchable a v | a -> v where sketch :: a -> Sketch v
+-- | The class of objects which can sketch themselves into a viewport with the
+--   specified dimension of projection matrix.
+class Sketchable a m v where sketch :: Viewport m -> a -> Sketch v
 
 
 -- | A sketch of basic line elements. Most objects can be presented this way.

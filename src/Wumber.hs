@@ -4,7 +4,6 @@ module Wumber (
   module Wumber.Constraint,
   module Wumber.Fingerprint,
   module Wumber.MathFn,
-  module Wumber.ModelAffine,
   module Wumber.ModelCSG,
   module Wumber.ModelFRep,
   module Wumber.Numeric,
@@ -17,7 +16,6 @@ import Wumber.ClosedComparable
 import Wumber.Constraint
 import Wumber.Fingerprint
 import Wumber.MathFn
-import Wumber.ModelAffine
 import Wumber.ModelCSG
 import Wumber.ModelFRep
 import Wumber.Numeric
