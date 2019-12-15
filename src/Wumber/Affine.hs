@@ -24,7 +24,9 @@ import Data.Foldable     (toList)
 import Data.IntMap       (fromList)
 import GHC.Generics      (Generic)
 import Lens.Micro        ((&), (.~), (^.))
-import Linear.Matrix     (M33, M44, (!*!), (*!), identity, inv33, inv44)
+import Linear.Matrix     (M33, M44, (!*!), (*!), fromQuaternion,
+                          identity, inv33, inv44, _m33)
+import Linear.Quaternion (Quaternion(..))
 import Linear.V2         (V2(..))
 import Linear.V3         (V3(..), _xy, _xyz)
 import Linear.V4         (V4(..))
@@ -37,30 +39,35 @@ import Wumber.SymExpr
 import Wumber.SymMath
 
 
--- | The class of values that have mappings to homogeneous coordinates.
+-- | The class of values that have mappings to homogeneous coordinates. 'hom'
+--   and 'unhom' work with absolute vectors: that is, values to which
+--   translation applies. 'hom0' and 'unhom0' are used for originless vectors
+--   like rotation axes, which are invariant under translation.
 class HomogeneousVector (v :: * -> *) where
   type Hom v :: * -> *
-  hom   :: Num a        => v a -> Hom v a
-  unhom :: Fractional a => Hom v a -> v a
+  hom    :: Num a        => v a -> Hom v a
+  hom0   :: Num a        => v a -> Hom v a
+  unhom  :: Fractional a => Hom v a -> v a
+  unhom0 :: Fractional a => Hom v a -> v a
 
 instance HomogeneousVector V2 where
   type Hom V2 = V3
-  hom   (V2 x y)   = V3 x y 1
-  unhom (V3 x y h) = V2 (x/h) (y/h)
+  hom    (V2 x y)   = V3 x y 1
+  hom0   (V2 x y)   = V3 x y 0
+  unhom  (V3 x y h) = V2 (x/h) (y/h)
+  unhom0 (V3 x y _) = V2 x y
 
 instance HomogeneousVector V3 where
   type Hom V3 = V4
-  hom   (V3 x y z)   = V4 x y z 1
-  unhom (V4 x y z h) = V3 (x/h) (y/h) (z/h)
+  hom    (V3 x y z)   = V4 x y z 1
+  hom0   (V3 x y z)   = V4 x y z 0
+  unhom  (V4 x y z h) = V3 (x/h) (y/h) (z/h)
+  unhom0 (V4 x y z h) = V3 x y z
 
 
 -- | The class of objects that can be transformed using an affine matrix of type
 --   'm'. For example, 'm' will be @M44@ (wrapped as @AffineM3@) to operate on
 --   3D vectors.
---
---   FIXME: 'rotate' isn't specified correctly; /n/-dimensional rotation has
---   /0.5 n(n-1)/ components. It isn't clear to me how it should be specified
---   yet.
 
 class (HomogeneousVector v, AffineMatrix m v n) =>
       Affine a m v n | a -> m, a -> n where
@@ -68,20 +75,23 @@ class (HomogeneousVector v, AffineMatrix m v n) =>
 
   untransform :: m n -> a -> a
   translate   :: v n -> a -> a
-  rotate      :: v n -> n -> a -> a
   scale       :: v n -> a -> a
+  rotate      :: Rotation m n -> a -> a
 
   untransform = transform . minvert
   translate   = transform . mtranslate
   scale       = transform . mscale
-  rotate v    = transform . mrotate v
+  rotate      = transform . mrotate
 
-
-instance Floating a => Affine (V3 a) AffineM3 V3 a where
-  transform (AM3 m) v = (hom v *! m) ^. _xyz
 
 instance Floating a => Affine (V2 a) AffineM2 V2 a where
-  transform (AM2 m) v = (hom v *! m) ^. _xy
+  transform (AM2 m) v = unhom (hom v *! m)
+
+instance Floating a => Affine (V3 a) AffineM3 V3 a where
+  transform (AM3 m) v = unhom (hom v *! m)
+
+instance Floating a => Affine (Quaternion a) AffineM3 V3 a where
+  transform (AM3 m) (Quaternion θ v) = Quaternion θ (unhom0 (hom0 v *! m))
 
 instance (Traversable v, MonadZip v, Affine (v a) m v a, Bounded (v a),
           ClosedComparable a) =>
@@ -101,12 +111,12 @@ instance (Traversable v, MonadZip v, Affine (v a) m v a, Bounded (v a),
 instance SymMathC f a =>
          Affine (SymMathV V2 f a) AffineM2 V2 (SymMath f a) where
   transform m (SymMathV v) = SymMathV $ v // v'
-    where v' = zip [0..] $ toList $ transform (minvert m) v2
+    where v' = zip [0..] $ toList $ untransform m v2
 
 instance SymMathC f a =>
          Affine (SymMathV V3 f a) AffineM3 V3 (SymMath f a) where
   transform m (SymMathV v) = SymMathV $ v // v'
-    where v' = zip [0..] $ toList $ transform (minvert m) v3
+    where v' = zip [0..] $ toList $ untransform m v3
 
 
 -- | The class of matrices that offer affine constructors. We need this to
@@ -121,10 +131,12 @@ instance SymMathC f a =>
 
 class Monoid (m n) =>
       AffineMatrix (m :: * -> *) (v :: * -> *) n | m -> v, v -> m where
+  type Rotation m n :: *
+
   minvert    :: m n -> m n
   mtranslate :: v n -> m n
   mscale     :: v n -> m n
-  mrotate    :: v n -> n -> m n
+  mrotate    :: Rotation m n -> m n
 
 newtype AffineM3 a = AM3 { unAM3 :: M44 a }
   deriving (Eq, Functor, Generic, Binary)
@@ -150,27 +162,21 @@ instance Num a => Semigroup (AffineM3 a) where AM3 x <> AM3 y = AM3 (x !*! y)
 
 
 instance Floating a => AffineMatrix AffineM2 V2 a where
+  type Rotation AffineM2 a = a
+
   minvert             = AM2 . inv33 . unAM2
   mtranslate (V2 x y) = AM2 $ V3 (V3 1 0 0) (V3 0 1 0) (V3 x y 1)
   mscale     (V2 x y) = AM2 $ V3 (V3 x 0 0) (V3 0 y 0) (V3 0 0 1)
-  mrotate v θ         = mtranslate (-v)
-                        <> AM2 (V3 (V3 c (-s) 0) (V3 s c 0) (V3 0 0 1))
-                        <> mtranslate (transform r' v)
-                        <> error "FIXME: mrotate V2"
-    where s  = sin θ
-          c  = cos θ
-          r' = AM2 (V3 (V3 c s 0) (V3 (-s) c 0) (V3 0 0 1))
+  mrotate θ           = AM2 (V3 (V3 c (-s) 0) (V3 s c 0) (V3 0 0 1))
+    where s = sin θ
+          c = cos θ
 
 instance Floating a => AffineMatrix AffineM3 V3 a where
+  type Rotation AffineM3 a = Quaternion a
+
   minvert                 = AM3 . inv44 . unAM3
   mtranslate (V3 x y z)   = AM3 $ V4 (V4 1 0 0 0) (V4 0 1 0 0)
                                      (V4 0 0 1 0) (V4 x y z 1)
   mscale     (V3 x y z)   = AM3 $ V4 (V4 x 0 0 0) (V4 0 y 0 0)
                                      (V4 0 0 z 0) (V4 0 0 0 1)
-  mrotate    (V3 x y z) θ = AM3 $
-    V4 (V4 (x*x*(1-c) + c)   (x*y*(1-c) - z*s) (x*z*(1-c) + y*s) 0)
-       (V4 (x*y*(1-c) + z*s) (y*y*(1-c) + c)   (y*z*(1-c) - x*s) 0)
-       (V4 (x*z*(1-c) - y*s) (y*z*(1-c) + x*s) (z*z*(1-c) + c)   0)
-       (V4 0                 0                 0                 1)
-    where s = sin θ
-          c = cos θ
+  mrotate q = AM3 $ identity & _m33 .~ fromQuaternion q
