@@ -1,4 +1,5 @@
 {-# LANGUAGE BlockArguments #-}
+{-# LANGUAGE ConstraintKinds #-}
 {-# LANGUAGE DeriveAnyClass #-}
 {-# LANGUAGE DeriveGeneric #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -8,14 +9,19 @@
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TupleSections #-}
 
-{-# OPTIONS_GHC -funbox-strict-fields #-}
+{-# OPTIONS_GHC -funbox-strict-fields -Wincomplete-patterns #-}
 
 -- | A library to manage potentially large systems of equations, reducing
 --   dimensionality eagerly as new relations are added.
 module Wumber.EquationSystem (
+  EquationC,
   EquationSystem(..),
-  init_es,
-  constrain,
+  Equation(..),
+  EquationType(..),
+  SplitCostFn,
+  es_subst, es_substset, es_minimize, es_inconsistent, es_amb, es_dofs,
+  eq_q, eq_type, eq_substset, eq_subst,
+  init_es, equations, merge, constrain,
 ) where
 
 
@@ -36,6 +42,13 @@ import qualified Data.IntMap   as IM
 import qualified Wumber.BitSet as BS
 
 
+-- | Constraints required to solve a system of equations both algebraically and
+--   numerically.
+type EquationC f a = (SymMathC f a,
+                      Invertible (SymMath f a),
+                      Delta a)
+
+
 -- | A system of equations that keeps track of algebraic equivalences and
 --   subsystem independence. Tracking and rewriting are done incrementally.
 --
@@ -51,6 +64,10 @@ import qualified Wumber.BitSet as BS
 --     haven't yet decided which one to commit to
 --   - '_es_dofs': current degrees of freedom
 
+-- TODO
+-- Track linear equations and solve them with BLAS functions rather than
+-- variable substitution, _iff_ they're unentangled with nonlinear equations.
+
 data EquationSystem f a = ES { _es_subst        :: !(IntMap (SymMath f a)),
                                _es_substset     :: BS.BitSet,
                                _es_minimize     :: SplitCostFn f a,
@@ -58,11 +75,6 @@ data EquationSystem f a = ES { _es_subst        :: !(IntMap (SymMath f a)),
                                _es_amb          :: [Equation f a],
                                _es_dofs         :: BS.BitSet }
   deriving (Show, Eq, Generic, Binary)
-
-
--- | An empty equation system.
-init_es :: EquationSystem f a
-init_es = ES IM.empty BS.empty [] [] [] BS.empty
 
 
 -- | A cost function partitioned across multiple independent subsets of a
@@ -121,30 +133,45 @@ makeLenses ''EquationSystem
 makeLenses ''Equation
 
 
--- TODO
--- Provide a merge function for multiple equation systems.
+-- | An empty equation system.
+init_es :: EquationSystem f a
+init_es = ES IM.empty BS.empty [] [] [] BS.empty
+
+
+-- | The set of equations that describes an 'EquationSystem'. These may or may
+--   not exist in the same form as originally specified, but they should be
+--   mathematically equivalent.
+equations :: SymMathC f a => EquationSystem f a -> [SymMath f a]
+equations (ES s _ m i a _) = s' ++ m ++ i ++ a'
+  where s' = [var i - x | (i, x) <- IM.toList s]
+        a' = map _eq_q a
+
+
+-- | Merges two 'EquationSystem's by intersecting their solution spaces.
+merge :: EquationC f a =>
+         EquationSystem f a -> EquationSystem f a -> EquationSystem f a
+merge x = foldr constrain x . equations
 
 
 -- | Adds a constraint to an equation system, where the constraint is a value to
 --   be set to zero. Mechanically, our goal is to use the new constraint to
 --   build new variable substitutions. Failing that, we try to add it to the
 --   list of quantities to minimize.
-constrain :: (Invertible (SymMath f a), SymMathC f a, Delta a)
+constrain :: EquationC f a
           => SymMath f a -> EquationSystem f a -> EquationSystem f a
 constrain c es@(ES s ss f i a d) = case _eq_type e of
   EqConsistent   -> es
   EqInconsistent -> ES s ss f (c:i) a d
   EqMinimize     -> ES s ss (add_costfn (_eq_q e) f) i a d
   EqMultivariate -> add_multivariate e es
-  _              -> add_univariate e es
+  EqUnivariate   -> add_univariate e es
   where e = equation (c //: s)
 
 
 -- | Constructs an 'Equation' from the given 'SymMath' quantity by attempting to
 --   isolate each one of its variables. The 'SymMath' quantity is converted to
 --   an implicit equation by setting it to zero.
-equation :: (Invertible (SymMath f a), SymMathC f a, Delta a)
-         => SymMath f a -> Equation f a
+equation :: EquationC f a => SymMath f a -> Equation f a
 equation m = EQN m t (BS.fromList $ map fst isos) (IM.fromList isos)
   where vs        = BS.toList $ vars_in m
         isos      = catMaybes $ map try_iso vs
@@ -178,7 +205,7 @@ subst_costfn b m fs = foldr add_costfn o $ map (//: m) i
 -- | Adds a multivariate equation to an 'EquationSystem'. If the equation
 --   provides a substitution for any existing degree of freedom, we choose one
 --   arbitrarily. Otherwise we enqueue the equation onto the '_es_amb' list.
-add_multivariate :: (Invertible (SymMath f a), SymMathC f a, Delta a)
+add_multivariate :: EquationC f a
                  => Equation f a -> EquationSystem f a -> EquationSystem f a
 add_multivariate e es@(ES s ss f i a d)
   | v:_ <- vs = add_subst v (_eq_subst e IM.! v) es
@@ -189,7 +216,7 @@ add_multivariate e es@(ES s ss f i a d)
 -- | Adds a univariate equation to an 'EquationSystem'. We do this by solving
 --   the equation, either numerically or algebraically, and adding a
 --   substitution.
-add_univariate :: (Invertible (SymMath f a), SymMathC f a, Delta a)
+add_univariate :: EquationC f a
                => Equation f a -> EquationSystem f a -> EquationSystem f a
 add_univariate e = add_subst v q where [(v, q)] = IM.toList (_eq_subst e)
 
@@ -200,7 +227,7 @@ add_univariate e = add_subst v q where [(v, q)] = IM.toList (_eq_subst e)
 --   If you try to substitute the same variable multiple times, we'll derive a
 --   new equation by setting the substitutions equal to each other.
 
-add_subst :: (Invertible (SymMath f a), SymMathC f a, Delta a)
+add_subst :: EquationC f a
           => VarID -> SymMath f a -> EquationSystem f a -> EquationSystem f a
 add_subst v q es@(ES s ss f i a d)
   | Just q' <- IM.lookup v s = constrain (q - q') es
