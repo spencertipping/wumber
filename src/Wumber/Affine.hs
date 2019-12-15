@@ -57,6 +57,11 @@ instance HomogeneousVector V3 where
 -- | The class of objects that can be transformed using an affine matrix of type
 --   'm'. For example, 'm' will be @M44@ (wrapped as @AffineM3@) to operate on
 --   3D vectors.
+--
+--   FIXME: 'rotate' isn't specified correctly; /n/-dimensional rotation has
+--   /0.5 n(n-1)/ components. It isn't clear to me how it should be specified
+--   yet.
+
 class (HomogeneousVector v, AffineMatrix m v n) =>
       Affine a m v n | a -> m, a -> n where
   transform   :: m n -> a -> a

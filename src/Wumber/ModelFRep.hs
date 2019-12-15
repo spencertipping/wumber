@@ -80,9 +80,6 @@ data FRep v f = FRep { _frep_fn  :: SymMathV v f R,
                        _frep_bb  :: BoundingBox (v R) }
   deriving (Generic)
 
-makeLenses ''FRep
-
-
 deriving instance (FnShow f,   Show (v R)) => Show   (FRep v f)
 deriving instance (Eq     f,     Eq (v R)) => Eq     (FRep v f)
 deriving instance (Binary f, Binary (v R)) => Binary (FRep v f)
@@ -92,6 +89,10 @@ instance (Binary f, Binary (v R)) => Fingerprintable (FRep v f) where
 
 instance BoundedObject (FRep v f) (v R) where bounding_box = _frep_bb
 
+makeLenses ''FRep
+
+
+-- Affine support
 instance SymMathC f R => Affine (FRep V2 f) AffineM2 V2 R where
   transform m (FRep f p b) = FRep (transform (fmap val m) f)
                                   (S.map (transform m) p)
@@ -102,6 +103,8 @@ instance SymMathC f R => Affine (FRep V3 f) AffineM3 V3 R where
                                   (S.map (transform m) p)
                                   (transform m b)
 
+
+-- CSG support
 instance (SymMathC f R, BoundingBoxC v R, Ord (v R)) =>
          FReppable (CSG (FRep v f)) v f where
 

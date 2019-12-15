@@ -60,6 +60,7 @@ library
                      , Wumber.Functionable
                      , Wumber.JIT
                      , Wumber.JITIR
+                     , Wumber.Kinematic
                      , Wumber.Macros
                      , Wumber.MathFn
                      , Wumber.ModelCSG

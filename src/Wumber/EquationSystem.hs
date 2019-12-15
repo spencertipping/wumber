@@ -12,7 +12,11 @@
 
 -- | A library to manage potentially large systems of equations, reducing
 --   dimensionality eagerly as new relations are added.
-module Wumber.EquationSystem where
+module Wumber.EquationSystem (
+  EquationSystem(..),
+  init_es,
+  constrain,
+) where
 
 
 import Data.Binary   (Binary)

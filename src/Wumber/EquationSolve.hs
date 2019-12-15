@@ -6,7 +6,8 @@
 
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
--- | Functions to reduce 'EquationSystem's to concrete values.
+-- | Functions to reduce 'EquationSystem's to concrete values using numerical
+--   minimization.
 module Wumber.EquationSolve where
 
 
@@ -44,7 +45,12 @@ default_settings = BFGSS (δ 1) 1048576 1 0.1
 
 -- | Reduces a system of equations to concrete values using a mixture of
 --   algebraic and numerical methods. If your equation system is underspecified,
---   then you'll get an incomplete solution.
+--   then you'll get an incomplete solution -- i.e. the resulting 'IntMap' will
+--   have mappings for only a subset of the unknowns.
+
+-- FIXME
+-- Apply 'amb' constraints before minimizing; otherwise we lose them altogether.
+
 solve :: SymDifferentiable f R
       => BFGSSettings -> IntMap R -> EquationSystem f R -> IntMap R
 solve ss ivs (ES s _ m _ a _) = IM.union mins s'
@@ -54,6 +60,11 @@ solve ss ivs (ES s _ m _ a _) = IM.union mins s'
 
 -- | Minimizes the solution error for the specified cost function by delegating
 --   to the GSL BFGS minimizer.
+
+-- FIXME
+-- Use vector JIT once we have that working. We'll need to do our own C FFI for
+-- performance.
+
 minimize :: SymDifferentiable f R
          => BFGSSettings -> IntMap R -> SymMath f R -> IntMap R
 minimize (BFGSS prec iter fs tol) ivs m = IM.map (s VS.!) cs

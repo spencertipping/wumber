@@ -27,7 +27,7 @@ import Wumber.View
 
 -- | The class of objects which can sketch themselves into a viewport with the
 --   specified dimension of projection matrix.
-class Sketchable a m v where sketch :: Viewport m -> a -> Sketch v
+class Sketchable a m where sketch :: ViewSettings m -> a -> Sketch (V2 R)
 
 
 -- | A sketch of basic line elements. Most objects can be presented this way.
