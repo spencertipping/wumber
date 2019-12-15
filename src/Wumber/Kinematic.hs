@@ -57,14 +57,15 @@ type KinematicC (m :: * -> *) (v :: * -> *) f a =
 -- | A condensed kinematic graph; that is, a graph with an end transform and
 --   inherited loop constraints.
 data Kinematic m f a = KG { _kg_transform   :: m (SymMath f a),
-                            _kg_constraints :: EquationSystem f a }
+                            _kg_constraints :: EquationSystem f a,
+                            _kg_priors      :: [Kinematic m f a] }
   deriving (Generic)
 
 
 -- | The origin kinematic system; that is, one with no constraints and no
 --   linkages.
 init_kg :: KinematicC m v f a => Kinematic m f a
-init_kg = KG mempty init_es
+init_kg = KG mempty init_es []
 
 
 deriving instance (Binary f, Binary a, Binary (m (SymMath f a))) =>
@@ -79,13 +80,19 @@ deriving instance (FnShow f, Show a, Show (m (SymMath f a))) =>
 
 instance KinematicC m v f a =>
          Affine (Kinematic m f a) m v (SymMath f a) where
-  transform m (KG t c) = KG (transform m t) c
+  transform m g@(KG t c _) = KG (transform m t) c [g]
+
+
+-- | Joins two kinematic graphs by unifying their endpoints, both in terms of
+--   position and orientation (and, if applicable, scaling and shearing).
+join :: KinematicC m v f a => Kinematic m f a -> Kinematic m f a -> Kinematic m f a
+join a@(KG ta sa _) b@(KG tb sb _) = KG ta (foldr constrain sa (tb - ta)) [a, b]
 
 
 -- | The ending transform of a kinematic linkage, which is just the linkage's
 --   transformation matrix.
 end_transform :: Kinematic m f a -> m (SymMath f a)
-end_transform (KG t _) = t
+end_transform (KG t _ _) = t
 
 
 -- | The orientation-free ending position of a kinematic linkage.
@@ -97,10 +104,12 @@ end_position g = transform (end_transform g) 0
 --   together by using 'end_position'.
 constrain_position :: KinematicC m v f a =>
                       v (SymMath f a) -> Kinematic m f a -> Kinematic m f a
-constrain_position p g@(KG t s) = KG t $ foldr constrain s (p - end_position g)
+constrain_position v g@(KG t s p) =
+  KG t (foldr constrain s (v - end_position g)) p
 
 
 -- | Sets the position and orientation of a linkage.
 constrain_transform :: KinematicC m v f a =>
                        m (SymMath f a) -> Kinematic m f a -> Kinematic m f a
-constrain_transform m g@(KG t s) = KG t $ foldr constrain s (m - end_transform g)
+constrain_transform m g@(KG t s p) =
+  KG t (foldr constrain s (m - end_transform g)) p
