@@ -88,6 +88,8 @@ instance KinematicC m v f a =>
 join :: KinematicC m v f a => Kinematic m f a -> Kinematic m f a -> Kinematic m f a
 join a@(KG ta sa _) b@(KG tb sb _) = KG ta (foldr constrain sa (tb - ta)) [a, b]
 
+-- FIXME: have 'join' inherit from both sa and sb
+
 
 -- | The ending transform of a kinematic linkage, which is just the linkage's
 --   transformation matrix.
