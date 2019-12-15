@@ -99,6 +99,10 @@ instance (Traversable v, MonadZip v, Affine (v a) m v a, Bounded (v a),
   transform m b = of_points $ map (transform m) (corners b)
 
 
+instance Floating a => Affine (AffineM3 a) AffineM3 V3 a where transform = (<>)
+instance Floating a => Affine (AffineM2 a) AffineM2 V2 a where transform = (<>)
+
+
 -- NOTE
 -- We can transform symbolic quantities that are acting as vector functions. To
 -- do this, we apply the transformation matrix inverse to their inputs and
@@ -159,6 +163,13 @@ instance Num a => Monoid    (AffineM2 a) where mempty         = AM2 identity
 instance Num a => Monoid    (AffineM3 a) where mempty         = AM3 identity
 instance Num a => Semigroup (AffineM2 a) where AM2 x <> AM2 y = AM2 (x !*! y)
 instance Num a => Semigroup (AffineM3 a) where AM3 x <> AM3 y = AM3 (x !*! y)
+
+
+instance Foldable AffineM3 where
+  foldr f x (AM3 m) = foldr f x $ concatMap toList $ toList m
+
+instance Foldable AffineM2 where
+  foldr f x (AM2 m) = foldr f x $ concatMap toList $ toList m
 
 
 instance Floating a => AffineMatrix AffineM2 V2 a where

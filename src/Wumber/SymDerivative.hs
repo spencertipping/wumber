@@ -109,7 +109,7 @@ vector_derivative (SymMathV f) = fmap (flip derivative f) var_ids
 
 
 -- | A Jacobian "matrix" of all variables that appear in a series of syms.
-jacobian :: (Delta a, SymDifferentiable f a)
-         => [SymMath f a] -> [IntMap (SymMath f a)]
-jacobian ss = map (\s -> fromList $ map (\v -> (v, derivative v s)) vs) ss
-  where vs = BS.toList $ BS.unions (map (vars_in . unMath) ss)
+jacobian :: (Functor t, Foldable t, Delta a, SymDifferentiable f a)
+         => t (SymMath f a) -> t (IntMap (SymMath f a))
+jacobian ss = fmap (\s -> fromList $ map (\v -> (v, derivative v s)) vs) ss
+  where vs = BS.toList $ foldr (\s b -> BS.union b (vars_in s)) BS.empty ss
