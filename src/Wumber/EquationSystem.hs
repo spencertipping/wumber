@@ -121,6 +121,10 @@ makeLenses ''EquationSystem
 makeLenses ''Equation
 
 
+-- TODO
+-- Provide a merge function for multiple equation systems.
+
+
 -- | Adds a constraint to an equation system, where the constraint is a value to
 --   be set to zero. Mechanically, our goal is to use the new constraint to
 --   build new variable substitutions. Failing that, we try to add it to the
