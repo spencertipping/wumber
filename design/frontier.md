@@ -35,8 +35,6 @@
 
 
 ## Modeling
-+ Compute abstraction
-  + `compute` is too general; modeling abstractions should manage down-projection
 + 2D
   + Render 2D within a 3D context, given a plane + UV coordinates
   + Diagrams/lines/graphs/etc?
