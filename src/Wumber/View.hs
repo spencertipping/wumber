@@ -32,6 +32,7 @@ data ViewSettings m = VS { _vs_viewport       :: Viewport m,
   deriving (Generic)
 
 deriving instance Show   (m R) => Show   (ViewSettings m)
+deriving instance Read   (m R) => Read   (ViewSettings m)
 deriving instance Eq     (m R) => Eq     (ViewSettings m)
 deriving instance Binary (m R) => Binary (ViewSettings m)
 
@@ -48,6 +49,7 @@ data Viewport m = VP { _vp_pixel_size :: !(V2 Int),
   deriving (Generic)
 
 deriving instance Show   (m R) => Show   (Viewport m)
+deriving instance Read   (m R) => Read   (Viewport m)
 deriving instance Eq     (m R) => Eq     (Viewport m)
 deriving instance Binary (m R) => Binary (Viewport m)
 

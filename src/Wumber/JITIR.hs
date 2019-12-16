@@ -61,7 +61,7 @@ data IR f a = IR { _ir_ret  :: IRID,
 data IROperand f a = IRC !a
                    | IRV !VarID
                    | IRF f [IRID]
-  deriving (Show, Eq, Ord, Generic, Binary)
+  deriving (Show, Read, Eq, Ord, Generic, Binary)
 
 type IRID = Int
 

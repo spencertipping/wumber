@@ -26,7 +26,7 @@ data CSG a = CSGJust a
            | CSGUnion     (CSG a) (CSG a)
            | CSGIntersect (CSG a) (CSG a)
            | CSGSubtract  (CSG a) (CSG a)
-  deriving (Show, Eq, Generic, Generic1, Functor, Foldable, Binary)
+  deriving (Show, Read, Eq, Generic, Generic1, Functor, Foldable, Binary)
 
 instance Binary a => Fingerprintable (CSG a) where
   fingerprint = binary_fingerprint

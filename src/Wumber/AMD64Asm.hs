@@ -1,7 +1,8 @@
-{-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE BlockArguments #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
+{-# LANGUAGE RankNTypes #-}
+{-# LANGUAGE TemplateHaskell #-}
+
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 -- | Machine code assembler for AMD64 processors, mostly using the AMD64
@@ -37,11 +38,15 @@ type XMMReg = Word8
 -- | Creates a stack frame sized for the specified number of locals. Uses the
 --   x86 'enter' instruction, which allows for up to 64K of local variables.
 --   '%rsp' will be aligned to a 16-byte boundary.
+--
+--   NOTE: stack alignment is really important. If you don't do this, routines
+--   like @f_sincos@ will segfault when they use AVX aligned-memory
+--   instructions.
+
 frame_enter :: Int -> Asm' ()
 frame_enter n = do hex "c8"
                    tell $ B.word16LE (fromIntegral $ n * 8)
                    hex "00"
-                   hex "50"             -- at least one more slot for %rdi backup
                    andqimm8 3 rsp (-16) -- align %rsp to 16-byte boundary
 
 
@@ -73,8 +78,7 @@ rex0_modrm = flip rex_modrm False
 rexw_modrm = flip rex_modrm True
 
 
--- | The '%rbp' signed displacement for the specified thread's local memory
---   address.
+-- | The '%rbp' signed displacement for the specified local variable address.
 rbp32 :: IRID -> Asm' ()
 rbp32 t = tell $ B.int32LE (fromIntegral $ (t + 1) * (-8))
 
@@ -83,11 +87,11 @@ rbp32 t = tell $ B.int32LE (fromIntegral $ (t + 1) * (-8))
 movsd_rr :: XMMReg -> XMMReg -> Asm' ()
 movsd_rr r1 r2 = rex0_modrm "f3" "0f7e" 3 r2 r1
 
--- | Loads a thread from memory into the specified XMM register.
+-- | Loads a local from memory into the specified XMM register.
 movsd_mr :: IRID -> XMMReg -> Asm' ()
 movsd_mr t x = rex0_modrm "f3" "0f7e" 2 x rbp >> rbp32 t
 
--- | Spills a register's value into the specified thread memory.
+-- | Spills a register's value into the specified local slot.
 movsd_rm :: XMMReg -> IRID -> Asm' ()
 movsd_rm x t = rex0_modrm "66" "0fd6" 2 x rbp >> rbp32 t
 
@@ -107,11 +111,11 @@ movconst_r x r = do hex "48b8"
 --   nothing to save or restore XMM registers; all it does is save and restore
 --   '%rdi' using its preallocated stack slot.
 call :: FunPtr a -> Asm' ()
-call p = do movq_rm 0 rdi 4; hex "24"   -- save %rdi
+call p = do hex "5657"                  -- push %rsi, %rdi
             hex "48b8"
             tell $ B.word64LE (fromIntegral a)
             hex "ffd0"
-            movq_mr 0 rdi 4; hex "24"   -- restore %rdi
+            hex "5f5e"                  -- pop %rdi, %rsi
             where WordPtr a = P.ptrToWordPtr $ P.castFunPtrToPtr p
 
 

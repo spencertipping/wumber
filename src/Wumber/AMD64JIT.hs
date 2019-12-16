@@ -18,7 +18,6 @@ module Wumber.AMD64JIT where
 
 import Control.Monad     (when)
 import Control.Monad.RWS (asks, gets, modify')
-import Data.Bits
 import Data.IntMap       (IntMap(..), (!))
 import Data.List         (sortOn)
 import Data.Maybe        (fromJust)
@@ -60,10 +59,6 @@ is_inline _          = False
 
 encoded_asm (Inline a) = a
 encoded_asm (FnCall a) = a
-
-
-empty_regset :: RegSet Word16
-empty_regset = RS 0
 
 
 -- | A model of the thread graph and processor that represents the current

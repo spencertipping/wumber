@@ -33,7 +33,7 @@ class Sketchable a m where sketch :: ViewSettings m -> a -> Sketch (V2 R)
 
 -- | A sketch of basic line elements. Most objects can be presented this way.
 newtype Sketch v = Sketch { unSketch :: [SketchElement v] }
-  deriving (Show, Eq, Ord, Generic, Binary)
+  deriving (Show, Read, Eq, Ord, Generic, Binary)
 
 instance BoundingBoxC v a => BoundedObject (Sketch (v a)) (v a) where
   bounding_box (Sketch es) = unions $ map bounding_box es
@@ -42,7 +42,7 @@ instance BoundingBoxC v a => BoundedObject (Sketch (v a)) (v a) where
 -- | A single thing you might want to draw in a sketch, where @v@ is the vector
 --   type of a point (e.g. @V3 R@).
 data SketchElement v = SketchLine !v !v !Color
-  deriving (Show, Eq, Ord, Generic, Binary)
+  deriving (Show, Read, Eq, Ord, Generic, Binary)
 
 instance (Bounded v, ClosedComparable v) =>
          BoundedObject (SketchElement v) v where
