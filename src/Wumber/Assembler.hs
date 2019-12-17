@@ -1,5 +1,6 @@
 {-# LANGUAGE BlockArguments #-}
 {-# LANGUAGE NoMonomorphismRestriction #-}
+
 {-# OPTIONS_GHC -funbox-strict-fields #-}
 
 -- | A DSL for assembling machine code and doing requisite value conversions.

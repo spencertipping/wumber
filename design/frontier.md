@@ -54,7 +54,6 @@
   + How do we cache this if it's dynamic?
 + Assembler
   + Multi-branch assembly with conditionals
-  + Constant vector + indexing
 + JIT
   + Reverse-engineer instruction latency/throughput
   + Benchmark reg/reg and reg/memory parallelization
