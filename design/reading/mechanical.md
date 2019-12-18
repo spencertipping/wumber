@@ -18,6 +18,7 @@
   + [Wikipedia: von Mises yield criterion](https://en.wikipedia.org/wiki/Von_Mises_yield_criterion)
   + [Wikipedia: Cauchy stress tensor](https://en.wikipedia.org/wiki/Cauchy_stress_tensor)
   + [Wikipedia: Linear elasticity](https://en.wikipedia.org/wiki/Linear_elasticity)
+  + [Wikipedia: Stress functions](https://en.wikipedia.org/wiki/Stress_functions)
 + [Wikipedia: Cholesky decomposition](https://en.wikipedia.org/wiki/Cholesky_decomposition)
   + [Wikipedia: Definiteness of a matrix](https://en.wikipedia.org/wiki/Definiteness_of_a_matrix)
   + [Wikipedia: Hermitian matrix](https://en.wikipedia.org/wiki/Hermitian_matrix)
@@ -31,6 +32,7 @@
   + [Wikipedia: Dirichlet boundary condition](https://en.wikipedia.org/wiki/Dirichlet_boundary_condition)
   + [Wikipedia: Neumann boundary condition](https://en.wikipedia.org/wiki/Neumann_boundary_condition)
 + [Wikipedia: structural dynamics](https://en.wikipedia.org/wiki/Structural_dynamics)
++ [SO: Why is the stress tensor linear and symmetric?](https://physics.stackexchange.com/questions/62963/why-is-the-nonrelativistic-stress-tensor-linear-and-symmetric)
 
 
 ### Solid modeling

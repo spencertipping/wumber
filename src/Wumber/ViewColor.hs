@@ -9,9 +9,10 @@
 module Wumber.ViewColor where
 
 
-import Data.Binary  (Binary)
-import GHC.Generics (Generic)
-import Linear.V3    (V3(..))
+import Data.Binary   (Binary)
+import GHC.Generics  (Generic)
+import Linear.Matrix (M33, identity)
+import Linear.V3     (V3(..))
 
 import Wumber.Numeric
 
@@ -58,7 +59,7 @@ data Color = ColorRGBA !R !R !R !R
 
 -- | Coordinate spaces that describe the HSV perception of a given RGB color
 --   given certain vision filters. 'CustomVision' lets you configure your own
---   RGB admittance vector.
+--   RGB perception matrix.
 --
 --   'Protanomaly', 'Deuteranomaly', and 'Tritanomaly' model the three types of
 --   single-cone deficiency with a unit scalar indicating admittance. So
@@ -70,17 +71,20 @@ data ColorPerception = NormalVision
                      | Deuteranomaly !R
                      | Tritanomaly   !R
                      | Achromatopsia
-                     | CustomVision !R !R !R
+                     | CustomVision  !ColorPerceptionMatrix
   deriving (Show, Read, Eq, Ord, Generic, Binary)
 
 
--- | Returns the RGB admittance vector for a given color perception model.
+-- | A color-parsing matrix for human vision. This operates as a confusion
+--   matrix; the inputs are R, G, and B, and the outputs are perceived channels.
+type ColorPerceptionMatrix = M33 R
 
--- TODO: RGB per-channel admittance is wrong; we need a matrix model here
-rgb_admittance :: ColorPerception -> V3 R
-rgb_admittance NormalVision         = 1
-rgb_admittance Achromatopsia        = V3 0 1 0       -- FIXME
-rgb_admittance (Protanomaly x)      = V3 x 1 1
-rgb_admittance (Deuteranomaly x)    = V3 1 x 1
-rgb_admittance (Tritanomaly x)      = V3 1 1 x
-rgb_admittance (CustomVision r g b) = V3 r g b
+
+-- | Returns the RGB perception matrix for a given perception model.
+perception_matrix :: ColorPerception -> ColorPerceptionMatrix
+perception_matrix NormalVision      = identity
+perception_matrix Achromatopsia     = V3 (V3 1 1 1) (V3 1 1 1) (V3 1 1 1) / 3
+perception_matrix (Protanomaly x)   = V3 (V3 x 0 0) (V3 0 1 0) (V3 0 0 1)
+perception_matrix (Deuteranomaly x) = V3 (V3 1 0 0) (V3 0 x 0) (V3 0 0 1)
+perception_matrix (Tritanomaly x)   = V3 (V3 1 0 0) (V3 0 1 0) (V3 0 0 x)
+perception_matrix (CustomVision m)  = m

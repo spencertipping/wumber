@@ -63,6 +63,7 @@ library
                      , Wumber.Kinematic
                      , Wumber.Macros
                      , Wumber.MathFn
+                     , Wumber.ModelBRep
                      , Wumber.ModelCSG
                      , Wumber.ModelFRep
                      , Wumber.Numeric
@@ -73,6 +74,8 @@ library
                      , Wumber.SymMath
                      , Wumber.VectorConversion
                      , Wumber.View
+                     , Wumber.ViewColor
+                     , Wumber.ViewRender
                      , Wumber.ViewSketch
                      , Wumber.WordProfile
 
