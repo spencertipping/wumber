@@ -63,9 +63,12 @@ library
                      , Wumber.Kinematic
                      , Wumber.Macros
                      , Wumber.MathFn
+                     , Wumber.Model
                      , Wumber.ModelBRep
                      , Wumber.ModelCSG
+                     , Wumber.ModelElectrical
                      , Wumber.ModelFRep
+                     , Wumber.ModelVRep
                      , Wumber.Numeric
                      , Wumber.SymAlgebra
                      , Wumber.SymDerivative

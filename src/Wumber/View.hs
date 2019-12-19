@@ -24,11 +24,13 @@ import Linear.V4     (V4)
 import Wumber.Affine
 import Wumber.Fingerprint
 import Wumber.Numeric
+import Wumber.ViewColor
 
 
 -- | View settings, from a rendering perspective.
-data ViewSettings m = VS { _vs_viewport       :: Viewport m,
-                           _vs_deadline_nanos :: Int }
+data ViewSettings m = VS { _vs_viewport         :: Viewport m,
+                           _vs_color_perception :: ColorPerception,
+                           _vs_deadline_nanos   :: Int }
   deriving (Generic)
 
 deriving instance Show   (m R) => Show   (ViewSettings m)

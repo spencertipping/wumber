@@ -1,5 +1,6 @@
 # Development frontier
 ## Priority queue
++ Precision-variant BRep structure
 + Composite visualization in general
 + 3D object view
 + Live code iteration that doesn't segfault

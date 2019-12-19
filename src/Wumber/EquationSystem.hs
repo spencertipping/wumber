@@ -12,7 +12,12 @@
 {-# OPTIONS_GHC -funbox-strict-fields -Wincomplete-patterns #-}
 
 -- | A library to manage potentially large systems of equations, reducing
---   dimensionality eagerly as new relations are added.
+--   dimensionality eagerly as new relations are added. This library isn't
+--   especially efficient at solving large systems of dense linear equations;
+--   for that you should use a matrix solver directly. This library is optimized
+--   for things like constraint systems, where many equations will result in
+--   trivial substitutions like @x = y + 3@, and some equations will be
+--   nonlinear and impossible to solve analytically.
 module Wumber.EquationSystem (
   EquationC,
   EquationSystem(..),
@@ -64,10 +69,6 @@ type EquationC f a = (SymMathC f a,
 --     haven't yet decided which one to commit to
 --   - '_es_dofs': current degrees of freedom
 
--- TODO
--- Track linear equations and solve them with BLAS functions rather than
--- variable substitution, _iff_ they're unentangled with nonlinear equations.
-
 data EquationSystem f a = ES { _es_subst        :: !(IntMap (SymMath f a)),
                                _es_substset     :: BS.BitSet,
                                _es_minimize     :: SplitCostFn f a,
@@ -80,10 +81,14 @@ data EquationSystem f a = ES { _es_subst        :: !(IntMap (SymMath f a)),
 -- | A cost function partitioned across multiple independent subsets of a
 --   variable space. We represent it this way so that we can invoke the
 --   numerical solver on subsystems with minimal dimension.
+--
+--   The elements of this list will have disjoint 'vars_in' bitsets.
+
 type SplitCostFn f a = [SymMath f a]
 
 
--- | A single equation that knows which variables can be isolated.
+-- | A single equation that knows which variables can be isolated -- and of
+--   those, stores the resulting substitutions for later use.
 data Equation f a = EQN { _eq_q        :: !(SymMath f a),
                           _eq_type     :: EquationType,
                           _eq_substset :: BS.BitSet,
@@ -114,12 +119,8 @@ data Equation f a = EQN { _eq_q        :: !(SymMath f a),
 
 -- TODO
 -- 'EqUnivariate' isn't the whole story; some univariate equations can be solved
--- numerically even though the variable can't be isolated.
-
--- TODO
--- Sometimes we'll have a self-contained subsystem that is entangled with a
--- larger subsystem. It makes sense to partition by solving the smaller one
--- first, then propagating constants into the larger one.
+-- numerically even though the variable can't be isolated. To do this, we'll
+-- need to understand which math functions are bijective.
 
 data EquationType = EqConsistent
                   | EqInconsistent
